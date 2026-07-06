@@ -5,3 +5,9 @@ pydantic-settings>=2.6
 sqlalchemy[asyncio]>=2.0
 asyncpg>=0.30
 alembic>=1.14
+
+# Document text extraction (app/infrastructure/documents/text_extractor.py)
+pymupdf>=1.24
+python-docx>=1.1
+openpyxl>=3.1
+chardet>=5.2

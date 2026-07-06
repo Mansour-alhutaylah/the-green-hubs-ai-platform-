@@ -1,13 +1,13 @@
 """Document ingestion / text-processing infrastructure.
 
-Placeholder for Sprint 1 -- no extraction, chunking, or classification logic
-is implemented yet.
+``text_extractor.py`` -- migrated from Hemaya's ``backend/text_extractor.py``
+in Sprint 2.3. PDF/DOCX/XLSX/XLS/TXT extraction behind a single async
+``extract_text(file_path)`` function. Framework-agnostic: no FastAPI,
+SQLAlchemy, or AI/RAG imports.
 
-Planned migrations from Hemaya:
+Still planned:
 - ``backend/chunker.py`` -- overlapping text chunker, dependency-free and
   reusable near-verbatim.
-- ``backend/text_extractor.py`` -- PDF/DOCX/XLSX/TXT extraction, reusable
-  near-verbatim, to be wrapped in an async ``TextExtractor`` interface.
 - ``backend/structured_extractor.py`` -- regex-based sentence classifier;
   the classification *approach* is reused, but its compliance-specific
   vocabulary will be replaced with ESG/GRI/SASB terminology.
