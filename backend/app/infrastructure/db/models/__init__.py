@@ -1,6 +1,10 @@
 """ORM models.
 
-Placeholder for Sprint 1 -- no concrete SQLAlchemy models exist yet. Future
-models will mirror the domain entities in ``app.domain.entities`` and inherit
-from ``app.infrastructure.db.base.Base``.
+Concrete models live in dedicated per-entity modules and are re-exported here
+so a single ``from app.infrastructure.db import models`` import (already used
+by Alembic's ``env.py``) populates ``Base.metadata`` with every mapped table.
 """
+
+from app.infrastructure.db.models.document import DocumentModel
+
+__all__ = ["DocumentModel"]

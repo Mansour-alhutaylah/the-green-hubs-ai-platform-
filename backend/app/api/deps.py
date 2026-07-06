@@ -4,20 +4,19 @@ This is the single seam where concrete infrastructure gets bound to the
 abstractions that routers/services depend on -- idiomatic FastAPI
 ``Depends``-based DI, chosen over a separate IoC container library since it
 fully satisfies the project's Dependency Injection requirement without extra
-machinery. Future tasks add per-entity providers here, e.g.:
-
-    async def get_document_repository(
-        session: AsyncSession = Depends(get_db),
-    ) -> IRepository[Document]:
-        return DocumentRepository(session)
+machinery. Future tasks add further per-entity providers here following the
+same shape as ``get_document_repository``.
 """
 
 from typing import AsyncIterator
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.domain.repositories.document import IDocumentRepository
 from app.infrastructure.db.session import get_db as _get_db
+from app.infrastructure.repositories.document import SQLAlchemyDocumentRepository
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -27,3 +26,9 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 def get_app_settings() -> Settings:
     return get_settings()
+
+
+def get_document_repository(
+    session: AsyncSession = Depends(get_db),
+) -> IDocumentRepository:
+    return SQLAlchemyDocumentRepository(session)

@@ -23,7 +23,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 settings = get_settings()
-DATABASE_URL = settings.database_url
+DATABASE_URL = settings.database_url or "postgresql+asyncpg://postgres:postgres@localhost:5432/placeholder_db"
 
 
 def run_migrations_offline() -> None:
