@@ -1,0 +1,10 @@
+# Minimal, single-service compose file. The database is a real, external
+# Supabase Postgres instance (via DATABASE_URL in backend/.env) -- there is
+# no local Postgres container here by design.
+services:
+  api:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
