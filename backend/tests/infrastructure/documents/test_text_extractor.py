@@ -38,6 +38,7 @@ async def test_extract_xlsx_reads_rows_tab_separated(tmp_path: Path) -> None:
     file_path = tmp_path / "metrics.xlsx"
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.append(["Metric", "Value"])
     sheet.append(["CO2e", 100])
     workbook.save(str(file_path))
