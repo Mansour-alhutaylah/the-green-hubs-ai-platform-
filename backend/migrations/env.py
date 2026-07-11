@@ -7,9 +7,11 @@ truth for the connection string.
 
 import asyncio
 from logging.config import fileConfig
+from uuid import uuid4
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 from app.infrastructure.db.base import Base
@@ -44,7 +46,23 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable = create_async_engine(DATABASE_URL)
+    # Mirrors app.infrastructure.db.session's PgBouncer-safe engine settings:
+    # Supabase's DATABASE_URL goes through PgBouncer in transaction-pooling
+    # mode, which doesn't preserve server-side prepared statements across a
+    # logical connection's lifetime -- asyncpg's default statement cache
+    # assumes it does, raising DuplicatePreparedStatementError once two
+    # connections share a physical backend. NullPool plus a disabled/
+    # randomized prepared-statement cache is the same fix, applied here so
+    # every `alembic` CLI invocation (a separate process from the app) gets
+    # its own connection instead of reusing a stale cached statement name.
+    connectable = create_async_engine(
+        DATABASE_URL,
+        poolclass=NullPool,
+        connect_args={
+            "prepared_statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+        },
+    )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
