@@ -233,3 +233,15 @@ Hemaya is only a reference project.
 Never migrate code blindly.
 
 Always review, adapt, and improve before integration.
+
+Whenever a string field represents a finite business state
+(status, type, role, category, lifecycle, stage, etc.)
+
+Always recommend using Enum.
+
+If the current Sprint explicitly requests str,
+implement str first,
+
+then mention Enum as a future refactoring opportunity.
+
+Never silently replace the requested type.
