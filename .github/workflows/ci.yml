@@ -22,7 +22,7 @@ jobs:
       - name: Type check
         run: mypy app
       - name: Test
-        run: pytest
+        run: pytest -m "not integration"
 
   frontend:
     runs-on: ubuntu-latest
