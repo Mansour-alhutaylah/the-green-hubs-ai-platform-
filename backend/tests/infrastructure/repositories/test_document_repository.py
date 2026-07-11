@@ -8,6 +8,15 @@ ships against. Every test creates its own randomized rows; the
 ``cleanup_ids`` fixture removes them via an independent session in
 teardown, which runs whether the test passes or fails.
 
+``documents.engagement_id`` has a real foreign key to ``engagements``
+(Migration C, ``73688728b480``), so a document can no longer be created
+against an arbitrary UUID -- ``make_engagement``/``engagement_id`` create
+a real ``Organization`` + ``Engagement`` row first. ``cleanup_ids``
+depends on ``make_engagement`` (unused directly) purely to force pytest
+to tear it down *before* ``make_engagement`` -- documents must be deleted
+before the engagement/organization rows they reference, since those
+foreign keys are ``NO ACTION``.
+
 ``Document`` (the domain entity) has no ``updated_at`` field, so a few
 assertions here read ``DocumentModel`` directly through a fresh session --
 that is a deliberate, read-only probe of persisted state, not a domain- or
@@ -23,7 +32,7 @@ Supabase instance.
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncIterator
+from typing import AsyncIterator, Awaitable, Callable
 
 import pytest
 from sqlalchemy import text
@@ -33,6 +42,8 @@ from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.domain.entities.document import Document
 from app.infrastructure.db.models.document import DocumentModel
+from app.infrastructure.db.models.engagement import Engagement
+from app.infrastructure.db.models.organization import Organization
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.infrastructure.repositories.document import SQLAlchemyDocumentRepository
 
@@ -72,8 +83,60 @@ async def repository(session: AsyncSession) -> SQLAlchemyDocumentRepository:
 
 
 @pytest.fixture
-async def cleanup_ids() -> AsyncIterator[list[uuid.UUID]]:
-    """Track document ids created by a test; delete them after, regardless of outcome."""
+async def make_engagement() -> AsyncIterator[Callable[[], Awaitable[uuid.UUID]]]:
+    """Factory fixture: each call creates a real ``Organization`` + ``Engagement``
+    row and returns the engagement's id, so ``documents.engagement_id`` has a
+    row to satisfy its foreign key. All rows created via calls to this
+    factory are deleted in teardown -- engagements first, then
+    organizations -- regardless of test outcome."""
+    organization_ids: list[uuid.UUID] = []
+    engagement_ids: list[uuid.UUID] = []
+
+    async def _make() -> uuid.UUID:
+        async with AsyncSessionLocal() as session:
+            organization = Organization(name="Schema Reconciliation Test Org")
+            session.add(organization)
+            await session.flush()
+            engagement = Engagement(
+                organization_id=organization.id,
+                title="Schema Reconciliation Test Engagement",
+            )
+            session.add(engagement)
+            await session.commit()
+            await session.refresh(engagement)
+        organization_ids.append(organization.id)
+        engagement_ids.append(engagement.id)
+        return engagement.id
+
+    yield _make
+
+    async with AsyncSessionLocal() as cleanup_session:
+        for engagement_id in engagement_ids:
+            model = await cleanup_session.get(Engagement, engagement_id)
+            if model is not None:
+                await cleanup_session.delete(model)
+        await cleanup_session.commit()
+        for organization_id in organization_ids:
+            model = await cleanup_session.get(Organization, organization_id)
+            if model is not None:
+                await cleanup_session.delete(model)
+        await cleanup_session.commit()
+
+
+@pytest.fixture
+async def engagement_id(make_engagement: Callable[[], Awaitable[uuid.UUID]]) -> uuid.UUID:
+    """The common case: a single valid engagement id for tests that don't
+    need to distinguish between multiple engagements."""
+    return await make_engagement()
+
+
+@pytest.fixture
+async def cleanup_ids(
+    make_engagement: Callable[[], Awaitable[uuid.UUID]],
+) -> AsyncIterator[list[uuid.UUID]]:
+    """Track document ids created by a test; delete them after, regardless
+    of outcome. Depends on ``make_engagement`` (unused directly) only to
+    control teardown order -- see the module docstring."""
     ids: list[uuid.UUID] = []
     yield ids
     if not ids:
@@ -94,8 +157,9 @@ async def cleanup_ids() -> AsyncIterator[list[uuid.UUID]]:
 async def test_create_persists_document_with_uuid_timestamps_and_status(
     repository: SQLAlchemyDocumentRepository,
     cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
 ) -> None:
-    document = _make_document(processing_status="PENDING")
+    document = _make_document(processing_status="PENDING", engagement_id=engagement_id)
 
     created = await repository.create(document)
     cleanup_ids.append(created.id)
@@ -120,6 +184,7 @@ async def test_create_persists_document_with_uuid_timestamps_and_status(
 async def test_new_row_defaults_processing_status_at_schema_level(
     session: AsyncSession,
     cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
 ) -> None:
     """Insert a raw ORM row with no explicit status to prove the column default
     (not just application-supplied "PENDING") is what the schema declares."""
@@ -127,7 +192,7 @@ async def test_new_row_defaults_processing_status_at_schema_level(
         id=uuid.uuid4(),
         filename="no-status-supplied.pdf",
         storage_path=f"test/{uuid.uuid4()}.pdf",
-        engagement_id=uuid.uuid4(),
+        engagement_id=engagement_id,
     )
     session.add(model)
     await session.commit()
@@ -145,8 +210,9 @@ async def test_new_row_defaults_processing_status_at_schema_level(
 async def test_get_retrieves_by_id(
     repository: SQLAlchemyDocumentRepository,
     cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
 ) -> None:
-    created = await repository.create(_make_document())
+    created = await repository.create(_make_document(engagement_id=engagement_id))
     cleanup_ids.append(created.id)
 
     fetched = await repository.get(created.id)
@@ -166,9 +232,10 @@ async def test_get_returns_none_for_missing_id(
 async def test_get_by_engagement_returns_only_matching_documents(
     repository: SQLAlchemyDocumentRepository,
     cleanup_ids: list[uuid.UUID],
+    make_engagement: Callable[[], Awaitable[uuid.UUID]],
 ) -> None:
-    engagement_id = uuid.uuid4()
-    other_engagement_id = uuid.uuid4()
+    engagement_id = await make_engagement()
+    other_engagement_id = await make_engagement()
 
     first = await repository.create(_make_document(engagement_id=engagement_id))
     second = await repository.create(_make_document(engagement_id=engagement_id))
@@ -191,8 +258,11 @@ async def test_update_status_changes_status_and_bumps_updated_at(
     repository: SQLAlchemyDocumentRepository,
     session: AsyncSession,
     cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
 ) -> None:
-    created = await repository.create(_make_document(processing_status="PENDING"))
+    created = await repository.create(
+        _make_document(processing_status="PENDING", engagement_id=engagement_id)
+    )
     cleanup_ids.append(created.id)
 
     before = await session.get(DocumentModel, created.id)
@@ -229,8 +299,9 @@ async def test_update_status_raises_not_found_for_missing_document(
 
 async def test_delete_removes_the_record(
     repository: SQLAlchemyDocumentRepository,
+    engagement_id: uuid.UUID,
 ) -> None:
-    created = await repository.create(_make_document())
+    created = await repository.create(_make_document(engagement_id=engagement_id))
 
     await repository.delete(created)
 
@@ -247,8 +318,9 @@ async def test_delete_removes_the_record(
 async def test_commit_persists_across_independent_sessions(
     repository: SQLAlchemyDocumentRepository,
     cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
 ) -> None:
-    created = await repository.create(_make_document())
+    created = await repository.create(_make_document(engagement_id=engagement_id))
     cleanup_ids.append(created.id)
 
     async with AsyncSessionLocal() as other_session:
@@ -256,8 +328,8 @@ async def test_commit_persists_across_independent_sessions(
         assert model is not None
 
 
-async def test_rollback_discards_uncommitted_changes() -> None:
-    document = _make_document()
+async def test_rollback_discards_uncommitted_changes(engagement_id: uuid.UUID) -> None:
+    document = _make_document(engagement_id=engagement_id)
 
     async with AsyncSessionLocal() as session:
         model = DocumentModel(
