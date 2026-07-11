@@ -1,0 +1,160 @@
+@import './tokens.css';
+@import '@fontsource-variable/manrope';
+@import '@fontsource/ibm-plex-sans-arabic';
+
+/* Base resets live in Tailwind's own `base` layer (declared by the
+   `@import 'tailwindcss'` in tokens.css) rather than unlayered, so an
+   explicit utility class on any element always wins over these defaults
+   regardless of source order — the same guarantee Tailwind's own preflight
+   relies on. Unlayered rules would otherwise always outrank layered
+   utilities in the CSS cascade, which is never what we want here. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-latin);
+    background-color: var(--color-paper-50);
+    color: var(--color-ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* §13.4: Arabic type takes the fallback pair at 1.05x size / 1.1x line
+     height, per the spec's "all metrics in this spec hold for both" clause. */
+  :root[dir='rtl'] body {
+    font-family: var(--font-arabic);
+  }
+
+  /* §17: visible focus everywhere — 2px Leaf outline, offset 2px; a Forest
+     surface (the rail) needs the white variant instead, applied locally via
+     `.focus-on-forest` where a component sits directly on Forest bg. */
+  :focus-visible {
+    outline: 2px solid var(--color-leaf-500);
+    outline-offset: 2px;
+  }
+  .focus-on-forest:focus-visible {
+    outline-color: var(--color-surface-0);
+  }
+
+  /* Mixed-language entity names (§13.4): isolate bidi runs so an English
+     org name inside an Arabic sentence (or vice versa) doesn't scramble
+     order. */
+  [data-user-content] {
+    unicode-bidi: isolate;
+  }
+}
+
+/* The Command Rail / MobileDrawer's own vertical scroll only engages once
+   the nav's items exceed the viewport (a full Owner/Admin item list at a
+   shorter viewport height) — without this, that moment surfaces the OS's
+   default scrollbar (on Windows: a thick, opaque gray bar) sitting right on
+   the dark Forest surface, reading as a stray seam rather than an
+   intentional part of the product. A slim, translucent-white thumb keeps
+   the same scroll behavior but in the rail's own material language. */
+.rail-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+.rail-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.rail-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rail-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.18);
+  border-radius: 3px;
+}
+.rail-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.28);
+}
+
+/* §14.8 LoadingDiamond: the leading arc travels one dash+gap period per
+   loop, reading as the diamond continuously "drawing itself". */
+@keyframes loading-diamond-spin {
+  to {
+    stroke-dashoffset: -37;
+  }
+}
+
+/* §11.4: the *only* ambient, self-animating element permitted anywhere at
+   rest — the Analysis queue's Processing status chip. Reserved for a later
+   phase's StatusChip component; declared once now, here, per token law. */
+@keyframes processing-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* §15/§18 Dialog entrance: overlay fades, card fades + rises from +8px. */
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dialog-content-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+/* §15 Toast: "toasts rise 8px" on entrance. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* §13 MobileDrawer: slides from the rail's logical side (right in RTL). */
+@keyframes drawer-in-ltr {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes drawer-in-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

@@ -1,0 +1,220 @@
+/**
+ * Design tokens — "Qa'ah" design system, spec §16.
+ *
+ * These are the single source of truth for every color, size, radius,
+ * shadow, duration, and z-index in the product ("tokens are law", §19).
+ * No component may hard-code a raw value that has a token here.
+ *
+ * Tailwind v4's @theme block does double duty: declaring a value here both
+ * (a) defines a real, inspectable CSS custom property (--color-forest-900)
+ * usable anywhere via var(), and (b) auto-generates the matching utility
+ * classes (bg-forest-900, text-forest-900, border-forest-900). One
+ * declaration, zero drift between "the token" and "the Tailwind class".
+ */
+@import 'tailwindcss';
+
+@theme {
+  /* Spacing — Tailwind's default 0.25rem (4px) base already produces every
+     §16 space step at these keys, so no scale override is needed:
+       4px  -> p-1   8px  -> p-2   12px -> p-3   16px -> p-4   20px -> p-5
+       24px -> p-6   32px -> p-8   40px -> p-10  48px -> p-12  64px -> p-16
+     Convention (enforced at review, no automated Tailwind-scale linter in
+     Phase 1): only ever use those ten keys, never an arbitrary spacing value. */
+  --spacing: 0.25rem;
+
+  /* Color — §16 / §14.1 */
+  --color-forest-900: #122618;
+  /* §15 Button spec: Primary's explicit hover shade ("hover deepens to
+     #0C1A10") — named as a token rather than an inline hex per §19. */
+  --color-forest-950: #0c1a10;
+  --color-leaf-100: #edf5e4;
+  --color-leaf-300: #c9e5ac;
+  --color-leaf-500: #7fc344;
+  --color-leaf-700: #2f6d1f;
+  --color-paper-50: #fbf7f3;
+  --color-surface-0: #ffffff;
+  --color-ink-900: #1a2420;
+  --color-gray-400: #9aa49d;
+  /* §16 gives #6B7570, verified "4.9:1" against pure white — but gray-600
+     is used constantly as body/caption text directly on --color-paper-50
+     (the app's own default background) and --color-tint-100 (well
+     backgrounds), where the literal value measures 4.47:1 and 4.38:1
+     (axe-core), just under WCAG AA's 4.5:1 floor for text this size.
+     Nudged darker so it reliably clears AA against every surface it's
+     actually used on, not just the one background it was checked against;
+     the spec's own §17 AA commitment wins over the literal hex here. */
+  --color-gray-600: #66706b;
+  --color-line-200: #e2e6e0;
+  /* §11.1/§15 Input border — a distinct, slightly darker hairline used only
+     on form controls at rest (vs. --color-line-200's general dividers). */
+  --color-line-300: #cdd4cc;
+  --color-tint-100: #f4f6f2;
+  --color-amber-100: #f6ebe1;
+  --color-amber-700: #8a4b27;
+
+  /* Rail-only states (rgba over Forest) — kept as first-class color tokens
+     so hover:bg-rail-hover / bg-rail-active work like any other color. */
+  --color-rail-text: rgb(255 255 255 / 0.72);
+  /* §3.1 specifies 0.45 for group labels/sovereignty seal text, but that
+     renders at ~4.05:1 on Forest — below WCAG AA's 4.5:1 floor for text
+     this small (§17 commits the whole product to AA). Nudged to 0.55
+     (~4.8:1) since this token carries real navigational/compliance text,
+     not decoration; the spec's own accessibility target wins over the
+     literal opacity figure here. */
+  --color-rail-muted: rgb(255 255 255 / 0.55);
+  --color-rail-hover: rgb(255 255 255 / 0.06);
+  --color-rail-active: rgb(127 195 68 / 0.12);
+  /* §3.1: "1px hairline rgba(255,255,255,0.10)" — the rail's internal
+     dividers (brand block, sovereignty seal, collapsed-group separators). */
+  --color-rail-hairline: rgb(255 255 255 / 0.1);
+  --color-overlay: rgb(18 38 24 / 0.4);
+
+  /* Chart neutrals / accent ramp — reserved now, consumed by later phases. */
+  --color-chart-neutral-1: #122618;
+  --color-chart-neutral-2: #5a6e5c;
+  --color-chart-neutral-3: #b9c6b4;
+  --color-chart-accent-1: #2f6d1f;
+  --color-chart-accent-2: #7fc344;
+  --color-chart-accent-3: #c9e5ac;
+
+  /* Type families — §0.5 assumption: Aeonik / Bahij TheSansArabic are
+     commercially licensed; ship the spec's own documented fallback pair.
+     Swapping in the licensed fonts later is a one-line change here only. */
+  --font-latin: 'Manrope Variable', 'Manrope', sans-serif;
+  --font-arabic: 'IBM Plex Sans Arabic', sans-serif;
+
+  /* Type scale — §14.2. Compound sub-keys (line-height / font-weight) let
+     Tailwind generate a single utility (e.g. `text-display`) that sets
+     size + line-height + weight together. */
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-display--font-weight: 800;
+
+  --text-metric: 30px;
+  --text-metric--line-height: 36px;
+  --text-metric--font-weight: 800;
+
+  --text-title: 18px;
+  --text-title--line-height: 26px;
+  --text-title--font-weight: 800;
+
+  --text-panel: 16px;
+  --text-panel--line-height: 24px;
+  --text-panel--font-weight: 800;
+
+  --text-body: 14px;
+  --text-body--line-height: 22px;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+
+  --text-label: 11px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 700;
+
+  /* Arabic label variant — §16: "ar: 12/18·700·none" (no tracking, no
+     uppercase; weight alone carries the hierarchy). */
+  --text-label-ar: 12px;
+  --text-label-ar--line-height: 18px;
+  --text-label-ar--font-weight: 700;
+
+  /* Two sizes the named §14.2 scale doesn't cover, but that recur
+     verbatim across the component spec (§11.1/§15 give "13px" for input
+     labels/errors/form links repeatedly; §3.1 gives the sovereignty
+     seal's "10.5px" exactly) — named here instead of left as repeated
+     `text-[13px]` / `text-[10.5px]` literals in components. */
+  --text-meta: 13px;
+  --text-meta--line-height: 18px;
+  --text-micro: 10.5px;
+  --text-micro--line-height: 14px;
+
+  /* Radius / shadow — §16 */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 8px;
+  --shadow-raise: 0 2px 8px rgb(18 38 24 / 0.08);
+  --shadow-float: 0 12px 40px rgb(18 38 24 / 0.18);
+}
+
+/* Tokens that are not first-class Tailwind theme namespaces (sizing,
+   motion, z-index) stay as plain custom properties, consumed via
+   Tailwind's var()-aware arbitrary values, e.g. `w-[var(--size-rail)]`,
+   `duration-[var(--motion-base)]`, `z-[var(--z-dialog)]`. */
+:root {
+  /* The product has no user-facing dark mode (§ brand: "quiet confidence",
+     one fixed surface language) — without this, a browser honoring the
+     OS's own dark-mode preference will still render native chrome
+     (scrollbars, form-control affordances) in its dark style, which reads
+     as a stray gray/tinted line wherever one appears against our light
+     surfaces. Pinning the color-scheme keeps native browser UI consistent
+     with the product's own light design regardless of OS preference. */
+  color-scheme: light;
+
+  --size-rail: 264px;
+  --size-rail-collapsed: 72px;
+  --size-contextbar: 64px;
+  --size-row: 56px;
+  --size-row-compact: 44px;
+  --size-control-xl: 54px;
+  --size-control-l: 48px;
+  --size-control-m: 40px;
+  --size-control-s: 32px;
+  --content-max: 1376px;
+  /* Authentication system's form column (approved auth redesign) — wider
+     than the general 400px auth column the rest of §11.1 implies, per the
+     explicit "~460px" call in that brief. 460/4 = 115, so it's reachable
+     via the ordinary spacing-scale utility `max-w-115`, no token needed. */
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 240ms;
+  --motion-pulse: 1200ms;
+  --ease-out: ease-out;
+  --ease-slow: cubic-bezier(0.2, 0, 0, 1);
+
+  --z-rail: 40;
+  --z-bar: 30;
+  --z-overlay: 50;
+  --z-dialog: 60;
+  --z-toast: 70;
+
+  /* §11.1/§15: form-field error state's border weight ("1.5px amber-700
+     border"), consumed via `border-[length:var(--border-width-error)]`. */
+  --border-width-error: 1.5px;
+  /* §3.1: the Command Rail active item's leading Leaf bar ("a 3px Leaf bar
+     flush left"), consumed via `w-[var(--size-active-bar)]`. */
+  --size-active-bar: 3px;
+  /* §15 Button/§18: the pressed-state scale ("active: scale(0.985)"). */
+  --scale-press: 0.985;
+}
+
+/* §18 / §17: reduced motion collapses every duration to near-zero and the
+   caller is expected to swap to opacity-only transitions. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-pulse: 0ms;
+  }
+}
+
+/* §16 label variant: uppercase + 0.14em tracking in LTR, but Arabic never
+   gets uppercase transforms or letter-tracking — weight carries hierarchy
+   instead. Applied globally via the `dir` attribute Tailwind mirrors from
+   LocaleContext, so no per-component branching is needed. */
+.type-label {
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  font-weight: var(--text-label--font-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+:root[dir='rtl'] .type-label {
+  font-size: var(--text-label-ar);
+  line-height: var(--text-label-ar--line-height);
+  font-weight: var(--text-label-ar--font-weight);
+  text-transform: none;
+  letter-spacing: 0;
+}
