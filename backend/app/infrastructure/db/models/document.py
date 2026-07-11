@@ -12,7 +12,7 @@ aggregates yet.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -32,7 +32,10 @@ class DocumentModel(Base):
         String, nullable=False, default="PENDING"
     )
     engagement_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), index=True, nullable=False
+        PG_UUID(as_uuid=True),
+        ForeignKey("engagements.id", ondelete="NO ACTION"),
+        index=True,
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
