@@ -27,6 +27,14 @@ class ValidationError(AppError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
+class AuthenticationError(AppError):
+    status_code = status.HTTP_401_UNAUTHORIZED
+
+
+class ProfileNotProvisionedError(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
