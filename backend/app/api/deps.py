@@ -15,8 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.domain.repositories.document import IDocumentRepository
+from app.domain.repositories.organization import IOrganizationRepository
 from app.infrastructure.db.session import get_db as _get_db
 from app.infrastructure.repositories.document import SQLAlchemyDocumentRepository
+from app.infrastructure.repositories.organization import SQLAlchemyOrganizationRepository
+from app.services.organization import OrganizationService
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -32,3 +35,15 @@ def get_document_repository(
     session: AsyncSession = Depends(get_db),
 ) -> IDocumentRepository:
     return SQLAlchemyDocumentRepository(session)
+
+
+def get_organization_repository(
+    session: AsyncSession = Depends(get_db),
+) -> IOrganizationRepository:
+    return SQLAlchemyOrganizationRepository(session)
+
+
+def get_organization_service(
+    repository: IOrganizationRepository = Depends(get_organization_repository),
+) -> OrganizationService:
+    return OrganizationService(repository)
