@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     supabase_service_role_key: Optional[str] = None
     supabase_jwt_secret: Optional[str] = None
 
+    # Verified 2026-07-12 against the live JWKS + OIDC discovery endpoints
+    # (see app/infrastructure/security/supabase_jwt.py's module docstring):
+    # this project signs access tokens asymmetrically (ES256), so
+    # `supabase_jwt_secret` above is not used for verification.
+    # `"authenticated"` is Supabase's documented default audience for
+    # signed-in user sessions; no evidence in this project contradicts it.
+    supabase_jwt_audience: str = "authenticated"
+
     jwt_algorithm: str = "HS256"
 
     # AI/embeddings. Not consumed by any code yet -- infrastructure/ai/ is a
