@@ -11,3 +11,7 @@ pymupdf>=1.24
 python-docx>=1.1
 openpyxl>=3.1
 chardet>=5.2
+
+# Supabase-issued JWT verification only (app/infrastructure/security/supabase_jwt.py).
+# Verification-only: no password hashing, no application-issued tokens.
+pyjwt[crypto]>=2.9
