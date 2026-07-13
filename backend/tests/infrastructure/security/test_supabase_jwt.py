@@ -27,9 +27,19 @@ ISSUER = "https://test.supabase.co/auth/v1"
 AUDIENCE = "authenticated"
 
 
-def _b64url_uint(value: int) -> str:
-    byte_length = (value.bit_length() + 7) // 8 or 1
-    raw = value.to_bytes(byte_length, "big")
+_P256_COORDINATE_BYTE_LENGTH = 32
+
+
+def _b64url_uint(value: int, *, length: int = _P256_COORDINATE_BYTE_LENGTH) -> str:
+    # P-256 JWK x/y coordinates must always be exactly 32 bytes, zero-padded
+    # on the left -- a variable, bit_length()-derived byte count (the
+    # previous implementation) under-pads whenever the value's leading byte
+    # happens to be zero, which is exactly what a randomly generated EC key
+    # will do about 1-in-256 times per coordinate, intermittently producing
+    # a malformed JWK that PyJWT correctly rejects with
+    # "Coords should be 32 bytes for curve P-256". This is what caused the
+    # cross-test flakiness observed in CI.
+    raw = value.to_bytes(length, "big")
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
