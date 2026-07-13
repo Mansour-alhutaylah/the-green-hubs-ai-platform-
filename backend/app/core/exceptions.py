@@ -43,6 +43,10 @@ class PersistenceError(AppError):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+class InvalidStateTransitionError(AppError):
+    status_code = status.HTTP_409_CONFLICT
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:

@@ -56,6 +56,12 @@ class FakeDocumentRepository(IDocumentRepository):
     async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
         raise NotImplementedError
 
+    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+        raise NotImplementedError
+
+    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+        raise NotImplementedError
+
 
 class FakeEngagementRepository(IEngagementRepository):
     def __init__(self) -> None:
@@ -103,6 +109,9 @@ class FakeDocumentStorage(IDocumentStorage):
         self.put_calls.append((object_key, content, content_type))
         if self.put_error is not None:
             raise self.put_error
+
+    async def get(self, object_key: str) -> bytes:
+        raise NotImplementedError
 
     async def delete(self, object_key: str) -> None:
         self.delete_calls.append(object_key)

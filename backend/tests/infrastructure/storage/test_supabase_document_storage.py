@@ -7,7 +7,12 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.domain.storage.document_storage import StorageError
+from app.domain.storage.document_storage import (
+    StorageConfigurationError,
+    StorageError,
+    StorageObjectNotFoundError,
+    StorageUnavailableError,
+)
 from app.infrastructure.storage.supabase_document_storage import SupabaseDocumentStorage
 
 
@@ -116,3 +121,71 @@ async def test_delete_raises_storage_error_on_transport_failure() -> None:
 
     with pytest.raises(StorageError):
         await storage.delete("some/key.pdf")
+
+
+# ---------------------------------------------------------------------------
+# get() -- Sprint 3.5, Document Processing Foundation
+# ---------------------------------------------------------------------------
+
+
+async def test_get_sends_expected_request_and_returns_content_on_2xx() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        return httpx.Response(200, content=b"%PDF-1.4 real content")
+
+    storage = SupabaseDocumentStorage(_settings(), transport=httpx.MockTransport(handler))
+
+    result = await storage.get("organizations/org/engagements/eng/documents/doc.pdf")
+
+    assert captured["method"] == "GET"
+    assert captured["url"].endswith(
+        "/storage/v1/object/test-bucket/organizations/org/engagements/eng/documents/doc.pdf"
+    )
+    assert captured["headers"]["authorization"] == "Bearer test-service-role-key"
+    assert captured["headers"]["apikey"] == "test-service-role-key"
+    assert result == b"%PDF-1.4 real content"
+
+
+async def test_get_raises_object_not_found_on_404() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, text="not found")
+
+    storage = SupabaseDocumentStorage(_settings(), transport=httpx.MockTransport(handler))
+
+    with pytest.raises(StorageObjectNotFoundError):
+        await storage.get("missing/key.pdf")
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+async def test_get_raises_configuration_error_on_auth_failure(status_code: int) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, text="unauthorized")
+
+    storage = SupabaseDocumentStorage(_settings(), transport=httpx.MockTransport(handler))
+
+    with pytest.raises(StorageConfigurationError):
+        await storage.get("some/key.pdf")
+
+
+async def test_get_raises_unavailable_error_on_transport_failure() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    storage = SupabaseDocumentStorage(_settings(), transport=httpx.MockTransport(handler))
+
+    with pytest.raises(StorageUnavailableError):
+        await storage.get("some/key.pdf")
+
+
+async def test_get_raises_generic_storage_error_on_unmapped_status() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="internal error")
+
+    storage = SupabaseDocumentStorage(_settings(), transport=httpx.MockTransport(handler))
+
+    with pytest.raises(StorageError):
+        await storage.get("some/key.pdf")

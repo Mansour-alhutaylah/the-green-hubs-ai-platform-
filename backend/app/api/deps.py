@@ -19,14 +19,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AuthenticationError, ProfileNotProvisionedError
 from app.domain.entities.user import User
+from app.domain.processing_unit_of_work import IProcessingUnitOfWork
 from app.domain.repositories.document import IDocumentRepository
+from app.domain.repositories.document_chunk import IDocumentChunkRepository
 from app.domain.repositories.engagement import IEngagementRepository
+from app.domain.repositories.extracted_text import IExtractedTextRepository
 from app.domain.repositories.organization import IOrganizationRepository
 from app.domain.repositories.user import IUserRepository
 from app.domain.storage.document_storage import IDocumentStorage
 from app.infrastructure.db.session import get_db as _get_db
+from app.infrastructure.processing_unit_of_work import SQLAlchemyProcessingUnitOfWork
 from app.infrastructure.repositories.document import SQLAlchemyDocumentRepository
+from app.infrastructure.repositories.document_chunk import SQLAlchemyDocumentChunkRepository
 from app.infrastructure.repositories.engagement import SQLAlchemyEngagementRepository
+from app.infrastructure.repositories.extracted_text import SQLAlchemyExtractedTextRepository
 from app.infrastructure.repositories.organization import SQLAlchemyOrganizationRepository
 from app.infrastructure.repositories.user import SQLAlchemyUserRepository
 from app.infrastructure.security.supabase_jwt import (
@@ -34,6 +40,7 @@ from app.infrastructure.security.supabase_jwt import (
     build_verifier_from_settings,
 )
 from app.infrastructure.storage.supabase_document_storage import SupabaseDocumentStorage
+from app.services.document_processing import DocumentProcessingService
 from app.services.document_upload import DocumentUploadService
 from app.services.engagement import EngagementService
 from app.services.organization import OrganizationService
@@ -127,4 +134,40 @@ def get_document_upload_service(
         engagement_repository,
         storage,
         max_upload_size_bytes=settings.max_upload_size_bytes,
+    )
+
+
+def get_extracted_text_repository(
+    session: AsyncSession = Depends(get_db),
+) -> IExtractedTextRepository:
+    return SQLAlchemyExtractedTextRepository(session)
+
+
+def get_document_chunk_repository(
+    session: AsyncSession = Depends(get_db),
+) -> IDocumentChunkRepository:
+    return SQLAlchemyDocumentChunkRepository(session)
+
+
+def get_processing_unit_of_work(
+    session: AsyncSession = Depends(get_db),
+) -> IProcessingUnitOfWork:
+    return SQLAlchemyProcessingUnitOfWork(session)
+
+
+def get_document_processing_service(
+    document_repository: IDocumentRepository = Depends(get_document_repository),
+    engagement_repository: IEngagementRepository = Depends(get_engagement_repository),
+    extracted_text_repository: IExtractedTextRepository = Depends(get_extracted_text_repository),
+    chunk_repository: IDocumentChunkRepository = Depends(get_document_chunk_repository),
+    storage: IDocumentStorage = Depends(get_document_storage),
+    unit_of_work: IProcessingUnitOfWork = Depends(get_processing_unit_of_work),
+) -> DocumentProcessingService:
+    return DocumentProcessingService(
+        document_repository,
+        engagement_repository,
+        extracted_text_repository,
+        chunk_repository,
+        storage,
+        unit_of_work,
     )

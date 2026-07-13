@@ -1,25 +1,36 @@
-"""Document upload endpoint.
+"""Document upload and processing endpoints.
 
-Converts the HTTP-specific multipart input (``UploadFile``) into a
-framework-independent ``DocumentUploadInput`` before ever calling
+Upload converts the HTTP-specific multipart input (``UploadFile``) into
+a framework-independent ``DocumentUploadInput`` before ever calling
 ``DocumentUploadService`` -- the service itself never imports FastAPI.
 
 ``_read_bounded`` reads the upload in fixed-size chunks, stopping the
 instant the configured maximum is exceeded (never buffering more than
 that plus one chunk of overshoot), and reliably closes the file in a
 ``finally`` block regardless of outcome.
+
+Processing (Sprint 3.5) is a deliberately separate endpoint and a
+deliberately separate service (``DocumentProcessingService``) -- upload
+never triggers processing automatically, and this router never imports
+anything from ``document_upload.py`` beyond what it already did.
 """
 
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 
-from app.api.deps import get_app_settings, get_current_user, get_document_upload_service
+from app.api.deps import (
+    get_app_settings,
+    get_current_user,
+    get_document_processing_service,
+    get_document_upload_service,
+)
 from app.core.config import Settings
 from app.core.exceptions import ValidationError
 from app.domain.entities.document import Document
 from app.domain.entities.user import User
 from app.schemas.document import DocumentResponse
+from app.services.document_processing import DocumentProcessingService
 from app.services.document_upload import DocumentUploadInput, DocumentUploadService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -82,4 +93,23 @@ async def upload_document(
         content=content,
     )
     document = await service.upload(upload_input, current_user=current_user)
+    return _to_response(document)
+
+
+@router.post(
+    "/{document_id}/process",
+    response_model=DocumentResponse,
+    responses={
+        404: {"description": "Document or Engagement not found"},
+        403: {"description": "Not authorized for this engagement"},
+        409: {"description": "Document is not in a state that can begin processing"},
+    },
+    summary="Process an uploaded PDF document into extracted text and chunks",
+)
+async def process_document(
+    document_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: DocumentProcessingService = Depends(get_document_processing_service),
+) -> DocumentResponse:
+    document = await service.process(document_id, current_user)
     return _to_response(document)
