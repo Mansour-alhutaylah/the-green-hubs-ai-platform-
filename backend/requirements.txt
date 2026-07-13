@@ -26,3 +26,9 @@ python-multipart>=0.0.12
 # functionality this sprint needs only two operations from. Previously a
 # dev-only dependency (the ASGI test client); now also used at runtime.
 httpx>=0.27
+
+# SQLAlchemy `vector(N)` column type + query operators for pgvector
+# (app/infrastructure/db/models/document_chunk_embedding.py). The OpenAI
+# embedding calls themselves are narrow httpx (same rationale as
+# Supabase Storage above) -- no `openai` SDK dependency.
+pgvector>=0.2
