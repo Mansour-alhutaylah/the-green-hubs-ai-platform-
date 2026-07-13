@@ -412,6 +412,34 @@ async def test_deterministic_sequential_chunk_indexes(
         assert chunk.document_id == document.id
 
 
+async def test_persisted_chunk_offsets_map_to_normalized_text(
+    service: DocumentProcessingService,
+    document_repository: FakeDocumentRepository,
+    engagement_repository: FakeEngagementRepository,
+    storage: FakeDocumentStorage,
+    extracted_text_repository: FakeExtractedTextRepository,
+    chunk_repository: FakeDocumentChunkRepository,
+) -> None:
+    long_text = "Emissions data point number recorded here. " * 60
+    document, _engagement, user = _setup_ready_document(
+        document_repository, engagement_repository, storage, pdf_text=long_text
+    )
+
+    await service.process(document.id, user)
+
+    normalized_text = extracted_text_repository.rows[0].extracted_content
+    assert normalized_text is not None
+    chunks_for_doc = sorted(chunk_repository.rows, key=lambda c: c.chunk_index)
+    assert len(chunks_for_doc) > 1
+    for chunk in chunks_for_doc:
+        assert chunk.char_start >= 0
+        assert chunk.char_end > chunk.char_start
+        assert normalized_text[chunk.char_start : chunk.char_end] == chunk.content
+    starts = [c.char_start for c in chunks_for_doc]
+    assert starts == sorted(starts)  # offsets increase consistently with chunk order
+    assert len(starts) == len(set(starts))  # no duplicate starting offsets
+
+
 # ---------------------------------------------------------------------------
 # Not found / authorization
 # ---------------------------------------------------------------------------

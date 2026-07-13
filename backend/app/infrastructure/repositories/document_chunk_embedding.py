@@ -234,8 +234,10 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                   AND dce.provider = :provider
                   AND dce.model = :model
                   AND dce.model_version = :model_version
-                  AND (:engagement_id IS NULL OR dce.engagement_id = :engagement_id)
-                  AND (:document_id IS NULL OR dce.document_id = :document_id)
+                  AND (CAST(:engagement_id AS uuid) IS NULL
+                       OR dce.engagement_id = CAST(:engagement_id AS uuid))
+                  AND (CAST(:document_id AS uuid) IS NULL
+                       OR dce.document_id = CAST(:document_id AS uuid))
                 ORDER BY dce.embedding <=> :query_vector
                 LIMIT :top_k
                 """

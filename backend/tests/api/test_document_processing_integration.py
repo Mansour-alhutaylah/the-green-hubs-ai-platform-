@@ -286,6 +286,20 @@ async def test_successful_processing_persists_extracted_text_and_chunks(
         chunk_indexes = sorted(c.chunk_index for c in chunk_rows)
         assert chunk_indexes == list(range(len(chunk_indexes)))  # sequential, no duplicates
 
+        # Persisted char_start/char_end must map exactly into the persisted
+        # normalized text, be non-negative, and increase with chunk order --
+        # proven against the real database, not just the chunker in isolation.
+        normalized_text = text_rows[0].extracted_content
+        assert normalized_text is not None
+        ordered_chunks = sorted(chunk_rows, key=lambda c: c.chunk_index)
+        for chunk_row in ordered_chunks:
+            assert chunk_row.char_start >= 0
+            assert chunk_row.char_end > chunk_row.char_start
+            assert normalized_text[chunk_row.char_start : chunk_row.char_end] == chunk_row.content
+        starts = [c.char_start for c in ordered_chunks]
+        assert starts == sorted(starts)
+        assert len(starts) == len(set(starts))
+
 
 async def test_organization_mismatch_returns_403_and_leaves_document_untouched(
     client: AsyncClient,
