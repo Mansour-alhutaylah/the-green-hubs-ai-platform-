@@ -24,14 +24,17 @@ from app.api.deps import (
     get_current_user,
     get_document_processing_service,
     get_document_upload_service,
+    get_embedding_generation_service,
 )
 from app.core.config import Settings
 from app.core.exceptions import ValidationError
 from app.domain.entities.document import Document
 from app.domain.entities.user import User
 from app.schemas.document import DocumentResponse
+from app.schemas.embedding import EmbeddingGenerationSummaryResponse
 from app.services.document_processing import DocumentProcessingService
 from app.services.document_upload import DocumentUploadInput, DocumentUploadService
+from app.services.embedding_generation import EmbeddingGenerationService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -113,3 +116,30 @@ async def process_document(
 ) -> DocumentResponse:
     document = await service.process(document_id, current_user)
     return _to_response(document)
+
+
+@router.post(
+    "/{document_id}/embeddings",
+    response_model=EmbeddingGenerationSummaryResponse,
+    responses={
+        404: {"description": "Document not found"},
+        403: {"description": "Not authorized for this document"},
+        409: {"description": "Document has not been processed yet"},
+    },
+    summary="Idempotently generate embeddings for a processed document's chunks",
+)
+async def generate_document_embeddings(
+    document_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: EmbeddingGenerationService = Depends(get_embedding_generation_service),
+) -> EmbeddingGenerationSummaryResponse:
+    summary = await service.generate_for_document(document_id, current_user)
+    return EmbeddingGenerationSummaryResponse(
+        document_id=summary.document_id,
+        total_chunks=summary.total_chunks,
+        newly_completed=summary.newly_completed,
+        already_completed=summary.already_completed,
+        failed=summary.failed,
+        in_progress=summary.in_progress,
+        conflicts=summary.conflicts,
+    )

@@ -209,8 +209,8 @@ async def test_document_chunk_create_many_bulk_inserts_and_flushes(
 
     created = await repository.create_many(
         [
-            DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="chunk zero", created_at=None),
-            DocumentChunk(id=None, document_id=document_id, chunk_index=1, content="chunk one", created_at=None),
+            DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="chunk zero", char_start=0, char_end=10, created_at=None),
+            DocumentChunk(id=None, document_id=document_id, chunk_index=1, content="chunk one", char_start=0, char_end=9, created_at=None),
         ]
     )
     cleanup_ids["chunks"].extend(c.id for c in created)
@@ -236,9 +236,9 @@ async def test_document_chunk_get_by_document_orders_by_chunk_index(
     repository = SQLAlchemyDocumentChunkRepository(session)
     created = await repository.create_many(
         [
-            DocumentChunk(id=None, document_id=document_id, chunk_index=2, content="c", created_at=None),
-            DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="a", created_at=None),
-            DocumentChunk(id=None, document_id=document_id, chunk_index=1, content="b", created_at=None),
+            DocumentChunk(id=None, document_id=document_id, chunk_index=2, content="c", char_start=0, char_end=1, created_at=None),
+            DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="a", char_start=0, char_end=1, created_at=None),
+            DocumentChunk(id=None, document_id=document_id, chunk_index=1, content="b", char_start=0, char_end=1, created_at=None),
         ]
     )
     await session.commit()
@@ -264,14 +264,14 @@ async def test_document_chunk_unique_constraint_violation_maps_to_persistence_er
 ) -> None:
     repository = SQLAlchemyDocumentChunkRepository(session)
     created = await repository.create_many(
-        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="first", created_at=None)]
+        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="first", char_start=0, char_end=5, created_at=None)]
     )
     await session.commit()
     cleanup_ids["chunks"].extend(c.id for c in created)
 
     with pytest.raises(PersistenceError):
         await repository.create_many(
-            [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="dup", created_at=None)]
+            [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="dup", char_start=0, char_end=3, created_at=None)]
         )
     await session.rollback()
 
@@ -428,7 +428,7 @@ async def test_unit_of_work_commit_persists_extracted_text_chunks_and_processed_
         ExtractedText(id=None, document_id=document_id, extracted_content="full text", created_at=None)
     )
     created_chunks = await chunk_repository.create_many(
-        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="full text", created_at=None)]
+        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="full text", char_start=0, char_end=9, created_at=None)]
     )
     await document_repository.complete_processing(document_id)
     await unit_of_work.commit()
@@ -463,7 +463,7 @@ async def test_unit_of_work_rollback_leaves_no_extracted_text_or_chunk_rows(
         ExtractedText(id=None, document_id=document_id, extracted_content="doomed text", created_at=None)
     )
     created_chunks = await chunk_repository.create_many(
-        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="doomed", created_at=None)]
+        [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="doomed", char_start=0, char_end=6, created_at=None)]
     )
 
     await unit_of_work.rollback()
