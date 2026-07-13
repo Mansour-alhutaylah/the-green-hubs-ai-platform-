@@ -9,6 +9,8 @@ export interface AuthContextValue {
   requestLogin: (email: string, password: string) => Promise<LoginChallenge>;
   verifyOtp: (challengeId: string, code: string) => Promise<void>;
   resendOtp: (challengeId: string) => Promise<void>;
+  /** Non-null only when the explicit development bypass flag is enabled. */
+  enterDemoWorkspace: (() => Promise<void>) | null;
   logout: () => Promise<void>;
   setActiveOrg: (orgId: string) => void;
   /** Present only when the active AuthService is a dev-mode mock — a real

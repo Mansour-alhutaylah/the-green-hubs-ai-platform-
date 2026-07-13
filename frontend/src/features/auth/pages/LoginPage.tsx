@@ -21,7 +21,7 @@ type Step = { name: 'credentials' } | { name: 'otp'; challengeId: string; masked
  * never to whatever deep link was originally attempted.
  */
 export function LoginPage() {
-  const { requestLogin, verifyOtp, resendOtp } = useAuth();
+  const { requestLogin, verifyOtp, resendOtp, enterDemoWorkspace } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>({ name: 'credentials' });
@@ -73,6 +73,20 @@ export function LoginPage() {
     }
   }
 
+  async function handleDemoWorkspace() {
+    if (!enterDemoWorkspace) return;
+    setIsSubmitting(true);
+    setError(undefined);
+    try {
+      await enterDemoWorkspace();
+      navigate(ROUTES.dashboard, { replace: true });
+    } catch {
+      setError('Development demo access is unavailable.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <AuthSplitLayout>
       {step.name === 'credentials' ? (
@@ -81,6 +95,7 @@ export function LoginPage() {
           isSubmitting={isSubmitting}
           error={error}
           lockoutSeconds={lockoutSeconds}
+          onEnterDemoWorkspace={enterDemoWorkspace ? handleDemoWorkspace : undefined}
         />
       ) : (
         <OtpForm

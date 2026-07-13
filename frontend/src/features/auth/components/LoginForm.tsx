@@ -16,9 +16,16 @@ export interface LoginFormProps {
   /** Present only when the account is locked out (§9.1: "fail x3 -> lock
    * 5 min"); ticks down live while it's non-zero. */
   lockoutSeconds?: number;
+  onEnterDemoWorkspace?: () => Promise<void>;
 }
 
-export function LoginForm({ onSubmit, isSubmitting, error, lockoutSeconds }: LoginFormProps) {
+export function LoginForm({
+  onSubmit,
+  isSubmitting,
+  error,
+  lockoutSeconds,
+  onEnterDemoWorkspace,
+}: LoginFormProps) {
   const { t } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,6 +85,34 @@ export function LoginForm({ onSubmit, isSubmitting, error, lockoutSeconds }: Log
         >
           {t('auth.signin.forgotPassword')}
         </Link>
+
+        {onEnterDemoWorkspace && (
+          <section className="mt-1" aria-labelledby="development-demo-access-label">
+            <div className="flex items-center gap-3" aria-hidden>
+              <span className="h-px flex-1 bg-line-200" />
+              <span className="text-caption font-semibold text-gray-600">{t('auth.demo.or')}</span>
+              <span className="h-px flex-1 bg-line-200" />
+            </div>
+            <div className="mt-4 rounded-l border border-leaf-300 bg-mist-50 p-3 sm:p-4">
+              <p id="development-demo-access-label" className="type-label text-leaf-700">
+                {t('auth.demo.label')}
+              </p>
+              <p className="mt-1 text-caption leading-5 text-gray-600">
+                {t('auth.demo.supporting')}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xl"
+                className="mt-3 w-full border-leaf-300 bg-surface-0 text-forest-900 hover:bg-leaf-100"
+                disabled={isSubmitting}
+                onClick={() => void onEnterDemoWorkspace()}
+              >
+                {t('auth.demo.enter')}
+              </Button>
+            </div>
+          </section>
+        )}
       </div>
     </form>
   );

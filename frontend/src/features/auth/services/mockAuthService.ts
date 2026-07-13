@@ -1,4 +1,7 @@
 import type { Session } from '../types';
+import { Role } from '@/features/rbac/roles';
+import { DEMO_WORKSPACE_ORG_ID } from '@/features/organizations/mockOrgs';
+import { isDevAuthBypassEnabled } from '../devAuthBypass';
 import {
   ChallengeExpiredError,
   InvalidCredentialsError,
@@ -7,7 +10,7 @@ import {
   type AuthService,
   type LoginChallenge,
 } from './AuthService';
-import { DEMO_PASSWORD, findDemoUserByEmail } from './demoUsers';
+import { DEMO_PASSWORD, DEMO_USERS, findDemoUserByEmail } from './demoUsers';
 import {
   clearPersistedSession,
   readPersistedSession,
@@ -31,6 +34,7 @@ const MAX_ATTEMPTS = 3;
 const LOCKOUT_MS = 5 * 60 * 1000; // §9.1: "fail x3 -> lock 5 min"
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const LOCAL_DEMO_TOKEN = 'local-development-demo-session';
 
 interface PendingChallenge {
   email: string;
@@ -112,6 +116,26 @@ class MockAuthService implements AuthService {
     const challenge = pendingChallenges.get(challengeId);
     if (!challenge) throw new ChallengeExpiredError();
     challenge.createdAt = Date.now();
+  }
+
+  async enterDemoWorkspace(): Promise<Session> {
+    if (!isDevAuthBypassEnabled()) {
+      throw new Error('Development authentication bypass is disabled.');
+    }
+
+    const user = DEMO_USERS.find((candidate) => candidate.role === Role.Admin);
+    if (!user) {
+      throw new Error('No Admin demo user is configured.');
+    }
+
+    const session: Session = {
+      user,
+      token: LOCAL_DEMO_TOKEN,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+      activeOrgId: DEMO_WORKSPACE_ORG_ID,
+    };
+    writePersistedSession(session);
+    return session;
   }
 
   async logout(): Promise<void> {
