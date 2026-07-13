@@ -1,5 +1,10 @@
 """Unit tests for ``EngagementService`` -- business logic exercised against
 in-memory fake repositories. No database, no HTTP, no ``integration`` mark.
+
+Sprint 3.5.1 (Tenant Isolation & API Security): every method now takes
+``current_user``, so fixtures seed two organizations (A/B) and two users
+(one per organization) to exercise same-tenant success and cross-tenant
+denial for every route.
 """
 
 import uuid
@@ -8,9 +13,10 @@ from typing import Sequence
 
 import pytest
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.domain.entities.engagement import Engagement
 from app.domain.entities.organization import Organization
+from app.domain.entities.user import User
 from app.domain.repositories.engagement import IEngagementRepository
 from app.domain.repositories.organization import IOrganizationRepository
 from app.services.engagement import EngagementService
@@ -19,6 +25,18 @@ from app.services.engagement import EngagementService
 class FakeEngagementRepository(IEngagementRepository):
     def __init__(self) -> None:
         self._rows: dict[uuid.UUID, Engagement] = {}
+
+    def seed(self, organization_id: uuid.UUID, title: str = "Seed Engagement") -> Engagement:
+        engagement_id = uuid.uuid4()
+        engagement = Engagement(
+            id=engagement_id,
+            organization_id=organization_id,
+            title=title,
+            status="planning",
+            created_at=datetime.now(timezone.utc),
+        )
+        self._rows[engagement_id] = engagement
+        return engagement
 
     async def get(self, entity_id: uuid.UUID) -> Engagement | None:
         return self._rows.get(entity_id)
@@ -34,14 +52,26 @@ class FakeEngagementRepository(IEngagementRepository):
         rows.sort(key=lambda e: (e.created_at, str(e.id)))
         return rows[offset : offset + limit]
 
-    async def count(self, *, organization_id: uuid.UUID | None = None) -> int:
-        return len(
-            [
-                e
-                for e in self._rows.values()
-                if organization_id is None or e.organization_id == organization_id
-            ]
-        )
+    async def count(self, *, organization_id: uuid.UUID) -> int:
+        return len([e for e in self._rows.values() if e.organization_id == organization_id])
+
+    async def get_for_organization(
+        self, entity_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Engagement | None:
+        row = self._rows.get(entity_id)
+        if row is not None and row.organization_id == organization_id:
+            return row
+        return None
+
+    async def update_for_organization(
+        self, entity: Engagement, *, organization_id: uuid.UUID
+    ) -> Engagement:
+        assert entity.id is not None
+        existing = self._rows.get(entity.id)
+        if existing is None or existing.organization_id != organization_id:
+            raise NotFoundError(f"Engagement {entity.id} not found")
+        self._rows[entity.id] = entity
+        return entity
 
     async def create(self, entity: Engagement) -> Engagement:
         new_id = uuid.uuid4()
@@ -95,6 +125,17 @@ class FakeOrganizationRepository(IOrganizationRepository):
         raise NotImplementedError
 
 
+def _user(organization_id: uuid.UUID | None) -> User:
+    return User(
+        id=uuid.uuid4(),
+        organization_id=organization_id,
+        full_name="Test User",
+        email="test@example.com",
+        role=None,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
 @pytest.fixture
 def organization_repository() -> FakeOrganizationRepository:
     return FakeOrganizationRepository()
@@ -114,139 +155,338 @@ def service(
 
 
 @pytest.fixture
-def organization_id(organization_repository: FakeOrganizationRepository) -> uuid.UUID:
+def organization_a_id(organization_repository: FakeOrganizationRepository) -> uuid.UUID:
     org_id = uuid.uuid4()
     organization_repository.seed(org_id)
     return org_id
 
 
-async def test_create_with_valid_organization_persists_engagement(
-    service: EngagementService, organization_id: uuid.UUID
+@pytest.fixture
+def organization_b_id(organization_repository: FakeOrganizationRepository) -> uuid.UUID:
+    org_id = uuid.uuid4()
+    organization_repository.seed(org_id)
+    return org_id
+
+
+@pytest.fixture
+def user_a(organization_a_id: uuid.UUID) -> User:
+    return _user(organization_a_id)
+
+
+@pytest.fixture
+def user_b(organization_b_id: uuid.UUID) -> User:
+    return _user(organization_b_id)
+
+
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
+
+
+async def test_create_in_own_organization_succeeds(
+    service: EngagementService, user_a: User, organization_a_id: uuid.UUID
 ) -> None:
-    created = await service.create(organization_id, "Audit 2026", "planning")
+    created = await service.create(organization_a_id, "Audit 2026", "planning", user_a)
 
     assert created.id is not None
-    assert created.organization_id == organization_id
+    assert created.organization_id == organization_a_id
     assert created.title == "Audit 2026"
     assert created.status == "planning"
+
+
+async def test_create_in_another_organization_rejected_with_403(
+    service: EngagementService, user_a: User, organization_b_id: uuid.UUID
+) -> None:
+    with pytest.raises(AuthorizationError):
+        await service.create(organization_b_id, "Audit 2026", "planning", user_a)
+
+
+async def test_create_with_null_user_organization_rejected_with_403(
+    service: EngagementService, organization_a_id: uuid.UUID
+) -> None:
+    user = _user(None)
+    with pytest.raises(AuthorizationError):
+        await service.create(organization_a_id, "Audit 2026", "planning", user)
 
 
 async def test_create_with_missing_organization_raises_not_found(
     service: EngagementService,
 ) -> None:
+    user = _user(uuid.uuid4())
     with pytest.raises(NotFoundError):
-        await service.create(uuid.uuid4(), "Audit 2026", "planning")
+        await service.create(user.organization_id, "Audit 2026", "planning", user)  # type: ignore[arg-type]
 
 
-async def test_get_returns_existing_engagement(
-    service: EngagementService, organization_id: uuid.UUID
-) -> None:
-    created = await service.create(organization_id, "Audit 2026", "planning")
-
-    fetched = await service.get(created.id)  # type: ignore[arg-type]
-
-    assert fetched.id == created.id
-
-
-async def test_get_raises_not_found_for_missing_engagement(
+async def test_create_in_another_organization_does_not_persist_a_row(
     service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_b_id: uuid.UUID,
+) -> None:
+    with pytest.raises(AuthorizationError):
+        await service.create(organization_b_id, "Audit 2026", "planning", user_a)
+
+    assert await engagement_repository.count(organization_id=organization_b_id) == 0
+
+
+# ---------------------------------------------------------------------------
+# Get
+# ---------------------------------------------------------------------------
+
+
+async def test_get_own_engagement_succeeds(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_a_id)
+
+    fetched = await service.get(engagement.id, user_a)  # type: ignore[arg-type]
+
+    assert fetched.id == engagement.id
+
+
+async def test_get_another_tenants_engagement_returns_not_found(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_b_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_b_id)
+
+    with pytest.raises(NotFoundError):
+        await service.get(engagement.id, user_a)  # type: ignore[arg-type]
+
+
+async def test_get_missing_engagement_returns_identical_not_found(
+    service: EngagementService, user_a: User
 ) -> None:
     with pytest.raises(NotFoundError):
-        await service.get(uuid.uuid4())
+        await service.get(uuid.uuid4(), user_a)
 
 
-async def test_list_filters_by_organization_id(
+async def test_get_rejected_for_user_with_null_organization(
     service: EngagementService,
-    organization_repository: FakeOrganizationRepository,
+    engagement_repository: FakeEngagementRepository,
+    organization_a_id: uuid.UUID,
 ) -> None:
-    org_a = uuid.uuid4()
-    org_b = uuid.uuid4()
-    organization_repository.seed(org_a)
-    organization_repository.seed(org_b)
-    await service.create(org_a, "Engagement A", "planning")
-    await service.create(org_b, "Engagement B", "planning")
+    engagement = engagement_repository.seed(organization_a_id)
+    user = _user(None)
+    with pytest.raises(AuthorizationError):
+        await service.get(engagement.id, user)  # type: ignore[arg-type]
 
-    items, total = await service.list(page=1, page_size=20, organization_id=org_a)
+
+# ---------------------------------------------------------------------------
+# List
+# ---------------------------------------------------------------------------
+
+
+async def test_list_automatically_scopes_to_own_organization(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+    organization_b_id: uuid.UUID,
+) -> None:
+    engagement_repository.seed(organization_a_id, "Engagement A")
+    engagement_repository.seed(organization_b_id, "Engagement B")
+
+    items, total = await service.list(user_a, page=1, page_size=20)
 
     assert total == 1
     assert len(items) == 1
-    assert items[0].organization_id == org_a
+    assert items[0].organization_id == organization_a_id
 
 
-async def test_list_without_filter_returns_all(
-    service: EngagementService, organization_id: uuid.UUID
+async def test_list_with_matching_organization_id_filter_succeeds(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
 ) -> None:
-    await service.create(organization_id, "Engagement A", "planning")
-    await service.create(organization_id, "Engagement B", "planning")
+    engagement_repository.seed(organization_a_id)
 
-    items, total = await service.list(page=1, page_size=20)
+    items, total = await service.list(
+        user_a, page=1, page_size=20, organization_id=organization_a_id
+    )
 
-    assert total == 2
-    assert len(items) == 2
+    assert total == 1
+    assert len(items) == 1
+
+
+async def test_list_with_foreign_organization_id_filter_rejected_with_403(
+    service: EngagementService, user_a: User, organization_b_id: uuid.UUID
+) -> None:
+    with pytest.raises(AuthorizationError):
+        await service.list(user_a, page=1, page_size=20, organization_id=organization_b_id)
+
+
+async def test_list_rejected_for_user_with_null_organization(
+    service: EngagementService,
+) -> None:
+    user = _user(None)
+    with pytest.raises(AuthorizationError):
+        await service.list(user, page=1, page_size=20)
 
 
 async def test_list_empty_returns_no_items_and_zero_total(
-    service: EngagementService,
+    service: EngagementService, user_a: User
 ) -> None:
-    items, total = await service.list(page=1, page_size=20)
+    items, total = await service.list(user_a, page=1, page_size=20)
 
     assert items == []
     assert total == 0
 
 
-async def test_update_changes_only_provided_fields(
-    service: EngagementService, organization_id: uuid.UUID
+# ---------------------------------------------------------------------------
+# Update
+# ---------------------------------------------------------------------------
+
+
+async def test_update_own_engagement_succeeds(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
 ) -> None:
-    created = await service.create(organization_id, "Old Title", "planning")
+    engagement = engagement_repository.seed(organization_a_id, "Old Title")
 
     updated = await service.update(
-        created.id,  # type: ignore[arg-type]
+        engagement.id,  # type: ignore[arg-type]
         title="New Title",
         status=None,
         organization_id=None,
+        current_user=user_a,
     )
 
     assert updated.title == "New Title"
     assert updated.status == "planning"  # unchanged
-    assert updated.organization_id == organization_id  # unchanged
-    assert updated.created_at == created.created_at
+    assert updated.organization_id == organization_a_id  # unchanged
 
 
-async def test_update_with_new_valid_organization_succeeds(
+async def test_update_another_tenants_engagement_returns_not_found(
     service: EngagementService,
-    organization_repository: FakeOrganizationRepository,
-    organization_id: uuid.UUID,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_b_id: uuid.UUID,
 ) -> None:
-    other_org = uuid.uuid4()
-    organization_repository.seed(other_org)
-    created = await service.create(organization_id, "Title", "planning")
-
-    updated = await service.update(
-        created.id,  # type: ignore[arg-type]
-        title=None,
-        status=None,
-        organization_id=other_org,
-    )
-
-    assert updated.organization_id == other_org
-
-
-async def test_update_with_missing_organization_raises_not_found(
-    service: EngagementService, organization_id: uuid.UUID
-) -> None:
-    created = await service.create(organization_id, "Title", "planning")
+    engagement = engagement_repository.seed(organization_b_id)
 
     with pytest.raises(NotFoundError):
         await service.update(
-            created.id,  # type: ignore[arg-type]
-            title=None,
+            engagement.id,  # type: ignore[arg-type]
+            title="Hijacked",
             status=None,
-            organization_id=uuid.uuid4(),
+            organization_id=None,
+            current_user=user_a,
         )
 
 
-async def test_update_raises_not_found_for_missing_engagement(
+async def test_update_does_not_change_another_tenants_engagement(
     service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_b_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_b_id, "Original Title")
+
+    with pytest.raises(NotFoundError):
+        await service.update(
+            engagement.id,  # type: ignore[arg-type]
+            title="Hijacked",
+            status=None,
+            organization_id=None,
+            current_user=user_a,
+        )
+
+    untouched = await engagement_repository.get(engagement.id)  # type: ignore[arg-type]
+    assert untouched is not None
+    assert untouched.title == "Original Title"
+
+
+async def test_cross_tenant_reassignment_rejected_with_403(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+    organization_b_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_a_id)
+
+    with pytest.raises(AuthorizationError):
+        await service.update(
+            engagement.id,  # type: ignore[arg-type]
+            title=None,
+            status=None,
+            organization_id=organization_b_id,
+            current_user=user_a,
+        )
+
+
+async def test_cross_tenant_reassignment_does_not_change_the_row(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+    organization_b_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_a_id)
+
+    with pytest.raises(AuthorizationError):
+        await service.update(
+            engagement.id,  # type: ignore[arg-type]
+            title=None,
+            status=None,
+            organization_id=organization_b_id,
+            current_user=user_a,
+        )
+
+    untouched = await engagement_repository.get(engagement.id)  # type: ignore[arg-type]
+    assert untouched is not None
+    assert untouched.organization_id == organization_a_id
+
+
+async def test_supplied_same_organization_id_is_accepted_as_a_no_op(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_a_id)
+
+    updated = await service.update(
+        engagement.id,  # type: ignore[arg-type]
+        title=None,
+        status=None,
+        organization_id=organization_a_id,
+        current_user=user_a,
+    )
+
+    assert updated.organization_id == organization_a_id
+
+
+async def test_update_rejected_for_user_with_null_organization(
+    service: EngagementService,
+    engagement_repository: FakeEngagementRepository,
+    organization_a_id: uuid.UUID,
+) -> None:
+    engagement = engagement_repository.seed(organization_a_id)
+    user = _user(None)
+    with pytest.raises(AuthorizationError):
+        await service.update(
+            engagement.id,  # type: ignore[arg-type]
+            title="New",
+            status=None,
+            organization_id=None,
+            current_user=user,
+        )
+
+
+async def test_update_missing_engagement_returns_not_found(
+    service: EngagementService, user_a: User
 ) -> None:
     with pytest.raises(NotFoundError):
-        await service.update(uuid.uuid4(), title="New", status=None, organization_id=None)
+        await service.update(
+            uuid.uuid4(), title="New", status=None, organization_id=None, current_user=user_a
+        )

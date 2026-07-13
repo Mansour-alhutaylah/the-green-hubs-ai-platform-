@@ -146,11 +146,21 @@ class FakeEngagementRepository(IEngagementRepository):
             rows = [r for r in rows if r.organization_id == organization_id]
         return rows[offset : offset + limit]
 
-    async def count(self, *, organization_id: uuid.UUID | None = None) -> int:
-        rows = list(self._rows.values())
-        if organization_id is not None:
-            rows = [r for r in rows if r.organization_id == organization_id]
-        return len(rows)
+    async def count(self, *, organization_id: uuid.UUID) -> int:
+        return len([r for r in self._rows.values() if r.organization_id == organization_id])
+
+    async def get_for_organization(
+        self, entity_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Engagement | None:
+        row = self._rows.get(entity_id)
+        if row is not None and row.organization_id == organization_id:
+            return row
+        return None
+
+    async def update_for_organization(
+        self, entity: Engagement, *, organization_id: uuid.UUID
+    ) -> Engagement:
+        raise NotImplementedError
 
     async def create(self, entity: Engagement) -> Engagement:
         raise NotImplementedError
