@@ -10,7 +10,7 @@ export function NotificationsBell() {
         <button
           type="button"
           aria-label="Notifications"
-          className="relative rounded-m p-2 text-gray-600 hover:bg-tint-100 hover:text-forest-900"
+          className="relative flex h-10 w-10 items-center justify-center rounded-m text-gray-600 transition-colors hover:bg-mist-50 hover:text-forest-900"
         >
           <Icon name="bell" size={20} />
         </button>

@@ -20,7 +20,7 @@ export function ContextBar({ menuButton }: { menuButton?: ReactNode }) {
   return (
     <header
       data-testid="context-bar"
-      className="sticky top-0 z-[var(--z-bar)] flex h-16 shrink-0 items-center gap-2 border-b border-line-200 bg-surface-0/95 px-3 backdrop-blur-sm sm:gap-4 sm:px-4 md:px-8"
+      className="sticky top-0 z-[var(--z-bar)] flex h-[var(--size-contextbar)] shrink-0 items-center gap-2 border-b border-line-200/80 bg-paper-50/92 px-3 shadow-[0_1px_0_rgb(255_255_255_/_0.75)] backdrop-blur-md sm:gap-4 sm:px-4 md:px-6 xl:px-8"
     >
       <div className="flex min-w-0 flex-1 items-center gap-4">
         {menuButton}
@@ -29,7 +29,7 @@ export function ContextBar({ menuButton }: { menuButton?: ReactNode }) {
           <Breadcrumb />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-1 rounded-l border border-line-200/80 bg-surface-0/80 p-1 shadow-card sm:gap-2">
         <div className="hidden items-center md:flex">
           <GlobalSearch />
         </div>

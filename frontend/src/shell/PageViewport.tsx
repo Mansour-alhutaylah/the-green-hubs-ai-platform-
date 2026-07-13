@@ -9,7 +9,7 @@ export function PageViewport({ children }: { children: ReactNode }) {
     <main
       id="main-content"
       tabIndex={-1}
-      className="mx-auto w-full max-w-[var(--content-max)] px-4 py-6 md:px-6 xl:px-8 xl:py-8"
+      className="relative z-10 mx-auto w-full max-w-[var(--content-max)] px-4 py-5 md:px-6 md:py-6 xl:px-8 xl:py-8"
     >
       {children}
     </main>

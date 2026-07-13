@@ -27,23 +27,28 @@ export function BrandBlock({ collapsed }: { collapsed: boolean }) {
   return (
     <Link
       to={ROUTES.dashboard}
-      className="focus-on-forest flex h-18 shrink-0 items-center border-b border-rail-hairline px-6"
+      className="focus-on-forest relative z-10 flex h-24 shrink-0 items-center border-b border-rail-hairline px-5"
     >
       {collapsed ? (
-        <div className="relative block h-8 w-9 shrink-0 grow-0 overflow-hidden border-0 bg-transparent outline-none">
+        <div className="relative mx-auto block h-9 w-10 shrink-0 grow-0 overflow-hidden border-0 bg-transparent outline-none">
           <img
             src={logoWhiteOnForest}
             alt={t('brand.name')}
-            className="pointer-events-none absolute left-[-20px] top-[-17px] block h-[68px] w-[102px] max-w-none select-none border-0 bg-transparent outline-none"
+            className="pointer-events-none absolute left-[-22px] top-[-18px] block h-[74px] w-[111px] max-w-none select-none border-0 bg-transparent outline-none"
           />
         </div>
       ) : (
-        <div className="relative block h-8 w-[74px] shrink-0 grow-0 overflow-hidden border-0 bg-transparent outline-none">
-          <img
-            src={logoWhiteOnForest}
-            alt={t('brand.name')}
-            className="pointer-events-none absolute left-[-15px] top-[-16px] block h-[67px] w-[100px] max-w-none select-none border-0 bg-transparent outline-none"
-          />
+        <div className="min-w-0">
+          <div className="relative block h-12 w-32 shrink-0 grow-0 overflow-hidden border-0 bg-transparent outline-none">
+            <img
+              src={logoWhiteOnForest}
+              alt={t('brand.name')}
+              className="pointer-events-none absolute left-[-32px] top-[-30px] block h-[115px] w-[172px] max-w-none select-none border-0 bg-transparent outline-none"
+            />
+          </div>
+          <p lang="en" className="mt-1 text-micro font-bold uppercase tracking-wider text-rail-muted">
+            Sustainability intelligence
+          </p>
         </div>
       )}
     </Link>

@@ -10,7 +10,7 @@ import { activeNavItemId, type NavItem } from '@/app/navigation/navConfig';
  * (§14.4: "status is never an icon... icons identify objects and actions
  * only"). */
 export function RailItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
-  const { t } = useLocale();
+  const { t, dir } = useLocale();
   const location = useLocation();
   const isActive = activeNavItemId(location.pathname) === item.id;
   const label = t(item.labelKey);
@@ -20,22 +20,27 @@ export function RailItem({ item, collapsed }: { item: NavItem; collapsed: boolea
       to={item.path}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'focus-on-forest relative flex h-11 items-center gap-3 px-6 text-body font-semibold transition-colors duration-[var(--motion-fast)]',
+        'focus-on-forest group relative mx-3 flex h-11 items-center gap-3 rounded-m border px-3 text-body font-semibold transition-all duration-[var(--motion-fast)]',
         isActive
-          ? 'bg-rail-active text-white'
-          : 'text-rail-text hover:bg-rail-hover hover:text-white',
+          ? 'border-rail-hairline bg-rail-active text-white shadow-raise'
+          : 'border-transparent text-rail-text hover:border-rail-hairline hover:bg-rail-hover hover:text-white',
         item.placeholder && !isActive && 'text-rail-muted',
-        collapsed && 'justify-center px-0',
+        collapsed && 'mx-2 justify-center px-0',
       )}
     >
       {isActive && (
         <span
-          className="absolute inset-y-0 start-0 w-[var(--size-active-bar)] bg-leaf-500"
+          className="absolute inset-y-2 start-0 w-[var(--size-active-bar)] rounded-e-full bg-leaf-500 shadow-signal"
           aria-hidden
         />
       )}
 
-      <span className="flex w-5 shrink-0 items-center justify-center">
+      <span
+        className={cn(
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-m bg-white/5 text-rail-text transition-colors group-hover:bg-white/10 group-hover:text-white',
+          isActive && 'bg-leaf-500/20 text-leaf-300',
+        )}
+      >
         {item.placeholder ? (
           <DiamondGlyph variant="hollow" size={14} />
         ) : (
@@ -60,7 +65,7 @@ export function RailItem({ item, collapsed }: { item: NavItem; collapsed: boolea
   if (!collapsed) return link;
 
   return (
-    <Tooltip content={label} side="right">
+      <Tooltip content={label} side={dir === 'rtl' ? 'left' : 'right'}>
       {link}
     </Tooltip>
   );

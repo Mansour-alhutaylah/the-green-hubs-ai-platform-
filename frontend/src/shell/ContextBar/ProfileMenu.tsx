@@ -23,9 +23,9 @@ export function ProfileMenu() {
         <button
           type="button"
           aria-label={`${user.name}, account menu`}
-          className="flex items-center gap-2 rounded-m p-1 hover:bg-tint-100"
+          className="flex min-h-10 items-center gap-2 rounded-m px-1.5 py-1 transition-colors hover:bg-mist-50"
         >
-          <Avatar name={user.name} size={32} />
+          <Avatar name={user.name} size={32} className="ring-2 ring-mint-100" />
           <span className="hidden max-w-32 text-start xl:block">
             <span className="block truncate text-meta font-bold text-ink-900">{user.name}</span>
             <span className="block text-caption capitalize text-gray-600">{user.role}</span>

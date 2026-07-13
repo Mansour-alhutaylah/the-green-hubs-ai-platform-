@@ -40,16 +40,16 @@ export function OrgSwitcher() {
         <button
           type="button"
           aria-label={t('contextBar.orgSwitcher.label')}
-          className="flex min-w-0 items-center gap-2 rounded-m px-2 py-1.5 hover:bg-tint-100"
+          className="flex min-h-10 min-w-0 items-center gap-2 rounded-m border border-line-200 bg-surface-0 px-2.5 py-1.5 shadow-card transition-colors hover:border-leaf-300 hover:bg-mist-50"
         >
           <Avatar
             name={activeOrg.name}
             shape="square"
             size={24}
-            className="hidden sm:inline-flex"
+            className="hidden ring-2 ring-leaf-100 sm:inline-flex"
           />
           <span
-            className="min-w-0 max-w-20 truncate text-body font-bold text-ink-900 sm:max-w-30 md:max-w-45"
+            className="min-w-0 max-w-20 truncate text-body font-bold text-forest-900 sm:max-w-30 md:max-w-45"
             data-user-content
           >
             {localizedOrgName(activeOrg, locale)}
