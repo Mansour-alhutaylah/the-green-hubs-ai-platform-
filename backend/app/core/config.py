@@ -53,6 +53,17 @@ class Settings(BaseSettings):
 
     jwt_algorithm: str = "HS256"
 
+    # Document Upload Foundation (app/services/document_upload.py). A
+    # configurable default, not hardcoded domain policy -- see the Sprint
+    # 3.4 plan's file-validation section.
+    max_upload_size_bytes: int = 25 * 1024 * 1024  # 25 MB
+
+    # Explicit, pre-provisioned bucket name. SupabaseDocumentStorage never
+    # creates or alters it -- that is an infrastructure setup step outside
+    # this codebase. Left unset by default (rather than defaulted to a real
+    # name) so a missing configuration fails clearly, not silently.
+    supabase_storage_bucket: Optional[str] = None
+
     # AI/embeddings. Not consumed by any code yet -- infrastructure/ai/ is a
     # placeholder this sprint. No LangChain dependency is introduced yet.
     openai_api_key: Optional[str] = None

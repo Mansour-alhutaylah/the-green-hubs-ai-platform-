@@ -35,6 +35,14 @@ class ProfileNotProvisionedError(AppError):
     status_code = status.HTTP_403_FORBIDDEN
 
 
+class AuthorizationError(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+
+
+class PersistenceError(AppError):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:

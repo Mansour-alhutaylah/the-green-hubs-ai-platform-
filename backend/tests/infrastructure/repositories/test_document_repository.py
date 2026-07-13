@@ -17,8 +17,8 @@ to tear it down *before* ``make_engagement`` -- documents must be deleted
 before the engagement/organization rows they reference, since those
 foreign keys are ``NO ACTION``.
 
-``Document`` (the domain entity) has no ``updated_at`` field, so a few
-assertions here read ``DocumentModel`` directly through a fresh session --
+A few assertions read ``DocumentModel`` directly through a fresh session
+(rather than through the domain ``Document`` the repository returns) --
 that is a deliberate, read-only probe of persisted state, not a domain- or
 infrastructure-layer change.
 
@@ -66,6 +66,7 @@ def _make_document(**overrides: object) -> Document:
         "processing_status": "PENDING",
         "engagement_id": uuid.uuid4(),
         "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
     defaults.update(overrides)
     return Document(**defaults)
