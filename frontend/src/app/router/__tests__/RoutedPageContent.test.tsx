@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '../routes';
@@ -10,6 +10,7 @@ describe('routed page content', () => {
   const admin = DEMO_USERS.find((user) => user.role === Role.Admin);
 
   beforeEach(() => {
+    vi.mocked(window.scrollTo).mockClear();
     window.sessionStorage.setItem('ghp:dashboard-visited', '1');
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
     window.dispatchEvent(new Event('resize'));
@@ -35,9 +36,10 @@ describe('routed page content', () => {
     const main = screen.getByRole('main');
     expect(main).not.toBeEmptyDOMElement();
     expect(main).toHaveClass('py-4', 'md:py-5', 'xl:py-6');
-    expect(screen.getByRole('heading', { name: /^dashboard$/i }).closest('section')).not.toHaveClass(
-      'panel-enter',
-    );
+    expect(
+      screen.getByRole('heading', { name: /^dashboard$/i }).closest('section'),
+    ).not.toHaveClass('panel-enter');
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
   });
 
   it('renders Dashboard after refresh-style remount and away/back navigation', async () => {
@@ -57,18 +59,35 @@ describe('routed page content', () => {
     expect(
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeVisible();
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' });
 
     const user = userEvent.setup();
+    vi.mocked(window.scrollTo).mockClear();
     await user.click(screen.getByRole('link', { name: /review documents/i }));
     expect(
       await screen.findByRole('heading', { name: /^documents$/i }, { timeout: 5000 }),
     ).toBeVisible();
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
+    vi.mocked(window.scrollTo).mockClear();
     await user.click(screen.getByRole('link', { name: /^dashboard$/i }));
     expect(
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeVisible();
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   }, 15_000);
+
+  it('leaves in-page hash navigation to the browser', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/dashboard#workspace-overview-heading'],
+      session: buildTestSession(admin),
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+    ).toBeVisible();
+    expect(window.scrollTo).not.toHaveBeenCalled();
+  });
 
   it.each([1440, 1280, 1024, 768, 390, 360])(
     'renders non-empty Dashboard content at %ipx',

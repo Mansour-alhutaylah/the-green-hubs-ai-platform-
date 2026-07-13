@@ -39,14 +39,18 @@ describe('development authentication bypass', () => {
     expect(screen.getByLabelText(/work email/i)).toHaveValue('');
     expect(screen.getByLabelText(/^password$/i)).toHaveValue('');
 
+    vi.mocked(window.scrollTo).mockClear();
     await user.click(screen.getByRole('button', { name: 'Enter Demo Workspace' }));
 
     expect(
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeVisible();
-    expect(screen.queryByRole('heading', { name: /verify your identity/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /verify your identity/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Mansour Ali Al-Hutaylah')).toBeVisible();
     expect(screen.getAllByText('The Green Hubs Demo Workspace').length).toBeGreaterThan(0);
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
 
     const persisted = JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? 'null');
     expect(persisted).toMatchObject({
@@ -92,8 +96,12 @@ describe('development authentication bypass', () => {
         initialEntries: [path],
         authService: mockAuthService,
       });
-      expect(await screen.findByRole('heading', { name: heading }, { timeout: 5000 })).toBeVisible();
-      expect(screen.queryByRole('heading', { name: /sign in to your hub/i })).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { name: heading }, { timeout: 5000 }),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole('heading', { name: /sign in to your hub/i }),
+      ).not.toBeInTheDocument();
       view.unmount();
     }
   }, 20_000);
@@ -108,7 +116,9 @@ describe('development authentication bypass', () => {
       authService: mockAuthService,
     });
 
-    await user.click(await screen.findByRole('button', { name: /mansour ali al-hutaylah, account menu/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /mansour ali al-hutaylah, account menu/i }),
+    );
     await user.click(await screen.findByRole('button', { name: /sign out/i }));
 
     expect(await screen.findByRole('heading', { name: /sign in to your hub/i })).toBeVisible();

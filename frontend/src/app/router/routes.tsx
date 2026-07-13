@@ -13,6 +13,7 @@ import { ROUTES } from '../navigation/routePaths';
 import { ProtectedRoute } from './guards/ProtectedRoute';
 import { PublicOnlyRoute } from './guards/PublicOnlyRoute';
 import { RoleGuard } from './guards/RoleGuard';
+import { RouteScrollReset } from './RouteScrollReset';
 
 /**
  * Every business-module page (everything behind auth) is code-split with
@@ -120,74 +121,77 @@ const AuditPage = lazy(() =>
  */
 export function AppRoutes() {
   return (
-    <Routes>
-      <Route element={<PublicOnlyRoute />}>
-        <Route path={ROUTES.login} element={<LoginPage />} />
-        <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
-        <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
-        <Route path={ROUTES.inviteAccept} element={<InviteAcceptPage />} />
-      </Route>
+    <>
+      <RouteScrollReset />
+      <Routes>
+        <Route element={<PublicOnlyRoute />}>
+          <Route path={ROUTES.login} element={<LoginPage />} />
+          <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
+          <Route path={ROUTES.inviteAccept} element={<InviteAcceptPage />} />
+        </Route>
 
-      {/* Reachable regardless of session state — a session that just
+        {/* Reachable regardless of session state — a session that just
           expired, or an access-denied bounce, must render even for an
           already-authenticated or already-unauthenticated visitor, so
           neither PublicOnlyRoute nor ProtectedRoute wraps these. */}
-      <Route path={ROUTES.sessionExpired} element={<SessionExpiredPage />} />
-      <Route path={ROUTES.accessDenied} element={<AccessDeniedPage />} />
+        <Route path={ROUTES.sessionExpired} element={<SessionExpiredPage />} />
+        <Route path={ROUTES.accessDenied} element={<AccessDeniedPage />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
-          <Route index element={<Navigate to={ROUTES.dashboard} replace />} />
-          <Route path={ROUTES.dashboard} element={<DashboardPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to={ROUTES.dashboard} replace />} />
+            <Route path={ROUTES.dashboard} element={<DashboardPage />} />
 
-          <Route path={ROUTES.reports} element={<ReportsListPage />} />
-          <Route path={ROUTES.reportDetail} element={<ReportDetailPage />} />
+            <Route path={ROUTES.reports} element={<ReportsListPage />} />
+            <Route path={ROUTES.reportDetail} element={<ReportDetailPage />} />
 
-          <Route path={ROUTES.documents} element={<DocumentsListPage />} />
-          <Route path={ROUTES.documentDetail} element={<DocumentDetailPage />} />
-          <Route
-            path={ROUTES.documentUpload}
-            element={
-              <RoleGuard minTier={findNavItem('upload').minTier}>
-                <DocumentUploadPage />
-              </RoleGuard>
-            }
-          />
+            <Route path={ROUTES.documents} element={<DocumentsListPage />} />
+            <Route path={ROUTES.documentDetail} element={<DocumentDetailPage />} />
+            <Route
+              path={ROUTES.documentUpload}
+              element={
+                <RoleGuard minTier={findNavItem('upload').minTier}>
+                  <DocumentUploadPage />
+                </RoleGuard>
+              }
+            />
 
-          <Route path={ROUTES.analysis} element={<AnalysisListPage />} />
-          <Route path={ROUTES.analysisRun} element={<AnalysisRunPage />} />
+            <Route path={ROUTES.analysis} element={<AnalysisListPage />} />
+            <Route path={ROUTES.analysisRun} element={<AnalysisRunPage />} />
 
-          <Route path={ROUTES.hubZero} element={<HubZeroPage />} />
-          <Route path={ROUTES.carbon} element={<CarbonPage />} />
-          <Route path={ROUTES.telemetry} element={<TelemetryPage />} />
+            <Route path={ROUTES.hubZero} element={<HubZeroPage />} />
+            <Route path={ROUTES.carbon} element={<CarbonPage />} />
+            <Route path={ROUTES.telemetry} element={<TelemetryPage />} />
 
-          <Route path={ROUTES.organizations} element={<OrganizationsListPage />} />
-          <Route path={ROUTES.organizationDetail} element={<OrganizationDetailPage />} />
-          <Route
-            path={ROUTES.users}
-            element={
-              <RoleGuard minTier={findNavItem('users').minTier}>
-                <UsersPage />
-              </RoleGuard>
-            }
-          />
-          <Route path={ROUTES.frameworks} element={<FrameworksPage />} />
-          <Route path={ROUTES.audit} element={<AuditPage />} />
-          <Route
-            path={ROUTES.settings}
-            element={
-              <RoleGuard minTier={findNavItem('settings').minTier}>
-                <SettingsPage />
-              </RoleGuard>
-            }
-          />
+            <Route path={ROUTES.organizations} element={<OrganizationsListPage />} />
+            <Route path={ROUTES.organizationDetail} element={<OrganizationDetailPage />} />
+            <Route
+              path={ROUTES.users}
+              element={
+                <RoleGuard minTier={findNavItem('users').minTier}>
+                  <UsersPage />
+                </RoleGuard>
+              }
+            />
+            <Route path={ROUTES.frameworks} element={<FrameworksPage />} />
+            <Route path={ROUTES.audit} element={<AuditPage />} />
+            <Route
+              path={ROUTES.settings}
+              element={
+                <RoleGuard minTier={findNavItem('settings').minTier}>
+                  <SettingsPage />
+                </RoleGuard>
+              }
+            />
 
-          <Route path={ROUTES.notifications} element={<NotificationsPage />} />
-          <Route path={ROUTES.profile} element={<ProfilePage />} />
+            <Route path={ROUTES.notifications} element={<NotificationsPage />} />
+            <Route path={ROUTES.profile} element={<ProfilePage />} />
 
-          <Route path="*" element={<NotFoundPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </>
   );
 }
