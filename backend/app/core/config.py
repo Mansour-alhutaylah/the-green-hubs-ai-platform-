@@ -64,10 +64,26 @@ class Settings(BaseSettings):
     # name) so a missing configuration fails clearly, not silently.
     supabase_storage_bucket: Optional[str] = None
 
-    # AI/embeddings. Not consumed by any code yet -- infrastructure/ai/ is a
-    # placeholder this sprint. No LangChain dependency is introduced yet.
+    # AI. `openai_model` is reserved for a future chat/completion use --
+    # never read by embedding code, which uses its own dedicated settings
+    # below so the two concerns can never be ambiguously conflated. No
+    # LangChain dependency is introduced yet.
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
+
+    # Embeddings (Sprint 3.6A, Vector Retrieval Foundation). Dedicated
+    # configuration, deliberately separate from `openai_model` above.
+    # `embedding_dimension` must equal 1536 this sprint -- the
+    # `document_chunk_embeddings.embedding` column is a fixed `vector(1536)`
+    # (migration `3f3acc7fc556`); OpenAIEmbeddingProvider refuses to
+    # construct with any other value. A future differently-sized model
+    # requires a new migration or a separate table, not a config change.
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimension: int = 1536
+    embedding_provider_timeout_seconds: float = 30.0
+    embedding_max_batch_size: int = 100
+    embedding_max_input_characters: int = 8000
+    embedding_processing_stale_after_seconds: int = 300
 
 
 @lru_cache
