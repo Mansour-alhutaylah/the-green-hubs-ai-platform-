@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent, KeyboardEvent } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 export interface OtpCellsProps {
   length?: number;
@@ -16,6 +17,7 @@ export interface OtpCellsProps {
  * pasting a full code splits across cells, and completing the last cell
  * auto-submits. */
 export function OtpCells({ length = 6, disabled, error, onComplete, label }: OtpCellsProps) {
+  const { t } = useLocale();
   const [digits, setDigits] = useState<string[]>(() => Array(length).fill(''));
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const hasSubmitted = useRef(false);
@@ -72,7 +74,10 @@ export function OtpCells({ length = 6, disabled, error, onComplete, label }: Otp
   }
 
   return (
-    <fieldset className="flex gap-2 border-0 p-0">
+    <fieldset
+      className="grid w-full max-w-[var(--size-otp-group)] grid-cols-6 gap-2 border-0 p-0"
+      dir="ltr"
+    >
       <legend className="sr-only">{label}</legend>
       {digits.map((digit, index) => (
         <input
@@ -86,16 +91,16 @@ export function OtpCells({ length = 6, disabled, error, onComplete, label }: Otp
           maxLength={1}
           disabled={disabled}
           value={digit}
-          aria-label={`Digit ${index + 1} of ${length}`}
+          aria-label={t('auth.otp.digitLabel', { position: index + 1, total: length })}
           onChange={(event) => handleChange(index, event.target.value)}
           onKeyDown={(event) => handleKeyDown(index, event)}
           onPaste={handlePaste}
           className={cn(
-            'h-[var(--size-control-xl)] w-[var(--size-control-xl)] rounded-m border text-center text-title text-ink-900 outline-none transition-colors duration-[var(--motion-fast)]',
+            'h-[var(--size-control-xl)] w-full min-w-0 rounded-m border bg-surface-0 text-center text-title text-ink-900 transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700',
             'disabled:bg-tint-100 disabled:text-gray-400',
             error
               ? 'border-[length:var(--border-width-error)] border-amber-700'
-              : 'border-line-300 focus:border-2 focus:border-forest-900',
+              : 'border-line-300 focus:border-forest-900',
           )}
         />
       ))}

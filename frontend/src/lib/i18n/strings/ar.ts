@@ -53,6 +53,7 @@ export const ar: Record<StringKey, string> = {
   'auth.otp.devHint': 'وضع التطوير — أدخل {code} لتسجيل الدخول.',
   'auth.otp.invalid': 'هذا الرمز غير صحيح.',
   'auth.otp.verifying': 'جارٍ التحقق…',
+  'auth.otp.digitLabel': 'الرقم {position} من {total}',
 
   'auth.forgot.eyebrow': 'استعادة الحساب',
   'auth.forgot.title': 'إعادة تعيين كلمة المرور',

@@ -74,7 +74,7 @@ export function LoginForm({ onSubmit, isSubmitting, error, lockoutSeconds }: Log
 
         <Link
           to={ROUTES.forgotPassword}
-          className="self-start rounded-s text-meta font-medium text-leaf-700 hover:underline"
+          className="inline-flex min-h-10 items-center self-start rounded-m px-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100"
         >
           {t('auth.signin.forgotPassword')}
         </Link>

@@ -54,6 +54,7 @@ export const en = {
   'auth.otp.devHint': 'Development mode — enter {code} to sign in.',
   'auth.otp.invalid': 'That code is not correct.',
   'auth.otp.verifying': 'Verifying…',
+  'auth.otp.digitLabel': 'Digit {position} of {total}',
 
   'auth.forgot.eyebrow': 'Account recovery',
   'auth.forgot.title': 'Reset your password',

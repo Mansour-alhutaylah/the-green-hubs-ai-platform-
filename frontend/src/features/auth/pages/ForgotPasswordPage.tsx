@@ -32,7 +32,7 @@ export function ForgotPasswordPage() {
           />
           <Link
             to={ROUTES.login}
-            className="inline-flex min-h-10 items-center rounded-m border border-line-200 px-4 text-meta font-semibold text-forest-900 hover:bg-tint-100"
+            className="inline-flex min-h-11 items-center rounded-m border border-line-300 bg-surface-0 px-4 text-meta font-semibold text-forest-900 shadow-card hover:bg-mist-50"
           >
             {t('auth.forgot.backToLogin')}
           </Link>
@@ -59,7 +59,7 @@ export function ForgotPasswordPage() {
             </Button>
             <Link
               to={ROUTES.login}
-              className="text-meta font-medium text-leaf-700 hover:underline"
+              className="inline-flex min-h-10 items-center self-start rounded-m px-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100"
             >
               {t('auth.forgot.backToLogin')}
             </Link>

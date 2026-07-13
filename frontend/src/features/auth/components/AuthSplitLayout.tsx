@@ -33,30 +33,30 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
   const { t, toggleLocale } = useLocale();
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col md:flex-row">
-      <aside className="relative flex min-h-32 shrink-0 items-center overflow-hidden bg-forest-900 px-4 py-4 sm:px-6 md:min-h-screen md:w-[45%] md:flex-col md:items-start md:justify-between md:px-10 md:py-10 xl:px-14 xl:py-14">
+    <div className="flex min-h-dvh min-w-0 flex-col lg:flex-row">
+      <aside className="auth-brand-panel relative flex min-h-40 shrink-0 items-center overflow-hidden px-4 py-5 sm:min-h-44 sm:px-6 lg:min-h-dvh lg:w-[45%] lg:flex-col lg:items-start lg:justify-between lg:px-10 lg:py-10 xl:px-14 xl:py-14">
         <BrandPatternAccent />
 
         {/* Logo + mission line as one tight brand lockup (rather than the
             logo sitting alone with a large gap below it) so the image
             reads as part of the panel's brand mark, not a separate block. */}
-        <div className="relative z-10 flex min-w-0 items-center md:flex-col md:items-start">
-          <div className="relative h-[52px] w-[120px] shrink-0 overflow-hidden md:h-[94px] md:w-[216px]">
+        <div className="relative z-10 flex min-w-0 items-center lg:flex-col lg:items-start">
+          <div className="relative h-[58px] w-[134px] shrink-0 overflow-hidden lg:h-[104px] lg:w-[238px]">
             <img
               src={logoWhiteOnForest}
               alt="The Green Hubs"
-              className="absolute left-[-21px] top-[-24px] h-[103px] w-[154px] max-w-none md:left-[-37px] md:top-[-43px] md:h-[185px] md:w-[278px]"
+              className="absolute left-[-24px] top-[-27px] h-[114px] w-[171px] max-w-none lg:left-[-41px] lg:top-[-47px] lg:h-[204px] lg:w-[306px]"
             />
           </div>
 
-          <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 md:ms-0 md:mt-6 md:max-w-75 md:border-0 md:ps-0">
-            <p lang="en" dir="ltr" className="text-caption font-light text-white sm:text-meta md:text-panel">
+          <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 lg:ms-0 lg:mt-6 lg:max-w-80 lg:border-0 lg:ps-0">
+            <p lang="en" dir="ltr" className="text-caption font-medium text-white sm:text-meta lg:text-title">
               {en['brand.mission']}
             </p>
             <p
               lang="ar"
               dir="rtl"
-              className="mt-1 text-caption font-light text-white sm:text-meta md:text-panel"
+              className="mt-1 text-caption font-medium text-white sm:text-meta lg:text-title"
               style={{ fontFamily: 'var(--font-arabic)' }}
             >
               {ar['brand.mission']}
@@ -64,8 +64,10 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <div className="relative z-10 hidden items-center gap-2.5 md:flex">
-          <Icon name="shield-check" size={15} className="shrink-0 text-rail-muted" />
+        <div className="relative z-10 hidden items-center gap-3 rounded-l border border-rail-hairline bg-white/5 px-4 py-3 lg:flex">
+          <span className="flex h-8 w-8 items-center justify-center rounded-m bg-leaf-500/15 text-leaf-300">
+            <Icon name="shield-check" size={16} />
+          </span>
           <div className="text-micro leading-relaxed text-rail-muted">
             <p>{t('sovereignty.line1')}</p>
             <p>{t('sovereignty.line2')}</p>
@@ -73,16 +75,18 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="relative flex min-w-0 flex-1 items-center justify-center bg-paper-50 px-4 py-14 sm:px-6 sm:py-16">
+      <main className="auth-form-panel relative flex min-w-0 flex-1 items-center justify-center px-3 py-12 sm:px-6 sm:py-16 lg:px-10">
         <button
           type="button"
           onClick={toggleLocale}
           aria-label={t('auth.localeToggle')}
-          className="absolute end-4 top-4 rounded-m px-2 py-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100 sm:end-8 sm:top-8"
+          className="absolute end-4 top-4 inline-flex min-h-11 items-center rounded-m border border-leaf-300 bg-surface-0/80 px-3 text-meta font-semibold text-leaf-700 shadow-card transition-colors hover:bg-leaf-100 sm:end-8 sm:top-8"
         >
           {t('auth.localeToggle')}
         </button>
-        <div className="w-full max-w-115">{children}</div>
+        <div className="auth-card panel-enter w-full max-w-115 rounded-xl border border-white/80 p-3 min-[390px]:p-5 sm:p-7 lg:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

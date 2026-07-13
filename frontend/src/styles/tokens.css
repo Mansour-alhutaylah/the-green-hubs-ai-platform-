@@ -38,7 +38,7 @@
   --color-paper-50: #f7f9f6;
   --color-surface-0: #ffffff;
   --color-ink-900: #172019;
-  --color-gray-400: #9aa49d;
+  --color-gray-400: #758079;
   /* §16 gives #6B7570, verified "4.9:1" against pure white — but gray-600
      is used constantly as body/caption text directly on --color-paper-50
      (the app's own default background) and --color-tint-100 (well
@@ -51,7 +51,7 @@
   --color-line-200: #dfe7e1;
   /* §11.1/§15 Input border — a distinct, slightly darker hairline used only
      on form controls at rest (vs. --color-line-200's general dividers). */
-  --color-line-300: #cdd4cc;
+  --color-line-300: #89978c;
   --color-tint-100: #f0f5f1;
   --color-amber-100: #f6ebe1;
   --color-amber-700: #8a4b27;
@@ -176,6 +176,7 @@
   --size-control-l: 48px;
   --size-control-m: 40px;
   --size-control-s: 32px;
+  --size-otp-group: 364px;
   --content-max: 1376px;
   /* Authentication system's form column (approved auth redesign) — wider
      than the general 400px auth column the rest of §11.1 implies, per the

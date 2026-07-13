@@ -34,14 +34,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         aria-invalid={Boolean(error)}
         aria-describedby={cn(errorId, hintId) || undefined}
         className={cn(
-          'rounded-m border bg-surface-0 text-body text-ink-900 outline-none transition-colors duration-[var(--motion-fast)]',
+          'rounded-m border bg-surface-0 text-body text-ink-900 transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700',
           'placeholder:text-gray-400 disabled:bg-tint-100 disabled:text-gray-400',
           inputSize === 'xl' && 'h-[var(--size-control-xl)] px-4',
           inputSize === 'lg' && 'h-12 px-3',
           inputSize === 'md' && 'h-10 px-3',
           error
             ? 'border-[length:var(--border-width-error)] border-amber-700'
-            : 'border-line-300 focus:border-2 focus:border-forest-900',
+            : 'border-line-300 focus:border-forest-900',
           className,
         )}
         {...props}

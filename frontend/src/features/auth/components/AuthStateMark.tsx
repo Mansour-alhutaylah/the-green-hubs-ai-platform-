@@ -5,14 +5,14 @@ export function AuthStateMark({ tone = 'attention' }: { tone?: 'success' | 'atte
   return (
     <span
       className={cn(
-        'mb-5 inline-flex h-12 w-12 items-center justify-center rounded-l border',
+        'relative mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl border shadow-card before:absolute before:inset-1 before:rounded-l before:border before:border-current before:opacity-15',
         tone === 'success'
           ? 'border-leaf-300 bg-leaf-100 text-leaf-700'
           : 'border-amber-100 bg-amber-100 text-amber-700',
       )}
       aria-hidden
     >
-      <Icon name={tone === 'success' ? 'check' : 'circle-alert'} size={24} />
+      <Icon name={tone === 'success' ? 'check' : 'circle-alert'} size={26} />
     </span>
   );
 }
