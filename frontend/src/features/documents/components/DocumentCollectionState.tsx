@@ -12,7 +12,12 @@ export function DocumentCollectionState({
 }) {
   if (state === 'loading') {
     return (
-      <SectionCard className="mt-5" contentClassName="space-y-5" aria-live="polite">
+      <SectionCard
+        className="mt-5 rounded-xl border-leaf-300/60 bg-mist-50"
+        contentClassName="space-y-5"
+        aria-live="polite"
+        aria-busy="true"
+      >
         {Array.from({ length: 4 }, (_, index) => (
           <LoadingSkeleton key={index} lines={2} label="Loading documents" />
         ))}
@@ -22,7 +27,7 @@ export function DocumentCollectionState({
 
   if (state === 'empty') {
     return (
-      <SectionCard className="mt-5">
+      <SectionCard className="mt-5 rounded-xl border-leaf-300/60 bg-mist-50">
         <EmptyState
           title="No documents in this demo workspace"
           description="Upload will become available when the document service is connected."
@@ -33,7 +38,7 @@ export function DocumentCollectionState({
 
   if (state === 'error') {
     return (
-      <SectionCard className="mt-5 border-red-100" aria-live="assertive">
+      <SectionCard className="mt-5 rounded-xl border-red-100 bg-red-100/35" aria-live="assertive">
         <EmptyState
           title="Documents could not be displayed"
           description="This preview is unavailable. No backend request was attempted."
