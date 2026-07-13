@@ -172,4 +172,11 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
             raise NotFoundError(f"Document {document_id} not found")
         model.processing_status = "PROCESSED"
         await self._session.flush()
+        # `updated_at`'s `onupdate=func.now()` is a server-evaluated SQL
+        # expression, so SQLAlchemy marks it expired after flush rather
+        # than knowing its new value -- refresh() re-reads it (still
+        # within this uncommitted transaction) so _to_domain() below can
+        # read it directly instead of triggering an unawaited lazy load,
+        # which raises MissingGreenlet under the async engine.
+        await self._session.refresh(model)
         return _to_domain(model)

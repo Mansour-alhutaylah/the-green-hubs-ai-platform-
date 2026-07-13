@@ -59,6 +59,9 @@ class FakeDocumentStorage(IDocumentStorage):
     async def put(self, object_key: str, content: bytes, content_type: str) -> None:
         self.objects[object_key] = content
 
+    async def get(self, object_key: str) -> bytes:
+        return self.objects[object_key]
+
     async def delete(self, object_key: str) -> None:
         self.delete_calls.append(object_key)
         self.objects.pop(object_key, None)

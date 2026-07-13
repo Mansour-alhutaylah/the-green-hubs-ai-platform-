@@ -70,8 +70,19 @@ logger = logging.getLogger(__name__)
 async def _extract_text_from_bytes(pdf_bytes: bytes) -> str:
     """Writes ``pdf_bytes`` to a secure, OS-managed temp file (never the
     original filename) and calls the existing, unmodified extractor
-    against it. The file is closed before extraction begins and removed
-    in ``finally``, on both success and every failure path."""
+    against it. The file is closed before extraction begins and removal is
+    attempted in ``finally``, on both success and every failure path.
+
+    Removal is best-effort: a parsing library that fails to open a
+    malformed PDF can leave its own internal file handle open slightly
+    longer than the Python-level call that raised, which on Windows makes
+    ``unlink`` fail with ``PermissionError`` even though the underlying
+    temp file is genuinely orphaned, not in normal use. Swallowing (and
+    logging) that specific failure here matters: without it, the cleanup
+    step itself would raise and replace -- not just accompany -- the real
+    extraction error, so callers would see an unrelated OS error instead
+    of the actual failure reason.
+    """
     fd, temp_path_str = tempfile.mkstemp(suffix=".pdf")
     temp_path = Path(temp_path_str)
     try:
@@ -79,7 +90,10 @@ async def _extract_text_from_bytes(pdf_bytes: bytes) -> str:
             temp_file.write(pdf_bytes)
         return await extract_text(temp_path)
     finally:
-        temp_path.unlink(missing_ok=True)
+        try:
+            temp_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Failed to remove temporary file %s", temp_path)
 
 
 def _map_to_app_error(exc: Exception) -> AppError:
