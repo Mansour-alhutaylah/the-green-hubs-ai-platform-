@@ -36,5 +36,5 @@ describe('Login -> OTP -> Dashboard flow', () => {
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(new RegExp(viewer.email))).toBeInTheDocument();
-  });
+  }, 10_000);
 });

@@ -23,7 +23,7 @@ export function ForgotPasswordPage() {
   return (
     <AuthSplitLayout>
       {submitted ? (
-        <div role="status">
+        <output className="block">
           <AuthStateMark tone="success" />
           <AuthPageHeader
             eyebrow={t('auth.forgot.eyebrow')}
@@ -36,7 +36,7 @@ export function ForgotPasswordPage() {
           >
             {t('auth.forgot.backToLogin')}
           </Link>
-        </div>
+        </output>
       ) : (
         <form onSubmit={handleSubmit}>
           <AuthPageHeader

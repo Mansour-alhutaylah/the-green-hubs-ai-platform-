@@ -10,7 +10,7 @@ export function LoadingSkeleton({
   label?: string;
 }) {
   return (
-    <div className={cn('space-y-2', className)} role="status" aria-label={label}>
+    <output className={cn('block space-y-2', className)} aria-label={label}>
       {Array.from({ length: lines }, (_, index) => (
         <span
           key={index}
@@ -21,6 +21,6 @@ export function LoadingSkeleton({
           aria-hidden
         />
       ))}
-    </div>
+    </output>
   );
 }

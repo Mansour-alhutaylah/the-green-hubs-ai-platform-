@@ -81,15 +81,10 @@ export function AnalysisRunPage() {
 
         <div className="space-y-5">
           <SectionCard title="Confidence">
-            <div
-              role="progressbar"
-              aria-label="Sample analysis confidence"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={run.confidence}
-            >
+            <div>
               <div className="flex items-end justify-between gap-3"><span className="text-metric text-forest-900">{run.confidence}%</span><span className="text-caption font-semibold text-gray-600">Sample score</span></div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-line-200"><div className="h-full rounded-full bg-leaf-700" style={{ width: `${run.confidence}%` }} /></div>
+              <progress className="sr-only" aria-label="Sample analysis confidence" max={100} value={run.confidence}>{run.confidence}%</progress>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-line-200" aria-hidden><div className="h-full rounded-full bg-leaf-700" style={{ width: `${run.confidence}%` }} /></div>
             </div>
             <p className="mt-3 text-caption text-gray-600">Confidence is illustrative and has not been calibrated against an evaluation dataset.</p>
           </SectionCard>
