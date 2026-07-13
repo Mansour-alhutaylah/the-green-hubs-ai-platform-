@@ -47,7 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {...props}
       />
       {error && (
-        <p id={errorId} className="text-meta text-amber-700">
+        <p id={errorId} className="text-meta text-amber-700" role="alert">
           {error}
         </p>
       )}

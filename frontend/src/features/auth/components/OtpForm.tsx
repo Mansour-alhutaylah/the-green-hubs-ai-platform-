@@ -46,10 +46,10 @@ export function OtpForm({
           error={Boolean(error)}
           onComplete={(code) => void onComplete(code)}
         />
-        {error && <p className="text-meta text-amber-700">{error}</p>}
-        {isSubmitting && <p className="text-caption text-gray-600">{t('auth.otp.verifying')}</p>}
+        {error && <p className="text-meta text-amber-700" role="alert">{error}</p>}
+        {isSubmitting && <p className="text-caption text-gray-600" role="status">{t('auth.otp.verifying')}</p>}
 
-        <div className="mt-1 flex items-center justify-between text-meta">
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-meta">
           <button type="button" onClick={onBack} className="font-medium text-leaf-700 hover:underline">
             {t('auth.otp.back')}
           </button>

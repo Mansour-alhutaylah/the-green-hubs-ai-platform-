@@ -16,11 +16,11 @@ export interface AuthPageHeaderProps {
  */
 export function AuthPageHeader({ eyebrow, heading, supporting }: AuthPageHeaderProps) {
   return (
-    <div className="mb-8">
+    <div className="mb-6 sm:mb-8">
       <p className="type-label mb-3 text-gray-600">{eyebrow}</p>
       <h1 className="text-display text-forest-900">{heading}</h1>
       {supporting && (
-        <p className="mt-2.5 max-w-[42ch] text-body text-gray-600">{supporting}</p>
+        <p className="mt-2.5 max-w-[42ch] break-words text-body text-gray-600">{supporting}</p>
       )}
     </div>
   );

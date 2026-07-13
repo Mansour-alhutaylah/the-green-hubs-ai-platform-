@@ -33,15 +33,15 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
   const { t, toggleLocale } = useLocale();
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="relative flex h-24 shrink-0 items-center overflow-hidden bg-forest-900 px-6 md:h-auto md:w-[45%] md:flex-col md:items-start md:justify-between md:px-14 md:py-14">
+    <div className="flex min-h-screen min-w-0 flex-col md:flex-row">
+      <aside className="relative flex min-h-32 shrink-0 items-center overflow-hidden bg-forest-900 px-4 py-4 sm:px-6 md:min-h-screen md:w-[45%] md:flex-col md:items-start md:justify-between md:px-10 md:py-10 xl:px-14 xl:py-14">
         <BrandPatternAccent />
 
         {/* Logo + mission line as one tight brand lockup (rather than the
             logo sitting alone with a large gap below it) so the image
             reads as part of the panel's brand mark, not a separate block. */}
-        <div className="relative z-10 flex flex-col items-start">
-          <div className="relative h-[52px] w-[120px] overflow-hidden md:h-[94px] md:w-[216px]">
+        <div className="relative z-10 flex min-w-0 items-center md:flex-col md:items-start">
+          <div className="relative h-[52px] w-[120px] shrink-0 overflow-hidden md:h-[94px] md:w-[216px]">
             <img
               src={logoWhiteOnForest}
               alt="The Green Hubs"
@@ -49,14 +49,14 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
             />
           </div>
 
-          <div className="mt-6 hidden max-w-75 md:block">
-            <p lang="en" dir="ltr" className="text-panel font-light text-white">
+          <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 md:ms-0 md:mt-6 md:max-w-75 md:border-0 md:ps-0">
+            <p lang="en" dir="ltr" className="text-caption font-light text-white sm:text-meta md:text-panel">
               {en['brand.mission']}
             </p>
             <p
               lang="ar"
               dir="rtl"
-              className="mt-1 text-panel font-light text-white"
+              className="mt-1 text-caption font-light text-white sm:text-meta md:text-panel"
               style={{ fontFamily: 'var(--font-arabic)' }}
             >
               {ar['brand.mission']}
@@ -73,11 +73,12 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="relative flex flex-1 items-center justify-center bg-paper-50 px-6 py-16">
+      <main className="relative flex min-w-0 flex-1 items-center justify-center bg-paper-50 px-4 py-14 sm:px-6 sm:py-16">
         <button
           type="button"
           onClick={toggleLocale}
-          className="absolute end-8 top-8 text-meta font-semibold text-leaf-700 hover:underline"
+          aria-label={t('auth.localeToggle')}
+          className="absolute end-4 top-4 rounded-m px-2 py-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100 sm:end-8 sm:top-8"
         >
           {t('auth.localeToggle')}
         </button>

@@ -6,6 +6,7 @@ import { useLocale } from '@/lib/i18n/useLocale';
 import { ROUTES } from '@/app/navigation/routePaths';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
 import { AuthPageHeader } from '../components/AuthPageHeader';
+import { AuthStateMark } from '../components/AuthStateMark';
 
 /** §9.1: "email entry -> 'check your inbox' state -> reset form -> /login".
  * No real email delivery exists yet — this is the UI shape only. */
@@ -22,7 +23,8 @@ export function ForgotPasswordPage() {
   return (
     <AuthSplitLayout>
       {submitted ? (
-        <div>
+        <div role="status">
+          <AuthStateMark tone="success" />
           <AuthPageHeader
             eyebrow={t('auth.forgot.eyebrow')}
             heading={t('auth.forgot.checkInbox.title')}
@@ -30,7 +32,7 @@ export function ForgotPasswordPage() {
           />
           <Link
             to={ROUTES.login}
-            className="text-meta font-medium text-leaf-700 hover:underline"
+            className="inline-flex min-h-10 items-center rounded-m border border-line-200 px-4 text-meta font-semibold text-forest-900 hover:bg-tint-100"
           >
             {t('auth.forgot.backToLogin')}
           </Link>
