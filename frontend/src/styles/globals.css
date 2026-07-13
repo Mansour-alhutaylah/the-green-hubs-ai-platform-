@@ -207,6 +207,74 @@
   animation: panel-enter var(--motion-slow) var(--ease-slow) both;
 }
 
+.dashboard-network {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: min(44%, 34rem);
+  pointer-events: none;
+  opacity: 0.82;
+  background:
+    radial-gradient(circle at 68% 38%, rgb(79 175 114 / 0.24), transparent 12rem),
+    linear-gradient(120deg, transparent 4%, rgb(255 255 255 / 0.06));
+  mask-image: linear-gradient(to left, black 66%, transparent);
+}
+
+:root[dir='rtl'] .dashboard-network {
+  mask-image: linear-gradient(to right, black 66%, transparent);
+}
+
+.dashboard-network::before,
+.dashboard-network::after {
+  position: absolute;
+  border: 1px solid rgb(184 222 195 / 0.25);
+  border-radius: 999px;
+  content: '';
+}
+
+.dashboard-network::before {
+  inset-block-start: 10%;
+  inset-inline-end: -8%;
+  width: 24rem;
+  height: 24rem;
+  box-shadow:
+    0 0 0 3rem rgb(184 222 195 / 0.035),
+    0 0 0 6rem rgb(184 222 195 / 0.025);
+}
+
+.dashboard-network::after {
+  inset-block-start: 42%;
+  inset-inline-end: 34%;
+  width: 9rem;
+  height: 9rem;
+}
+
+.dashboard-node {
+  position: absolute;
+  z-index: 1;
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid rgb(255 255 255 / 0.68);
+  border-radius: 999px;
+  background: var(--color-leaf-500);
+  box-shadow: var(--shadow-signal);
+}
+
+.dashboard-node-primary {
+  inset-block-start: 24%;
+  inset-inline-end: 22%;
+}
+
+.dashboard-node-secondary {
+  inset-block-start: 61%;
+  inset-inline-end: 49%;
+}
+
+.dashboard-node-tertiary {
+  inset-block-start: 76%;
+  inset-inline-end: 16%;
+}
+
 .loading-skeleton {
   background-image: linear-gradient(
     90deg,
