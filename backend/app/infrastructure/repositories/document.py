@@ -20,20 +20,37 @@ had it observed the deletion in time. A unique-constraint violation on
 mapping is done here, in the SQL-aware repository layer, specifically so
 the service layer never needs to import SQLAlchemy or asyncpg to
 distinguish these cases.
+
+``begin_processing()`` (Sprint 3.5) is the sole mechanism preventing two
+concurrent requests from both claiming the same Document: a single
+``UPDATE ... WHERE processing_status = 'PENDING' RETURNING ...``,
+committed immediately. Verified empirically against this project's real
+database during planning: a second, identical conditional UPDATE against
+an already-claimed row matches zero rows under Postgres's default READ
+COMMITTED isolation, because the two UPDATEs serialize via row-level
+locking and the second one re-evaluates the WHERE clause against the
+freshly committed value. A prior read followed by an unconditional write
+would not provide this guarantee.
 """
 
 from typing import Sequence
 from uuid import UUID
 
 import asyncpg.exceptions as pg_exceptions  # type: ignore[import-untyped]
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppError, NotFoundError, PersistenceError
+from app.core.exceptions import AppError, InvalidStateTransitionError, NotFoundError, PersistenceError
 from app.domain.entities.document import Document
 from app.domain.repositories.document import IDocumentRepository
 from app.infrastructure.db.models.document import DocumentModel
+
+_STATE_TRANSITION_MESSAGES = {
+    "PROCESSING": "Document is already being processed.",
+    "PROCESSED": "Document has already been processed.",
+    "FAILED": "Failed documents cannot be reprocessed in this sprint.",
+}
 
 
 def _to_domain(model: DocumentModel) -> Document:
@@ -125,4 +142,34 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         model.processing_status = status
         await self._session.commit()
         await self._session.refresh(model)
+        return _to_domain(model)
+
+    async def begin_processing(self, document_id: UUID) -> Document:
+        stmt = (
+            update(DocumentModel)
+            .where(DocumentModel.id == document_id, DocumentModel.processing_status == "PENDING")
+            .values(processing_status="PROCESSING")
+            .returning(DocumentModel)
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        await self._session.commit()
+        if model is not None:
+            return _to_domain(model)
+
+        existing = await self._session.get(DocumentModel, document_id)
+        if existing is None:
+            raise NotFoundError(f"Document {document_id} not found")
+        message = _STATE_TRANSITION_MESSAGES.get(
+            existing.processing_status,
+            f"Document is not in a PENDING state (current state: {existing.processing_status}).",
+        )
+        raise InvalidStateTransitionError(message)
+
+    async def complete_processing(self, document_id: UUID) -> Document:
+        model = await self._session.get(DocumentModel, document_id)
+        if model is None:
+            raise NotFoundError(f"Document {document_id} not found")
+        model.processing_status = "PROCESSED"
+        await self._session.flush()
         return _to_domain(model)

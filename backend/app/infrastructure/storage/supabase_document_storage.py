@@ -3,16 +3,20 @@
 Uses a narrow ``httpx.AsyncClient`` call against Supabase Storage's object
 endpoints directly -- not the ``supabase-py`` SDK, which would pull in a
 much larger dependency tree (postgrest-py, gotrue, realtime-py, storage3)
-for functionality this sprint needs exactly two operations from. ``httpx``
-was already a project dependency (previously dev-only, for the ASGI test
-client); this makes it a runtime dependency too.
+for functionality this sprint needs exactly three operations from.
+``httpx`` was already a project dependency (previously dev-only, for the
+ASGI test client); this makes it a runtime dependency too.
 
 The bucket is provisioned as an explicit infrastructure setup step, outside
 this codebase -- this class never creates it, never alters its policies,
-and never makes it public. A missing/inaccessible bucket, an unreachable
-Supabase instance, or any non-2xx response surfaces uniformly as
-``StorageError``; the caller (``DocumentUploadService``) maps that to a
-generic application error without leaking provider details to the client.
+and never makes it public.
+
+``get()`` (Sprint 3.5) distinguishes three failure causes: a 404 response
+maps to ``StorageObjectNotFoundError``, a transport-level failure (DNS,
+connection, timeout) maps to ``StorageUnavailableError``, and a 401/403
+response maps to ``StorageConfigurationError`` -- callers
+(``DocumentProcessingService``) map these to safe application errors
+without ever exposing the provider's raw response.
 
 Authenticates with the service-role key (elevated access, bypasses RLS --
 mirroring how this backend's own Postgres connection already bypasses RLS
@@ -23,7 +27,13 @@ never exposed to the frontend or included in any response.
 import httpx
 
 from app.core.config import Settings
-from app.domain.storage.document_storage import IDocumentStorage, StorageError
+from app.domain.storage.document_storage import (
+    IDocumentStorage,
+    StorageConfigurationError,
+    StorageError,
+    StorageObjectNotFoundError,
+    StorageUnavailableError,
+)
 
 _REQUEST_TIMEOUT_SECONDS = 30.0
 
@@ -78,3 +88,17 @@ class SupabaseDocumentStorage(IDocumentStorage):
             raise StorageError("Unable to reach the storage provider") from exc
         if response.status_code >= 400:
             raise StorageError(f"Storage delete failed with status {response.status_code}")
+
+    async def get(self, object_key: str) -> bytes:
+        try:
+            async with self._client() as client:
+                response = await client.get(self._object_url(object_key), headers=self._headers)
+        except httpx.HTTPError as exc:
+            raise StorageUnavailableError("Unable to reach the storage provider") from exc
+        if response.status_code == 404:
+            raise StorageObjectNotFoundError(f"Object not found: {object_key}")
+        if response.status_code in (401, 403):
+            raise StorageConfigurationError("Storage provider rejected the request")
+        if response.status_code >= 400:
+            raise StorageError(f"Storage retrieval failed with status {response.status_code}")
+        return response.content
