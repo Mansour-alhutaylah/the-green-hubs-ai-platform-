@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '../routes';
 import { Role } from '@/features/rbac/roles';
 import { DEMO_USERS } from '@/features/auth/services/demoUsers';
@@ -10,6 +11,8 @@ describe('routed page content', () => {
 
   beforeEach(() => {
     window.sessionStorage.setItem('ghp:dashboard-visited', '1');
+    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
+    window.dispatchEvent(new Event('resize'));
   });
 
   if (!admin) throw new Error('No Admin demo user seeded');
@@ -29,8 +32,64 @@ describe('routed page content', () => {
     expect(screen.getByText(/pending approvals/i)).toBeVisible();
     expect(screen.getByRole('heading', { name: /recent documents/i })).toBeVisible();
     expect(screen.getByRole('heading', { name: /recent activity/i })).toBeVisible();
-    expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+    const main = screen.getByRole('main');
+    expect(main).not.toBeEmptyDOMElement();
+    expect(main).toHaveClass('py-4', 'md:py-5', 'xl:py-6');
+    expect(screen.getByRole('heading', { name: /^dashboard$/i }).closest('section')).not.toHaveClass(
+      'panel-enter',
+    );
   });
+
+  it('renders Dashboard after refresh-style remount and away/back navigation', async () => {
+    const firstView = renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/dashboard'],
+      session: buildTestSession(admin),
+    });
+    expect(
+      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+    ).toBeVisible();
+    firstView.unmount();
+
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/dashboard'],
+      session: buildTestSession(admin),
+    });
+    expect(
+      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+    ).toBeVisible();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('link', { name: /review documents/i }));
+    expect(
+      await screen.findByRole('heading', { name: /^documents$/i }, { timeout: 5000 }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('link', { name: /^dashboard$/i }));
+    expect(
+      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+    ).toBeVisible();
+    expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+  }, 15_000);
+
+  it.each([1440, 1280, 1024, 768, 390, 360])(
+    'renders non-empty Dashboard content at %ipx',
+    async (width) => {
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+      window.dispatchEvent(new Event('resize'));
+
+      renderWithProviders(<AppRoutes />, {
+        initialEntries: ['/dashboard'],
+        session: buildTestSession(admin),
+      });
+
+      expect(
+        await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      ).toBeVisible();
+      expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+        document.documentElement.clientWidth,
+      );
+    },
+  );
 
   it.each([
     ['/documents', /^documents$/i],

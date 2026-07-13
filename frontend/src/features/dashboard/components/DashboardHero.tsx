@@ -9,7 +9,7 @@ export function DashboardHero({ user }: { user?: DemoUser | null }) {
   const displayName = user?.name ?? 'Green Hubs team';
 
   return (
-    <section className="panel-enter relative overflow-hidden rounded-xl border border-white/10 bg-forest-900 text-white shadow-brand">
+    <section className="relative overflow-hidden rounded-xl border border-white/10 bg-forest-900 text-white shadow-brand">
       <div className="dashboard-network" aria-hidden>
         <span className="dashboard-node dashboard-node-primary" />
         <span className="dashboard-node dashboard-node-secondary" />
