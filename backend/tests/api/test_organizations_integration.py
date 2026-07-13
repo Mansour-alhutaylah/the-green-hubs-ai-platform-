@@ -1,15 +1,24 @@
 """Integration API tests for Organization Management endpoints.
 
-These exercise the endpoints through the real ``app`` (via the ``client``
-fixture's in-process ``ASGITransport``), which resolves ``get_db`` to a real
-``AsyncSessionLocal`` against the configured ``DATABASE_URL`` -- so every
-test here actually creates/reads/updates rows in the real database. Every
-row a test creates is tracked by id and deleted, via an independent
-session, in ``cleanup_ids``'s teardown -- regardless of test outcome.
+Sprint 3.5.1 (Tenant Isolation & API Security) rewrite: these endpoints
+now require authentication and enforce tenant scope, so every test here
+uses the real orchestration path -- a real ``OrganizationService`` wired
+with the real ``IOrganizationRepository`` against the configured
+database -- authenticated via the same locally-signed-token technique as
+``test_auth_integration.py``/``test_documents_integration.py``: the real
+issuer/audience (from actual settings) with only the JWKS *fetch* faked,
+never touching Supabase's Auth API, never creating any ``auth.users``
+row.
+
+Every row a test creates -- an Organization and a matching ``public.users``
+profile -- is tracked and deleted, via an independent session, in
+``cleanup_ids``'s teardown (users before organizations, since
+``users.organization_id`` references ``organizations.id``), regardless
+of test outcome. Two Organizations and two Users are used throughout to
+exercise same-tenant success and cross-tenant denial.
 
 Marked ``integration`` module-wide, mirroring
-``test_document_repository.py``, so the default CI run
-(``pytest -m "not integration"``) skips this file entirely.
+``test_document_processing_integration.py``.
 """
 
 import uuid
@@ -18,9 +27,23 @@ from typing import AsyncIterator
 import pytest
 from httpx import AsyncClient
 
+from app.api.deps import get_supabase_jwt_verifier
 from app.core.config import get_settings
 from app.infrastructure.db.models.organization import Organization as OrganizationModel
+from app.infrastructure.db.models.user import User as UserModel
 from app.infrastructure.db.session import AsyncSessionLocal
+from app.infrastructure.security.supabase_jwt import (
+    JWKSCache,
+    SupabaseJWTVerifier,
+    build_verifier_from_settings,
+)
+from app.main import app
+
+from tests.infrastructure.security.test_supabase_jwt import (
+    _generate_keypair,
+    _make_token,
+    _public_key_to_jwk,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -32,120 +55,234 @@ def _require_database_url() -> None:
 
 
 @pytest.fixture
-async def cleanup_ids() -> AsyncIterator[list[uuid.UUID]]:
-    ids: list[uuid.UUID] = []
+def keypair():
+    return _generate_keypair()
+
+
+@pytest.fixture
+def real_verifier() -> SupabaseJWTVerifier:
+    return build_verifier_from_settings(get_settings())
+
+
+@pytest.fixture(autouse=True)
+def _override_dependencies(keypair, real_verifier: SupabaseJWTVerifier):
+    _private_key, public_key = keypair
+    jwk = _public_key_to_jwk(public_key, "integration-test-kid")
+
+    def fake_fetch(_uri: str) -> dict:
+        return {"keys": [jwk]}
+
+    test_verifier = SupabaseJWTVerifier(
+        jwks_cache=JWKSCache(real_verifier.jwks_cache.jwks_uri, fetch=fake_fetch),
+        issuer=real_verifier.issuer,
+        audience=real_verifier.audience,
+    )
+    app.dependency_overrides[get_supabase_jwt_verifier] = lambda: test_verifier
+    yield
+    app.dependency_overrides.pop(get_supabase_jwt_verifier, None)
+
+
+@pytest.fixture
+async def cleanup_ids() -> AsyncIterator[dict[str, list[uuid.UUID]]]:
+    ids: dict[str, list[uuid.UUID]] = {"users": [], "organizations": []}
     yield ids
-    if not ids:
-        return
     async with AsyncSessionLocal() as cleanup_session:
-        for organization_id in ids:
+        for user_id in ids["users"]:
+            model = await cleanup_session.get(UserModel, user_id)
+            if model is not None:
+                await cleanup_session.delete(model)
+        await cleanup_session.commit()
+        for organization_id in ids["organizations"]:
             model = await cleanup_session.get(OrganizationModel, organization_id)
             if model is not None:
                 await cleanup_session.delete(model)
         await cleanup_session.commit()
 
 
-async def test_create_organization_returns_201_and_persists(
-    client: AsyncClient, cleanup_ids: list[uuid.UUID]
+async def _make_organization_and_profile(
+    cleanup_ids: dict[str, list[uuid.UUID]], *, name: str
+) -> tuple[uuid.UUID, uuid.UUID]:
+    async with AsyncSessionLocal() as session:
+        organization = OrganizationModel(name=name)
+        session.add(organization)
+        await session.flush()
+        cleanup_ids["organizations"].append(organization.id)
+
+        profile_id = uuid.uuid4()
+        profile = UserModel(
+            id=profile_id,
+            organization_id=organization.id,
+            full_name="Organization Integration Test User",
+            email=f"org-integration-{profile_id}@example.com",
+            role=None,
+        )
+        session.add(profile)
+        await session.commit()
+        cleanup_ids["users"].append(profile_id)
+
+        return organization.id, profile_id
+
+
+def _token_for(private_key, real_verifier: SupabaseJWTVerifier, profile_id: uuid.UUID) -> str:
+    return _make_token(
+        private_key,
+        kid="integration-test-kid",
+        overrides={
+            "sub": str(profile_id),
+            "iss": real_verifier.issuer,
+            "aud": real_verifier.audience,
+        },
+    )
+
+
+async def test_no_anonymous_success_remains_on_any_route(
+    client: AsyncClient, cleanup_ids: dict[str, list[uuid.UUID]]
 ) -> None:
-    response = await client.post("/api/v1/organizations", json={"name": "  Acme Corp  "})
-    assert response.status_code == 201
+    organization_id, _profile_id = await _make_organization_and_profile(
+        cleanup_ids, name="Anonymous Access Test Org"
+    )
 
+    assert (await client.post("/api/v1/organizations", json={"name": "X"})).status_code == 401
+    assert (await client.get("/api/v1/organizations")).status_code == 401
+    assert (
+        await client.get(f"/api/v1/organizations/{organization_id}")
+    ).status_code == 401
+    assert (
+        await client.patch(f"/api/v1/organizations/{organization_id}", json={"name": "X"})
+    ).status_code == 401
+
+
+async def test_user_a_sees_only_organization_a_when_listing(
+    client: AsyncClient,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]],
+) -> None:
+    private_key, _public_key = keypair
+    organization_a, profile_a = await _make_organization_and_profile(
+        cleanup_ids, name="Organization A"
+    )
+    _organization_b, _profile_b = await _make_organization_and_profile(
+        cleanup_ids, name="Organization B"
+    )
+    token = _token_for(private_key, real_verifier, profile_a)
+
+    response = await client.get(
+        "/api/v1/organizations", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 200
     body = response.json()
-    cleanup_ids.append(uuid.UUID(body["id"]))
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["id"] == str(organization_a)
 
-    assert body["name"] == "Acme Corp"
-    assert body["created_at"] is not None
+
+async def test_user_a_cannot_get_organization_b(
+    client: AsyncClient,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]],
+) -> None:
+    private_key, _public_key = keypair
+    _organization_a, profile_a = await _make_organization_and_profile(
+        cleanup_ids, name="Organization A"
+    )
+    organization_b, _profile_b = await _make_organization_and_profile(
+        cleanup_ids, name="Organization B"
+    )
+    token = _token_for(private_key, real_verifier, profile_a)
+
+    response = await client.get(
+        f"/api/v1/organizations/{organization_b}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+
+
+async def test_user_a_cannot_update_organization_b(
+    client: AsyncClient,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]],
+) -> None:
+    private_key, _public_key = keypair
+    _organization_a, profile_a = await _make_organization_and_profile(
+        cleanup_ids, name="Organization A"
+    )
+    organization_b, _profile_b = await _make_organization_and_profile(
+        cleanup_ids, name="Organization B"
+    )
+    token = _token_for(private_key, real_verifier, profile_a)
+
+    response = await client.patch(
+        f"/api/v1/organizations/{organization_b}",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Hijacked"},
+    )
+
+    assert response.status_code == 404
 
     async with AsyncSessionLocal() as verify_session:
-        model = await verify_session.get(OrganizationModel, uuid.UUID(body["id"]))
+        model = await verify_session.get(OrganizationModel, organization_b)
         assert model is not None
-        assert model.name == "Acme Corp"
+        assert model.name == "Organization B"  # untouched
 
 
-async def test_get_existing_organization_returns_200(
-    client: AsyncClient, cleanup_ids: list[uuid.UUID]
+async def test_same_tenant_get_and_update_still_succeed(
+    client: AsyncClient,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]],
 ) -> None:
-    created = await client.post("/api/v1/organizations", json={"name": "Beta Org"})
-    organization_id = created.json()["id"]
-    cleanup_ids.append(uuid.UUID(organization_id))
+    private_key, _public_key = keypair
+    organization_a, profile_a = await _make_organization_and_profile(
+        cleanup_ids, name="Organization A"
+    )
+    token = _token_for(private_key, real_verifier, profile_a)
+    headers = {"Authorization": f"Bearer {token}"}
 
-    response = await client.get(f"/api/v1/organizations/{organization_id}")
+    get_response = await client.get(f"/api/v1/organizations/{organization_a}", headers=headers)
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == str(organization_a)
 
-    assert response.status_code == 200
-    assert response.json()["id"] == organization_id
-    assert response.json()["name"] == "Beta Org"
+    update_response = await client.patch(
+        f"/api/v1/organizations/{organization_a}", headers=headers, json={"name": "Renamed A"}
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["name"] == "Renamed A"
+
+    async with AsyncSessionLocal() as verify_session:
+        model = await verify_session.get(OrganizationModel, organization_a)
+        assert model is not None
+        assert model.name == "Renamed A"
 
 
-async def test_get_missing_organization_returns_404(client: AsyncClient) -> None:
-    response = await client.get(f"/api/v1/organizations/{uuid.uuid4()}")
-    assert response.status_code == 404
-
-
-async def test_list_returns_created_organizations_in_deterministic_order(
-    client: AsyncClient, cleanup_ids: list[uuid.UUID]
+async def test_organization_creation_disabled_for_authenticated_user(
+    client: AsyncClient,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]],
 ) -> None:
-    names = ["List Org A", "List Org B", "List Org C"]
-    created_ids = []
-    for name in names:
-        response = await client.post("/api/v1/organizations", json={"name": name})
-        created_ids.append(response.json()["id"])
-    cleanup_ids.extend(uuid.UUID(cid) for cid in created_ids)
+    private_key, _public_key = keypair
+    _organization_id, profile_id = await _make_organization_and_profile(
+        cleanup_ids, name="Creation Attempt Test Org"
+    )
+    token = _token_for(private_key, real_verifier, profile_id)
 
-    response = await client.get("/api/v1/organizations", params={"page": 1, "page_size": 100})
+    response = await client.post(
+        "/api/v1/organizations",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Should Never Exist"},
+    )
 
-    assert response.status_code == 200
-    body = response.json()
-    listed_ids = [item["id"] for item in body["items"]]
-    positions = [listed_ids.index(cid) for cid in created_ids]
-    assert positions == sorted(positions)  # created_ids appear in creation order
+    assert response.status_code == 403
 
+    async with AsyncSessionLocal() as verify_session:
+        from sqlalchemy import select
 
-async def test_list_pagination_defaults_and_boundaries(
-    client: AsyncClient, cleanup_ids: list[uuid.UUID]
-) -> None:
-    created_ids = []
-    for i in range(3):
-        response = await client.post(
-            "/api/v1/organizations", json={"name": f"Page Org {i}"}
+        result = await verify_session.execute(
+            select(OrganizationModel).where(OrganizationModel.name == "Should Never Exist")
         )
-        created_ids.append(response.json()["id"])
-    cleanup_ids.extend(uuid.UUID(cid) for cid in created_ids)
-
-    default_response = await client.get("/api/v1/organizations")
-    assert default_response.status_code == 200
-    assert default_response.json()["page"] == 1
-    assert default_response.json()["page_size"] == 20
-
-    page_response = await client.get(
-        "/api/v1/organizations", params={"page": 1, "page_size": 1}
-    )
-    assert page_response.status_code == 200
-    assert len(page_response.json()["items"]) == 1
-    assert page_response.json()["total"] >= 3
-
-
-async def test_update_organization_returns_200_and_persists_new_name(
-    client: AsyncClient, cleanup_ids: list[uuid.UUID]
-) -> None:
-    created = await client.post("/api/v1/organizations", json={"name": "Old Name"})
-    organization_id = created.json()["id"]
-    cleanup_ids.append(uuid.UUID(organization_id))
-    created_at = created.json()["created_at"]
-
-    response = await client.patch(
-        f"/api/v1/organizations/{organization_id}", json={"name": "New Name"}
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["name"] == "New Name"
-    assert body["id"] == organization_id
-    assert body["created_at"] == created_at  # created_at preserved
-
-
-async def test_update_missing_organization_returns_404(client: AsyncClient) -> None:
-    response = await client.patch(
-        f"/api/v1/organizations/{uuid.uuid4()}", json={"name": "New Name"}
-    )
-    assert response.status_code == 404
+        assert result.scalars().all() == []
