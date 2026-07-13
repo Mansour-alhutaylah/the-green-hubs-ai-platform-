@@ -8,15 +8,29 @@ expect. Here, callers expect the pure ``Document`` domain entity, so every
 method maps explicitly between ``DocumentModel`` (ORM) and ``Document``
 (domain) via ``_to_domain`` -- the ORM type never crosses the repository
 boundary.
+
+``create()`` distinguishes two real constraint-violation causes (Sprint
+3.4, Document Upload Foundation): a foreign-key violation on
+``engagement_id`` (the Engagement was deleted concurrently, between the
+caller's own existence check and this insert) maps to ``NotFoundError``
+(404) -- the same status the caller's earlier check would have produced
+had it observed the deletion in time. A unique-constraint violation on
+``storage_path``, or any other integrity error, maps to ``PersistenceError``
+(500) -- a generic, non-leaking failure, never a raw DB exception. This
+mapping is done here, in the SQL-aware repository layer, specifically so
+the service layer never needs to import SQLAlchemy or asyncpg to
+distinguish these cases.
 """
 
 from typing import Sequence
 from uuid import UUID
 
+import asyncpg.exceptions as pg_exceptions  # type: ignore[import-untyped]
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AppError, NotFoundError, PersistenceError
 from app.domain.entities.document import Document
 from app.domain.repositories.document import IDocumentRepository
 from app.infrastructure.db.models.document import DocumentModel
@@ -30,7 +44,23 @@ def _to_domain(model: DocumentModel) -> Document:
         processing_status=model.processing_status,
         engagement_id=model.engagement_id,
         created_at=model.created_at,
+        updated_at=model.updated_at,
     )
+
+
+def _map_integrity_error(exc: IntegrityError, entity: Document) -> AppError:
+    # SQLAlchemy's asyncpg dialect wraps the real asyncpg exception at
+    # exc.orig.__cause__ (verified empirically against this project's
+    # actual database during Sprint 3.4 planning), not at exc.orig
+    # directly -- checking both keeps this correct even if that wrapping
+    # detail changes across SQLAlchemy versions.
+    candidates = (exc.orig, getattr(exc.orig, "__cause__", None))
+    for candidate in candidates:
+        if isinstance(candidate, pg_exceptions.ForeignKeyViolationError):
+            return NotFoundError(f"Engagement {entity.engagement_id} not found")
+        if isinstance(candidate, pg_exceptions.UniqueViolationError):
+            return PersistenceError("A document with this storage path already exists")
+    return PersistenceError("Unable to persist the document")
 
 
 class SQLAlchemyDocumentRepository(IDocumentRepository):
@@ -57,7 +87,11 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
             engagement_id=entity.engagement_id,
         )
         self._session.add(model)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise _map_integrity_error(exc, entity) from exc
         await self._session.refresh(model)
         return _to_domain(model)
 
