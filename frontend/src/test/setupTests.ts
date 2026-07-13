@@ -7,12 +7,19 @@ Object.defineProperty(window, 'scrollTo', {
   value: vi.fn<typeof window.scrollTo>(),
 });
 
+Object.defineProperty(window.history, 'scrollRestoration', {
+  configurable: true,
+  writable: true,
+  value: 'auto',
+});
+
 /** mockAuthService persists to real localStorage/sessionStorage — clear
  * both between tests so one test's session/lockout state can't leak into
  * the next. */
 afterEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
+  window.history.scrollRestoration = 'auto';
   vi.mocked(window.scrollTo).mockClear();
 });
 

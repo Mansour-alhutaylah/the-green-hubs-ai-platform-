@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router';
 
 /**
@@ -8,6 +8,15 @@ import { useLocation } from 'react-router';
  */
 export function RouteScrollReset() {
   const { hash, pathname } = useLocation();
+
+  useEffect(() => {
+    const previousRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    return () => {
+      window.history.scrollRestoration = previousRestoration;
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (hash) {

@@ -40,6 +40,7 @@ describe('routed page content', () => {
       screen.getByRole('heading', { name: /^dashboard$/i }).closest('section'),
     ).not.toHaveClass('panel-enter');
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
+    expect(window.history.scrollRestoration).toBe('manual');
   });
 
   it('renders Dashboard after refresh-style remount and away/back navigation', async () => {
