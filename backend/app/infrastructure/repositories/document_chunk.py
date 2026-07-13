@@ -27,6 +27,8 @@ def _to_domain(model: DocumentChunkModel) -> DocumentChunk:
         document_id=model.document_id,
         chunk_index=model.chunk_index,
         content=model.content,
+        char_start=model.char_start,
+        char_end=model.char_end,
         created_at=model.created_at,
     )
 
@@ -43,6 +45,8 @@ class SQLAlchemyDocumentChunkRepository(IDocumentChunkRepository):
                 document_id=entity.document_id,
                 chunk_index=entity.chunk_index,
                 content=entity.content,
+                char_start=entity.char_start,
+                char_end=entity.char_end,
             )
             for entity in entities
         ]

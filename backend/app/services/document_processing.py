@@ -189,6 +189,8 @@ class DocumentProcessingService:
                     document_id=document.id,
                     chunk_index=chunk.chunk_index,
                     content=chunk.text,
+                    char_start=chunk.char_start,
+                    char_end=chunk.char_end,
                     created_at=None,
                 )
                 for chunk in text_chunks
