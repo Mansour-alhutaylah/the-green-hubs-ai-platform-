@@ -51,6 +51,10 @@
   --color-tint-100: #f4f6f2;
   --color-amber-100: #f6ebe1;
   --color-amber-700: #8a4b27;
+  --color-red-100: #f8e9e7;
+  --color-red-700: #973b32;
+  --color-sky-100: #eaf2f1;
+  --color-sky-700: #35645f;
 
   /* Rail-only states (rgba over Forest) — kept as first-class color tokens
      so hover:bg-rail-hover / bg-rail-active work like any other color. */
@@ -135,6 +139,7 @@
   --radius-l: 8px;
   --shadow-raise: 0 2px 8px rgb(18 38 24 / 0.08);
   --shadow-float: 0 12px 40px rgb(18 38 24 / 0.18);
+  --shadow-card: 0 1px 2px rgb(18 38 24 / 0.04), 0 8px 24px rgb(18 38 24 / 0.04);
 }
 
 /* Tokens that are not first-class Tailwind theme namespaces (sizing,

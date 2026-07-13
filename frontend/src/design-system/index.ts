@@ -22,3 +22,11 @@ export {
 } from './primitives/DiamondGlyph/DiamondGlyph';
 export { Icon, type IconProps } from './primitives/Icon/Icon';
 export type { IconName } from './primitives/Icon/iconRegistry';
+export { SectionCard, type SectionCardProps } from './primitives/SectionCard/SectionCard';
+export {
+  StatusBadge,
+  type StatusBadgeProps,
+  type StatusTone,
+} from './primitives/StatusBadge/StatusBadge';
+export { DemoDataBadge } from './primitives/DemoDataBadge/DemoDataBadge';
+export { LoadingSkeleton } from './primitives/LoadingSkeleton/LoadingSkeleton';

@@ -20,11 +20,23 @@ export function ProfileMenu() {
     <PopoverMenu
       contentClassName="w-50 py-1"
       trigger={
-        <button type="button" aria-label={user.name} className="focus-on-forest rounded-full">
+        <button
+          type="button"
+          aria-label={`${user.name}, account menu`}
+          className="flex items-center gap-2 rounded-m p-1 hover:bg-tint-100"
+        >
           <Avatar name={user.name} size={32} />
+          <span className="hidden max-w-32 text-start xl:block">
+            <span className="block truncate text-meta font-bold text-ink-900">{user.name}</span>
+            <span className="block text-caption capitalize text-gray-600">{user.role}</span>
+          </span>
         </button>
       }
     >
+      <div className="border-b border-line-200 px-4 py-3 xl:hidden">
+        <p className="truncate text-meta font-bold text-ink-900">{user.name}</p>
+        <p className="mt-0.5 truncate text-caption text-gray-600">{user.email}</p>
+      </div>
       <MenuLink label={t('contextBar.profile.profile')} onClick={() => navigate(ROUTES.profile)} />
       <MenuLink
         label={t('contextBar.profile.settings')}
