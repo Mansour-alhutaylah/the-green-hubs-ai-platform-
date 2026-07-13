@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-export interface SectionCardProps {
+export interface SectionCardProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   children: ReactNode;
   title?: string;
   description?: string;
@@ -18,6 +18,7 @@ export function SectionCard({
   action,
   className,
   contentClassName,
+  ...sectionProps
 }: SectionCardProps) {
   return (
     <section
@@ -25,6 +26,7 @@ export function SectionCard({
         'overflow-hidden rounded-l border border-line-200 bg-surface-0 shadow-card',
         className,
       )}
+      {...sectionProps}
     >
       {(title || description || action) && (
         <div className="flex flex-col gap-3 border-b border-line-200 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">

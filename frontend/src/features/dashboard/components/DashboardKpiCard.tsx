@@ -11,7 +11,8 @@ const TONE_CLASSES: Record<MockKpi['tone'], string> = {
 export function DashboardKpiCard({ kpi }: { kpi: MockKpi }) {
   const { t } = useLocale();
   return (
-    <div className="rounded-l border border-line-200 bg-surface-0 p-5">
+    <div className="relative overflow-hidden rounded-l border border-line-200 bg-surface-0 p-4 shadow-card sm:p-5">
+      <span className="absolute inset-x-0 top-0 h-0.5 bg-leaf-500" aria-hidden />
       <p className="type-label text-gray-600">{t(kpi.labelKey)}</p>
       <p className="mt-2 text-metric text-forest-900">{kpi.value}</p>
       <p className={cn('mt-1 text-meta font-medium', TONE_CLASSES[kpi.tone])}>

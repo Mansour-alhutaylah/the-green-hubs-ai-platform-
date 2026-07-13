@@ -15,7 +15,7 @@ export interface DashboardCardProps {
 export function DashboardCard({ title, viewAllHref, children }: DashboardCardProps) {
   const { t } = useLocale();
   return (
-    <section className="rounded-l border border-line-200 bg-surface-0 p-6">
+    <section className="rounded-l border border-line-200 bg-surface-0 p-4 shadow-card sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-panel text-forest-900">{title}</h2>
         {viewAllHref && (
