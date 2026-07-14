@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { Icon } from '@/design-system';
+import { BrandLogo, Icon } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { en } from '@/lib/i18n/strings/en';
 import { ar } from '@/lib/i18n/strings/ar';
-import logoWhiteOnForest from '@/assets/brand/logo-lockup-white-on-forest.png';
 import { BrandPatternAccent } from './BrandPatternAccent';
 
 /**
@@ -15,15 +14,8 @@ import { BrandPatternAccent } from './BrandPatternAccent';
  * form panel's top-inline-end corner. Below ~900px the brand panel
  * collapses to a compact top band (logo only).
  *
- * The logo is the exact provided asset (`logo-lockup-white-on-forest.png`)
- * — no recolor, redraw, or effect ever applied to its pixels. The asset's
- * own canvas (1536×1024) carries the lockup on a large padded background
- * (measured content box: x 344–1262, y 296–694), which read as a "pasted
- * poster" when shown at its native crop. The frame below is a pure-CSS
- * windowed crop (an oversized `img` absolutely positioned inside an
- * `overflow-hidden` box) tightened to the lockup's own content with ~15%
- * breathing room — the same technique as a `background-position` crop,
- * just expressed with an `<img>`. No pixels are edited.
+ * The logo is the approved supplied company asset, rendered without any
+ * crop, recolor, transform, or distortion through the shared BrandLogo.
  *
  * The mission line is shown bilingually (English, then Arabic) regardless
  * of the current UI locale — a fixed sovereignty statement, not something
@@ -48,13 +40,7 @@ export function AuthSplitLayout({
             logo sitting alone with a large gap below it) so the image
             reads as part of the panel's brand mark, not a separate block. */}
         <div className="relative z-10 flex min-w-0 items-center lg:flex-col lg:items-start">
-          <div className="relative h-16 w-[158px] shrink-0 overflow-hidden lg:h-[104px] lg:w-[238px]">
-            <img
-              src={logoWhiteOnForest}
-              alt="The Green Hubs"
-              className="absolute left-[-28px] top-[-32px] h-[134px] w-[201px] max-w-none lg:left-[-41px] lg:top-[-47px] lg:h-[204px] lg:w-[306px]"
-            />
-          </div>
+          <BrandLogo size="hero" />
 
           {!isLogin && (
             <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 lg:ms-0 lg:mt-6 lg:max-w-80 lg:border-0 lg:ps-0">

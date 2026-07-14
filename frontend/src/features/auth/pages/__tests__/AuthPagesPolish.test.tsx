@@ -9,12 +9,19 @@ describe('authentication page polish', () => {
   it.each([
     ['session expired', <SessionExpiredPage key="session" />, /sign in again/i],
     ['access denied', <AccessDeniedPage key="access" />, /back to sign in/i],
-  ])('renders the %s state with mission context and a named action', async (_name, page, action) => {
-    renderWithProviders(page);
+  ])(
+    'renders the %s state with mission context and a named action',
+    async (_name, page, action) => {
+      renderWithProviders(page);
 
-    expect(screen.getByText('The operating system for sustainability.')).toBeVisible();
-    expect(screen.getByRole('button', { name: action })).toBeVisible();
-  });
+      expect(screen.getByText('The operating system for sustainability.')).toBeVisible();
+      expect(screen.getByRole('img', { name: 'The Green Hubs' })).toHaveAttribute(
+        'src',
+        '/brand/green-hubs-official.png',
+      );
+      expect(screen.getByRole('button', { name: action })).toBeVisible();
+    },
+  );
 
   it('renders the recovery form with labeled controls', () => {
     renderWithProviders(<ForgotPasswordPage />);
