@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     # a defensive pre-filter; the LLM's own evidence_status remains the
     # authoritative signal for nuanced cases.
     rag_minimum_relevance_score: float = 0.5
+    rag_retrieval_top_k: int = 10
     rag_prompt_template_version: str = "v1"
     rag_output_schema_version: str = "v1"
     rag_processing_stale_after_seconds: int = 300
