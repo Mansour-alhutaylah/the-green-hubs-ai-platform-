@@ -29,12 +29,19 @@ import { BrandPatternAccent } from './BrandPatternAccent';
  * of the current UI locale — a fixed sovereignty statement, not something
  * the locale toggle switches between.
  */
-export function AuthSplitLayout({ children }: { children: ReactNode }) {
+export function AuthSplitLayout({
+  children,
+  variant = 'default',
+}: {
+  children: ReactNode;
+  variant?: 'default' | 'login';
+}) {
   const { t, toggleLocale } = useLocale();
+  const isLogin = variant === 'login';
 
   return (
     <div className="flex min-h-dvh min-w-0 flex-col lg:flex-row">
-      <aside className="auth-brand-panel relative flex min-h-40 shrink-0 items-center overflow-hidden px-4 py-5 sm:min-h-44 sm:px-6 lg:min-h-dvh lg:w-[45%] lg:flex-col lg:items-start lg:justify-between lg:px-10 lg:py-10 xl:px-14 xl:py-14">
+      <aside className="auth-brand-panel relative flex min-h-40 shrink-0 items-center overflow-hidden px-4 py-5 sm:min-h-44 sm:px-6 lg:min-h-dvh lg:w-[44%] lg:flex-col lg:items-start lg:px-10 lg:py-10 xl:px-14 xl:py-14">
         <BrandPatternAccent />
 
         {/* Logo + mission line as one tight brand lockup (rather than the
@@ -49,20 +56,54 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
             />
           </div>
 
-          <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 lg:ms-0 lg:mt-6 lg:max-w-80 lg:border-0 lg:ps-0">
-            <p lang="en" dir="ltr" className="text-caption font-medium text-white sm:text-meta lg:text-title">
-              {en['brand.mission']}
+          {!isLogin && (
+            <div className="ms-3 min-w-0 border-s border-rail-hairline ps-3 lg:ms-0 lg:mt-6 lg:max-w-80 lg:border-0 lg:ps-0">
+              <p
+                lang="en"
+                dir="ltr"
+                className="text-caption font-medium text-white sm:text-meta lg:text-title"
+              >
+                {en['brand.mission']}
+              </p>
+              <p
+                lang="ar"
+                dir="rtl"
+                className="mt-1 text-caption font-medium text-white sm:text-meta lg:text-title"
+                style={{ fontFamily: 'var(--font-arabic)' }}
+              >
+                {ar['brand.mission']}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {isLogin && (
+          <div className="relative z-10 mt-auto hidden max-w-96 pb-32 lg:block xl:pb-40">
+            <p lang="en" dir="ltr" className="text-display text-white xl:text-hero">
+              {en['auth.welcome.title']}
+            </p>
+            <p lang="en" dir="ltr" className="mt-3 max-w-[36ch] text-body leading-6 text-rail-text">
+              {en['auth.welcome.supporting']}
+            </p>
+            <div className="my-7 h-px w-12 bg-leaf-500" aria-hidden />
+            <p
+              lang="ar"
+              dir="rtl"
+              className="text-display text-white xl:text-hero"
+              style={{ fontFamily: 'var(--font-arabic)' }}
+            >
+              {ar['auth.welcome.title']}
             </p>
             <p
               lang="ar"
               dir="rtl"
-              className="mt-1 text-caption font-medium text-white sm:text-meta lg:text-title"
+              className="mt-3 max-w-[36ch] text-body leading-7 text-rail-text"
               style={{ fontFamily: 'var(--font-arabic)' }}
             >
-              {ar['brand.mission']}
+              {ar['auth.welcome.supporting']}
             </p>
           </div>
-        </div>
+        )}
 
         <div className="relative z-10 hidden items-center gap-3 rounded-l border border-rail-hairline bg-white/5 px-4 py-3 lg:flex">
           <span className="flex h-8 w-8 items-center justify-center rounded-m bg-leaf-500/15 text-leaf-300">
@@ -87,6 +128,11 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
         <div className="auth-card panel-enter w-full max-w-115 rounded-xl border border-white/80 p-3 min-[390px]:p-5 sm:p-7 lg:p-8">
           {children}
         </div>
+        {isLogin && (
+          <p className="absolute bottom-6 hidden text-caption text-gray-600 lg:block">
+            {t('auth.copyright')}
+          </p>
+        )}
       </main>
     </div>
   );

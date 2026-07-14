@@ -33,10 +33,16 @@ export const ar: Record<StringKey, string> = {
   'sovereignty.line2': 'تشفير متوافق مع الهيئة الوطنية للأمن السيبراني',
 
   'auth.signin.eyebrow': 'تسجيل الدخول',
-  'auth.signin.title': 'سجّل الدخول إلى منصتك',
+  'auth.signin.title': 'مرحباً بعودتك',
+  'auth.signin.supporting': 'سجّل الدخول للمتابعة إلى مساحة عمل الاستدامة.',
   'auth.signin.emailLabel': 'البريد الإلكتروني للعمل',
   'auth.signin.passwordLabel': 'كلمة المرور',
-  'auth.signin.submit': 'متابعة',
+  'auth.signin.rememberMe': 'تذكرني',
+  'auth.signin.submit': 'تسجيل الدخول',
+  'auth.welcome.title': 'مرحباً بعودتك',
+  'auth.welcome.supporting':
+    'أدر أدلة الاستدامة والمستندات والرؤى الموثّقة في مساحة عمل آمنة واحدة.',
+  'auth.copyright': '© 2026 ذا جرين هبز. جميع الحقوق محفوظة.',
   'auth.signin.forgotPassword': 'نسيت كلمة المرور؟',
   'auth.demo.or': 'أو',
   'auth.demo.label': 'دخول تجريبي لبيئة التطوير',

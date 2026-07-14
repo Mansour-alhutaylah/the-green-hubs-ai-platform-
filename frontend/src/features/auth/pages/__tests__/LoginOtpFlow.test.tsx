@@ -18,11 +18,12 @@ describe('Login -> OTP -> Dashboard flow', () => {
       authService: mockAuthService,
     });
 
-    await screen.findByRole('heading', { name: /sign in to your hub/i });
+    await screen.findByRole('heading', { name: /welcome back/i });
+    expect(screen.getByRole('checkbox', { name: /remember me/i })).toBeChecked();
 
     await user.type(screen.getByLabelText(/work email/i), viewer.email);
     await user.type(screen.getByLabelText(/^password$/i), DEMO_PASSWORD);
-    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
     const otpCells = await screen.findAllByLabelText(/Digit \d of 6/);
     expect(otpCells).toHaveLength(6);

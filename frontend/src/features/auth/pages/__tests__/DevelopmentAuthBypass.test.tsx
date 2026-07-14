@@ -69,7 +69,7 @@ describe('development authentication bypass', () => {
       authService: mockAuthService,
     });
 
-    expect(await screen.findByRole('heading', { name: /sign in to your hub/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
     expect(screen.queryByRole('button', { name: /enter demo workspace/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/development demo access/i)).not.toBeInTheDocument();
     await expect(mockAuthService.enterDemoWorkspace?.()).rejects.toThrow(
@@ -99,9 +99,7 @@ describe('development authentication bypass', () => {
       expect(
         await screen.findByRole('heading', { name: heading }, { timeout: 5000 }),
       ).toBeVisible();
-      expect(
-        screen.queryByRole('heading', { name: /sign in to your hub/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /welcome back/i })).not.toBeInTheDocument();
       view.unmount();
     }
   }, 20_000);
@@ -121,7 +119,7 @@ describe('development authentication bypass', () => {
     );
     await user.click(await screen.findByRole('button', { name: /sign out/i }));
 
-    expect(await screen.findByRole('heading', { name: /sign in to your hub/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
     expect(window.localStorage.getItem(SESSION_KEY)).toBeNull();
     view.unmount();
 
@@ -129,7 +127,7 @@ describe('development authentication bypass', () => {
       initialEntries: ['/documents'],
       authService: mockAuthService,
     });
-    expect(await screen.findByRole('heading', { name: /sign in to your hub/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
   }, 10_000);
 
   it('renders the enabled demo action in Arabic with its explanatory copy', async () => {

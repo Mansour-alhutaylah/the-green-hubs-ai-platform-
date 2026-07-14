@@ -127,6 +127,125 @@
   opacity: 0.7;
 }
 
+.auth-sun {
+  position: absolute;
+  inset-inline-end: 18%;
+  inset-block-end: 19%;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: var(--color-leaf-300);
+  box-shadow: 0 0 3rem rgb(184 222 195 / 0.28);
+  opacity: 0.9;
+}
+
+.auth-hill {
+  position: absolute;
+  inset-inline-start: -12%;
+  inset-block-end: -11%;
+  width: 125%;
+  height: 28%;
+  border-radius: 50% 50% 0 0;
+  transform: rotate(-4deg);
+  transform-origin: center bottom;
+}
+
+.auth-hill-far {
+  inset-block-end: 1%;
+  background: rgb(79 175 114 / 0.16);
+}
+
+.auth-hill-near {
+  background: rgb(12 26 16 / 0.7);
+}
+
+.auth-turbine {
+  position: absolute;
+  inset-block-end: 7%;
+  width: 0.15rem;
+  height: 7rem;
+  background: rgb(255 255 255 / 0.58);
+  transform-origin: bottom;
+}
+
+.auth-turbine-one {
+  inset-inline-end: 29%;
+}
+.auth-turbine-two {
+  inset-inline-end: 48%;
+  height: 5rem;
+  opacity: 0.72;
+}
+
+.auth-turbine i,
+.auth-turbine b,
+.auth-turbine em {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 0;
+  width: 0.13rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.7);
+  transform-origin: center top;
+}
+
+.auth-turbine i {
+  transform: rotate(0deg);
+}
+.auth-turbine b {
+  transform: rotate(120deg);
+}
+.auth-turbine em {
+  transform: rotate(240deg);
+}
+
+.auth-tree {
+  position: absolute;
+  inset-block-end: 1%;
+  width: 0.18rem;
+  height: 5rem;
+  background: rgb(184 222 195 / 0.35);
+}
+
+.auth-tree::before,
+.auth-tree::after,
+.auth-tree i {
+  position: absolute;
+  inset-inline-start: 50%;
+  border-inline: 1.15rem solid transparent;
+  border-block-end: 2.1rem solid rgb(79 175 114 / 0.3);
+  content: '';
+  transform: translateX(-50%);
+}
+
+.auth-tree::before {
+  inset-block-start: -0.5rem;
+}
+.auth-tree::after {
+  inset-block-start: 0.8rem;
+}
+.auth-tree i {
+  inset-block-start: 2rem;
+}
+.auth-tree-one {
+  inset-inline-start: 13%;
+}
+.auth-tree-two {
+  inset-inline-start: 22%;
+  height: 3.8rem;
+  opacity: 0.75;
+}
+
+@media (max-width: 63.999rem) {
+  .auth-sun,
+  .auth-hill,
+  .auth-turbine,
+  .auth-tree {
+    display: none;
+  }
+}
+
 .auth-brand-network::before,
 .auth-brand-network::after {
   position: absolute;

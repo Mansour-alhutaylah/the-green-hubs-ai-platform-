@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router';
-import { Button, Input } from '@/design-system';
+import { Button, Icon, Input } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { useCountdown, formatCountdown } from '@/lib/utils/useCountdown';
 import { ROUTES } from '@/app/navigation/routePaths';
@@ -29,6 +29,7 @@ export function LoginForm({
   const { t } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const { remaining: lockoutRemaining } = useCountdown(lockoutSeconds ?? 0);
   const isLocked = lockoutRemaining > 0;
 
@@ -44,7 +45,17 @@ export function LoginForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <AuthPageHeader eyebrow={t('auth.signin.eyebrow')} heading={t('auth.signin.title')} />
+      <div
+        className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-leaf-300 bg-leaf-100 text-leaf-700 shadow-card"
+        aria-hidden
+      >
+        <Icon name="lock" size={22} />
+      </div>
+      <AuthPageHeader
+        eyebrow={t('auth.signin.eyebrow')}
+        heading={t('auth.signin.title')}
+        supporting={t('auth.signin.supporting')}
+      />
 
       <div className="flex flex-col gap-4">
         <Input
@@ -69,6 +80,24 @@ export function LoginForm({
           error={fieldError}
         />
 
+        <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-meta font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+              className="h-4 w-4 rounded-s border-line-300 accent-forest-900"
+            />
+            {t('auth.signin.rememberMe')}
+          </label>
+          <Link
+            to={ROUTES.forgotPassword}
+            className="inline-flex min-h-10 items-center rounded-m px-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100"
+          >
+            {t('auth.signin.forgotPassword')}
+          </Link>
+        </div>
+
         <Button
           type="submit"
           size="xl"
@@ -78,13 +107,6 @@ export function LoginForm({
         >
           {t('auth.signin.submit')}
         </Button>
-
-        <Link
-          to={ROUTES.forgotPassword}
-          className="inline-flex min-h-10 items-center self-start rounded-m px-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100"
-        >
-          {t('auth.signin.forgotPassword')}
-        </Link>
 
         {onEnterDemoWorkspace && (
           <section className="mt-1" aria-labelledby="development-demo-access-label">

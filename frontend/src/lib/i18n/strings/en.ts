@@ -34,10 +34,16 @@ export const en = {
   'sovereignty.line2': 'NCA-compliant encryption',
 
   'auth.signin.eyebrow': 'Sign in',
-  'auth.signin.title': 'Sign in to your hub',
+  'auth.signin.title': 'Welcome back',
+  'auth.signin.supporting': 'Sign in to continue to your sustainability workspace.',
   'auth.signin.emailLabel': 'Work email',
   'auth.signin.passwordLabel': 'Password',
-  'auth.signin.submit': 'Continue',
+  'auth.signin.rememberMe': 'Remember me',
+  'auth.signin.submit': 'Sign in',
+  'auth.welcome.title': 'Welcome back',
+  'auth.welcome.supporting':
+    'Manage sustainability evidence, documents, and verified insights in one secure workspace.',
+  'auth.copyright': '© 2026 The Green Hubs. All rights reserved.',
   'auth.demo.or': 'or',
   'auth.demo.label': 'Development demo access',
   'auth.demo.supporting': 'No account or verification is required in development mode.',

@@ -88,7 +88,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthSplitLayout>
+    <AuthSplitLayout variant="login">
       {step.name === 'credentials' ? (
         <LoginForm
           onSubmit={handleCredentials}
