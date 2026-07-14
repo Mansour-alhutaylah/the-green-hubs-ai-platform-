@@ -64,12 +64,23 @@ class Settings(BaseSettings):
     # name) so a missing configuration fails clearly, not silently.
     supabase_storage_bucket: Optional[str] = None
 
-    # AI. `openai_model` is reserved for a future chat/completion use --
-    # never read by embedding code, which uses its own dedicated settings
-    # below so the two concerns can never be ambiguously conflated. No
+    # AI. `openai_api_key` is the shared account credential for every
+    # OpenAI-backed gateway (embeddings and chat/completion alike) --
+    # never read for anything but Authorization headers, never logged. No
     # LangChain dependency is introduced yet.
     openai_api_key: Optional[str] = None
+
+    # LLM gateway (Sprint 3.6B, RAG + Structured Sustainability Analysis
+    # Foundation). `openai_model` was reserved in Sprint 3.6A specifically
+    # "for a future chat/completion use" -- this is that use, so it is
+    # repurposed here as OpenAILLMGateway's model setting rather than
+    # adding a redundant duplicate field. Deliberately separate from
+    # `embedding_model` below -- the two concerns must never be
+    # ambiguously conflated.
     openai_model: str = "gpt-4o-mini"
+    llm_provider_timeout_seconds: float = 60.0
+    llm_max_tokens: int = 1500
+    llm_temperature: float = 0.1
 
     # Embeddings (Sprint 3.6A, Vector Retrieval Foundation). Dedicated
     # configuration, deliberately separate from `openai_model` above.
@@ -84,6 +95,16 @@ class Settings(BaseSettings):
     embedding_max_batch_size: int = 100
     embedding_max_input_characters: int = 8000
     embedding_processing_stale_after_seconds: int = 300
+
+    # RAG analysis (Sprint 3.6B). Chunks whose retrieval similarity_score
+    # falls below this threshold are excluded from assembled context --
+    # a defensive pre-filter; the LLM's own evidence_status remains the
+    # authoritative signal for nuanced cases.
+    rag_minimum_relevance_score: float = 0.5
+    rag_retrieval_top_k: int = 10
+    rag_prompt_template_version: str = "v1"
+    rag_output_schema_version: str = "v1"
+    rag_processing_stale_after_seconds: int = 300
 
 
 @lru_cache
