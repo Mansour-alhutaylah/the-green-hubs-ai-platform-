@@ -1,5 +1,5 @@
 import { forwardRef, useId } from 'react';
-import type { InputHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -12,10 +12,21 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
    * visible characters). */
   inputSize?: 'xl' | 'lg' | 'md';
   containerClassName?: string;
+  endAdornment?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, inputSize = 'md', className, containerClassName, id, ...props },
+  {
+    label,
+    error,
+    hint,
+    inputSize = 'md',
+    className,
+    containerClassName,
+    endAdornment,
+    id,
+    ...props
+  },
   ref,
 ) {
   const generatedId = useId();
@@ -28,24 +39,30 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <label htmlFor={inputId} className="text-meta font-bold text-ink-900">
         {label}
       </label>
-      <input
-        ref={ref}
-        id={inputId}
-        aria-invalid={Boolean(error)}
-        aria-describedby={cn(errorId, hintId) || undefined}
-        className={cn(
-          'rounded-m border bg-surface-0 text-body text-ink-900 transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700',
-          'placeholder:text-gray-400 disabled:bg-tint-100 disabled:text-gray-400',
-          inputSize === 'xl' && 'h-[var(--size-control-xl)] px-4',
-          inputSize === 'lg' && 'h-12 px-3',
-          inputSize === 'md' && 'h-10 px-3',
-          error
-            ? 'border-[length:var(--border-width-error)] border-amber-700'
-            : 'border-line-300 focus:border-forest-900',
-          className,
+      <div className="relative">
+        <input
+          ref={ref}
+          id={inputId}
+          aria-invalid={Boolean(error)}
+          aria-describedby={cn(errorId, hintId) || undefined}
+          className={cn(
+            'w-full rounded-m border bg-surface-0 text-body text-ink-900 transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-700',
+            'placeholder:text-gray-400 disabled:bg-tint-100 disabled:text-gray-400',
+            inputSize === 'xl' && 'h-[var(--size-control-xl)] px-4',
+            inputSize === 'lg' && 'h-12 px-3',
+            inputSize === 'md' && 'h-10 px-3',
+            endAdornment && 'pe-12',
+            error
+              ? 'border-[length:var(--border-width-error)] border-amber-700'
+              : 'border-line-300 focus:border-forest-900',
+            className,
+          )}
+          {...props}
+        />
+        {endAdornment && (
+          <span className="absolute inset-y-0 end-2 flex items-center">{endAdornment}</span>
         )}
-        {...props}
-      />
+      </div>
       {error && (
         <p id={errorId} className="text-meta text-amber-700" role="alert">
           {error}

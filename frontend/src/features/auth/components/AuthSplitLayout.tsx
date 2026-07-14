@@ -48,11 +48,11 @@ export function AuthSplitLayout({
             logo sitting alone with a large gap below it) so the image
             reads as part of the panel's brand mark, not a separate block. */}
         <div className="relative z-10 flex min-w-0 items-center lg:flex-col lg:items-start">
-          <div className="relative h-[58px] w-[134px] shrink-0 overflow-hidden lg:h-[104px] lg:w-[238px]">
+          <div className="relative h-16 w-[158px] shrink-0 overflow-hidden lg:h-[104px] lg:w-[238px]">
             <img
               src={logoWhiteOnForest}
               alt="The Green Hubs"
-              className="absolute left-[-24px] top-[-27px] h-[114px] w-[171px] max-w-none lg:left-[-41px] lg:top-[-47px] lg:h-[204px] lg:w-[306px]"
+              className="absolute left-[-28px] top-[-32px] h-[134px] w-[201px] max-w-none lg:left-[-41px] lg:top-[-47px] lg:h-[204px] lg:w-[306px]"
             />
           </div>
 

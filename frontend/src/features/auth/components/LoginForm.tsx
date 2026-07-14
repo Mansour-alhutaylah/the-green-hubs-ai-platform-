@@ -29,6 +29,7 @@ export function LoginForm({
   const { t } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const { remaining: lockoutRemaining } = useCountdown(lockoutSeconds ?? 0);
   const isLocked = lockoutRemaining > 0;
@@ -63,6 +64,7 @@ export function LoginForm({
           type="email"
           inputSize="xl"
           autoComplete="email"
+          placeholder={t('auth.signin.emailPlaceholder')}
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
@@ -70,14 +72,27 @@ export function LoginForm({
         />
         <Input
           label={t('auth.signin.passwordLabel')}
-          type="password"
+          type={isPasswordVisible ? 'text' : 'password'}
           inputSize="xl"
           autoComplete="current-password"
+          placeholder={t('auth.signin.passwordPlaceholder')}
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           disabled={isSubmitting || isLocked}
           error={fieldError}
+          endAdornment={
+            <button
+              type="button"
+              onClick={() => setIsPasswordVisible((visible) => !visible)}
+              aria-label={
+                isPasswordVisible ? t('auth.signin.hidePassword') : t('auth.signin.showPassword')
+              }
+              className="flex h-10 w-10 items-center justify-center rounded-m text-gray-600 transition-colors hover:bg-mist-50 hover:text-forest-900"
+            >
+              <Icon name={isPasswordVisible ? 'eye-off' : 'eye'} size={18} />
+            </button>
+          }
         />
 
         <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1">
