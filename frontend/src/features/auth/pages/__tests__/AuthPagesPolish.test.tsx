@@ -17,7 +17,7 @@ describe('authentication page polish', () => {
       expect(screen.getByText('The operating system for sustainability.')).toBeVisible();
       expect(screen.getByRole('img', { name: 'The Green Hubs' })).toHaveAttribute(
         'src',
-        '/brand/green-hubs-official.png',
+        '/brand/logo-lockup-white-on-forest.png',
       );
       expect(screen.getByRole('button', { name: action })).toBeVisible();
     },

@@ -104,19 +104,38 @@
   background:
     radial-gradient(circle at 18% 18%, rgb(79 175 114 / 0.24), transparent 22rem),
     radial-gradient(circle at 86% 82%, rgb(46 125 79 / 0.22), transparent 28rem),
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.05), transparent 60%),
     linear-gradient(155deg, var(--color-forest-800), var(--color-forest-900) 58%, var(--color-forest-950));
+  box-shadow: inset 0 0 10rem rgb(0 0 0 / 0.22);
 }
 
 .auth-form-panel {
+  position: relative;
   background:
     radial-gradient(circle at 96% 4%, rgb(79 175 114 / 0.11), transparent 22rem),
+    radial-gradient(circle at 4% 96%, rgb(79 175 114 / 0.07), transparent 26rem),
     linear-gradient(145deg, var(--color-paper-50), var(--color-mist-50));
 }
 
+/* Very low-opacity fractal noise so the light auth panel reads as a textured
+   surface rather than a flat fill — kept faint enough to stay invisible at a
+   glance, `pointer-events: none` so it never intercepts the form/card above it. */
+.auth-form-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .auth-card {
-  background: rgb(255 255 255 / 0.88);
-  box-shadow: var(--shadow-brand);
-  backdrop-filter: blur(12px);
+  background: rgb(255 255 255 / 0.86);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 2px 10px rgb(18 38 24 / 0.07),
+    var(--shadow-brand);
+  backdrop-filter: blur(16px);
 }
 
 .auth-brand-network {

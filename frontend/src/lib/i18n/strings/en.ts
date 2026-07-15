@@ -30,12 +30,12 @@ export const en = {
   'nav.domain.intelligence': 'Intelligence',
   'nav.domain.administration': 'Administration',
 
-  'sovereignty.line1': 'Sovereign Saudi Cloud',
-  'sovereignty.line2': 'NCA-compliant encryption',
+  'sovereignty.line1': 'Secure sustainability workspace',
+  'sovereignty.line2': 'Protected document processing',
 
   'auth.signin.eyebrow': 'Sign in',
   'auth.signin.title': 'Welcome back',
-  'auth.signin.supporting': 'Sign in to continue to your sustainability workspace.',
+  'auth.signin.supporting': 'Sign in to continue to your workspace.',
   'auth.signin.emailLabel': 'Work email',
   'auth.signin.emailPlaceholder': 'name@company.com',
   'auth.signin.passwordLabel': 'Password',
@@ -44,9 +44,9 @@ export const en = {
   'auth.signin.hidePassword': 'Hide password',
   'auth.signin.rememberMe': 'Remember me',
   'auth.signin.submit': 'Sign in',
-  'auth.welcome.title': 'Welcome back',
+  'auth.welcome.title': 'Sustainability intelligence, grounded in evidence.',
   'auth.welcome.supporting':
-    'Manage sustainability evidence, documents, and verified insights in one secure workspace.',
+    'Manage documents, analyses, and verified insights in one secure workspace.',
   'auth.copyright': '© 2026 The Green Hubs. All rights reserved.',
   'auth.demo.or': 'or',
   'auth.demo.label': 'Development demo access',

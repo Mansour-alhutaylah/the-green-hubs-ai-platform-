@@ -5,8 +5,15 @@ const STORAGE_KEY = 'ghp:rail-pref';
 type RailPreference = 'expanded' | 'collapsed';
 
 function readStoredPreference(): RailPreference | null {
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'expanded' || stored === 'collapsed' ? stored : null;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === 'expanded' || stored === 'collapsed' ? stored : null;
+  } catch {
+    // Storage can throw (disabled by browser policy, private-mode quota,
+    // sandboxed iframe/webview); this runs in a useState initializer with no
+    // error boundary above it, so fail safe instead of white-screening.
+    return null;
+  }
 }
 
 /**
@@ -27,7 +34,11 @@ export function useRailPreference(navMode: NavMode): { isCollapsed: boolean; tog
   const toggle = useCallback(() => {
     const next: RailPreference = isCollapsed ? 'expanded' : 'collapsed';
     setExplicitPreference(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Non-fatal: preference just won't persist across sessions.
+    }
   }, [isCollapsed]);
 
   return { isCollapsed, toggle };

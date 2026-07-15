@@ -3,6 +3,7 @@ import { BrandLogo, Icon } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { en } from '@/lib/i18n/strings/en';
 import { ar } from '@/lib/i18n/strings/ar';
+import { cn } from '@/lib/utils/cn';
 import { BrandPatternAccent } from './BrandPatternAccent';
 
 /**
@@ -17,9 +18,12 @@ import { BrandPatternAccent } from './BrandPatternAccent';
  * The logo is the approved supplied company asset, rendered without any
  * crop, recolor, transform, or distortion through the shared BrandLogo.
  *
- * The mission line is shown bilingually (English, then Arabic) regardless
- * of the current UI locale — a fixed sovereignty statement, not something
- * the locale toggle switches between.
+ * The non-login mission line is shown bilingually (English, then Arabic)
+ * regardless of the current UI locale — a fixed sovereignty statement, not
+ * something the locale toggle switches between. The login-only hero
+ * heading/description is different: only the active locale ever renders,
+ * driven by `t()`/`locale`/`dir` — showing both languages at once there was
+ * a bug, not a feature.
  */
 export function AuthSplitLayout({
   children,
@@ -28,7 +32,7 @@ export function AuthSplitLayout({
   children: ReactNode;
   variant?: 'default' | 'login';
 }) {
-  const { t, toggleLocale } = useLocale();
+  const { t, locale, dir, toggleLocale } = useLocale();
   const isLogin = variant === 'login';
 
   return (
@@ -65,28 +69,24 @@ export function AuthSplitLayout({
 
         {isLogin && (
           <div className="relative z-10 mt-auto hidden max-w-96 pb-32 lg:block xl:pb-40">
-            <p lang="en" dir="ltr" className="text-display text-white xl:text-hero">
-              {en['auth.welcome.title']}
-            </p>
-            <p lang="en" dir="ltr" className="mt-3 max-w-[36ch] text-body leading-6 text-rail-text">
-              {en['auth.welcome.supporting']}
-            </p>
-            <div className="my-7 h-px w-12 bg-leaf-500" aria-hidden />
             <p
-              lang="ar"
-              dir="rtl"
+              lang={locale}
+              dir={dir}
               className="text-display text-white xl:text-hero"
-              style={{ fontFamily: 'var(--font-arabic)' }}
+              style={locale === 'ar' ? { fontFamily: 'var(--font-arabic)' } : undefined}
             >
-              {ar['auth.welcome.title']}
+              {t('auth.welcome.title')}
             </p>
             <p
-              lang="ar"
-              dir="rtl"
-              className="mt-3 max-w-[36ch] text-body leading-7 text-rail-text"
-              style={{ fontFamily: 'var(--font-arabic)' }}
+              lang={locale}
+              dir={dir}
+              className={cn(
+                'mt-3 max-w-[36ch] text-body text-rail-text',
+                locale === 'ar' ? 'leading-7' : 'leading-6',
+              )}
+              style={locale === 'ar' ? { fontFamily: 'var(--font-arabic)' } : undefined}
             >
-              {ar['auth.welcome.supporting']}
+              {t('auth.welcome.supporting')}
             </p>
           </div>
         )}
@@ -107,11 +107,11 @@ export function AuthSplitLayout({
           type="button"
           onClick={toggleLocale}
           aria-label={t('auth.localeToggle')}
-          className="absolute end-4 top-4 inline-flex min-h-11 items-center rounded-m border border-leaf-300 bg-surface-0/80 px-3 text-meta font-semibold text-leaf-700 shadow-card transition-colors hover:bg-leaf-100 sm:end-8 sm:top-8"
+          className="absolute end-4 top-4 inline-flex min-h-12 items-center rounded-l border border-leaf-300 bg-surface-0/85 px-4 text-meta font-semibold text-leaf-700 shadow-raise backdrop-blur-sm transition-all duration-[var(--motion-base)] hover:bg-leaf-100 hover:shadow-float sm:end-8 sm:top-8"
         >
           {t('auth.localeToggle')}
         </button>
-        <div className="auth-card panel-enter w-full max-w-115 rounded-xl border border-white/80 p-3 min-[390px]:p-5 sm:p-7 lg:p-8">
+        <div className="auth-card panel-enter w-full max-w-115 rounded-[20px] border border-white/90 p-3 min-[390px]:p-5 sm:p-7 lg:p-8">
           {children}
         </div>
         {isLogin && (

@@ -29,12 +29,12 @@ export const ar: Record<StringKey, string> = {
   'nav.domain.intelligence': 'الذكاء',
   'nav.domain.administration': 'الإدارة',
 
-  'sovereignty.line1': 'سحابة سعودية سيادية',
-  'sovereignty.line2': 'تشفير متوافق مع الهيئة الوطنية للأمن السيبراني',
+  'sovereignty.line1': 'مساحة عمل آمنة للاستدامة',
+  'sovereignty.line2': 'معالجة محمية للمستندات',
 
   'auth.signin.eyebrow': 'تسجيل الدخول',
-  'auth.signin.title': 'مرحباً بعودتك',
-  'auth.signin.supporting': 'سجّل الدخول للمتابعة إلى مساحة عمل الاستدامة.',
+  'auth.signin.title': 'مرحبًا بعودتك',
+  'auth.signin.supporting': 'سجّل الدخول للمتابعة إلى مساحة عملك.',
   'auth.signin.emailLabel': 'البريد الإلكتروني للعمل',
   'auth.signin.emailPlaceholder': 'name@company.com',
   'auth.signin.passwordLabel': 'كلمة المرور',
@@ -43,9 +43,9 @@ export const ar: Record<StringKey, string> = {
   'auth.signin.hidePassword': 'إخفاء كلمة المرور',
   'auth.signin.rememberMe': 'تذكرني',
   'auth.signin.submit': 'تسجيل الدخول',
-  'auth.welcome.title': 'مرحباً بعودتك',
+  'auth.welcome.title': 'ذكاء استدامة قائم على الأدلة',
   'auth.welcome.supporting':
-    'أدر أدلة الاستدامة والمستندات والرؤى الموثّقة في مساحة عمل آمنة واحدة.',
+    'أدر المستندات والتحليلات والرؤى الموثّقة في مساحة عمل آمنة واحدة.',
   'auth.copyright': '© 2026 ذا جرين هبز. جميع الحقوق محفوظة.',
   'auth.signin.forgotPassword': 'نسيت كلمة المرور؟',
   'auth.demo.or': 'أو',

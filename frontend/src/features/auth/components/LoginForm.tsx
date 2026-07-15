@@ -56,6 +56,7 @@ export function LoginForm({
         eyebrow={t('auth.signin.eyebrow')}
         heading={t('auth.signin.title')}
         supporting={t('auth.signin.supporting')}
+        spacing="compact"
       />
 
       <div className="flex flex-col gap-4">
@@ -118,7 +119,7 @@ export function LoginForm({
           size="xl"
           isLoading={isSubmitting}
           disabled={isLocked}
-          className="mt-1 w-full"
+          className="mt-1 w-full bg-gradient-to-b from-forest-800 to-forest-950 shadow-[0_12px_28px_rgb(18_38_24_/_0.3)] transition-all duration-[var(--motion-base)] hover:shadow-[0_16px_36px_rgb(18_38_24_/_0.38)] hover:brightness-110"
         >
           {t('auth.signin.submit')}
         </Button>
