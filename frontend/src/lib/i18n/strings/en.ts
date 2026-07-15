@@ -254,6 +254,47 @@ export const en = {
   'documents.detail.process.submitting': 'Processing…',
   'documents.detail.process.timeout.title': 'Taking longer than expected',
   'documents.detail.process.timeout.description': 'Processing is still running. Refresh to check the latest status.',
+  'documents.detail.intelligence.title': 'AI intelligence',
+  'documents.detail.intelligence.description':
+    'Prepare this document for evidence-grounded analysis.',
+  'documents.detail.intelligence.embeddings.title': 'Embeddings',
+  'documents.detail.intelligence.embeddings.notStarted': 'Not started',
+  'documents.detail.intelligence.embeddings.processing': 'In progress',
+  'documents.detail.intelligence.embeddings.completed': 'Completed',
+  'documents.detail.intelligence.embeddings.partial': 'Partially complete',
+  'documents.detail.intelligence.embeddings.failed': 'Needs attention',
+  'documents.detail.intelligence.embeddings.counts': '{completed} of {total} chunk embeddings completed',
+  'documents.detail.intelligence.embeddings.failedCount': '{failed} failed',
+  'documents.detail.intelligence.embeddings.action': 'Generate embeddings',
+  'documents.detail.intelligence.embeddings.retryAction': 'Retry embeddings',
+  'documents.detail.intelligence.embeddings.submitting': 'Generating embeddings…',
+  'documents.detail.intelligence.embeddings.requiresProcessed':
+    'Process the document before generating embeddings.',
+  'documents.detail.intelligence.embeddings.error': 'Unable to generate embeddings.',
+  'documents.detail.intelligence.embeddings.result.title': 'Latest generation result',
+  'documents.detail.intelligence.embeddings.result.totalChunks': 'Total chunks',
+  'documents.detail.intelligence.embeddings.result.newlyCompleted': 'Newly completed',
+  'documents.detail.intelligence.embeddings.result.alreadyCompleted': 'Already completed',
+  'documents.detail.intelligence.embeddings.result.failed': 'Failed',
+  'documents.detail.intelligence.embeddings.result.inProgress': 'In progress elsewhere',
+  'documents.detail.intelligence.embeddings.result.conflicts': 'Conflicts',
+  'documents.detail.intelligence.embeddings.result.partialFailure':
+    'Some chunk embeddings failed. Retrying will attempt only the failed chunks.',
+  'documents.detail.intelligence.embeddings.result.alreadyDone':
+    'Embeddings were already complete for these chunks.',
+  'documents.detail.intelligence.analysis.title': 'AI analysis',
+  'documents.detail.intelligence.analysis.notStarted': 'Not started',
+  'documents.detail.intelligence.analysis.action': 'Run AI analysis',
+  'documents.detail.intelligence.analysis.submitting': 'Running analysis…',
+  'documents.detail.intelligence.analysis.requiresProcessed':
+    'Process the document before running analysis.',
+  'documents.detail.intelligence.analysis.requiresEmbeddings':
+    'Generate embeddings before running analysis.',
+  'documents.detail.intelligence.analysis.partialNote':
+    'Some embeddings are incomplete. Analysis uses only the completed ones.',
+  'documents.detail.intelligence.analysis.error': 'Unable to run the analysis.',
+  'documents.detail.intelligence.analysis.latestLabel': 'Latest run',
+  'documents.detail.intelligence.analysis.viewLatest': 'View latest analysis',
 
   'documents.upload.eyebrow': 'Document intake',
   'documents.upload.live.subtitle': 'Upload a source PDF to an engagement in your workspace.',

@@ -12,6 +12,7 @@ import type { DocumentReadResponse } from '@/lib/api/types';
 import type { StringKey } from '@/lib/i18n/strings/en';
 import { MOCK_DOCUMENTS, type DocumentProcessingStatus } from '../mockDocuments';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
+import { DocumentIntelligencePanel } from '../components/DocumentIntelligencePanel';
 import { useDocumentQuery } from '../useDocumentQuery';
 import { useDocumentProcessingPoll } from '../useDocumentProcessingPoll';
 
@@ -318,6 +319,8 @@ export function DocumentDetailPage() {
               ))}
             </dl>
           </SectionCard>
+
+          <DocumentIntelligencePanel document={document} onRefresh={refreshDocument} />
         </div>
       </div>
     </div>

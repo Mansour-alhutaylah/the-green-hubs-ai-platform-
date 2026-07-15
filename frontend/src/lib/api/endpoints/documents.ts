@@ -1,5 +1,11 @@
 import { apiRequest } from '../client';
-import type { DocumentListResponse, DocumentReadResponse, DocumentResponse, ListDocumentsParams } from '../types';
+import type {
+  DocumentListResponse,
+  DocumentReadResponse,
+  DocumentResponse,
+  EmbeddingGenerationSummaryResponse,
+  ListDocumentsParams,
+} from '../types';
 
 /** GET /api/v1/documents — server-side paginated, filtered by the caller's
  * own organization on the backend (never a client-supplied organization
@@ -46,6 +52,21 @@ export function uploadDocument(
  * (or a mapped error), never an in-flight PROCESSING acknowledgement. */
 export function processDocument(documentId: string, signal?: AbortSignal): Promise<DocumentResponse> {
   return apiRequest<DocumentResponse>(`/api/v1/documents/${documentId}/process`, {
+    method: 'POST',
+    signal,
+  });
+}
+
+/** POST /api/v1/documents/{document_id}/embeddings — deliberately no
+ * request body: the backend derives everything from the path id and the
+ * bearer token (never a client-supplied organization id). Idempotent per
+ * chunk: chunks embedded earlier come back counted in `already_completed`,
+ * never as an error. 409 = the document is not PROCESSED yet. */
+export function generateEmbeddings(
+  documentId: string,
+  signal?: AbortSignal,
+): Promise<EmbeddingGenerationSummaryResponse> {
+  return apiRequest<EmbeddingGenerationSummaryResponse>(`/api/v1/documents/${documentId}/embeddings`, {
     method: 'POST',
     signal,
   });
