@@ -104,6 +104,49 @@ export function AnalysisRunPage() {
     );
   }
 
+  if (run.status === 'INSUFFICIENT_EVIDENCE') {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Analysis intelligence"
+          title={run.documentName}
+          subtitle={`Started ${run.startedAt}`}
+          action={
+            <>
+              <DemoDataBadge />
+              <AnalysisStatusBadge status={run.status} />
+            </>
+          }
+        />
+        <SectionCard className="rounded-xl border-amber-100 bg-amber-100/30" aria-live="polite">
+          <EmptyState
+            title="Not enough evidence to summarize"
+            description={
+              run.summary ||
+              'The sample source did not contain enough structured data to produce a reliable summary. No provider or backend was contacted.'
+            }
+            action={
+              <Link to="/analysis" className="font-semibold text-leaf-700 hover:underline">
+                Return to analysis runs
+              </Link>
+            }
+          />
+        </SectionCard>
+        {run.findings.length > 0 && (
+          <SectionCard className="mt-5 rounded-xl" title="What was found" description="Illustrative observations · Not verified evidence">
+            <ul className="grid gap-3 md:grid-cols-2">
+              {run.findings.map((finding) => (
+                <li key={finding} className="rounded-xl border border-line-200 bg-tint-100 p-4">
+                  <p className="text-body text-ink-900">{finding}</p>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        )}
+      </div>
+    );
+  }
+
   const confidence = run.confidence ?? 0;
 
   return (

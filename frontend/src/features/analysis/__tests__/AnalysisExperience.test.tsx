@@ -12,9 +12,10 @@ describe('analysis preview experience', () => {
     renderWithProviders(<AnalysisListPage />);
 
     expect(screen.getByText(/sample data · analysis preview/i)).toBeVisible();
-    expect(screen.getByText('COMPLETE')).toBeVisible();
-    expect(screen.getByText('PROCESSING')).toBeVisible();
-    expect(screen.getByText('FAILED')).toBeVisible();
+    expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Processing').length).toBeGreaterThan(0);
+    expect(screen.getByText('Failed')).toBeVisible();
+    expect(screen.getAllByText('Insufficient evidence').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: /no analysis yet/i })).toBeVisible();
     expect(screen.getByRole('status', { name: /sample analysis is processing/i })).toBeVisible();
     expect(screen.getByRole('heading', { name: /analysis not available/i })).toBeVisible();

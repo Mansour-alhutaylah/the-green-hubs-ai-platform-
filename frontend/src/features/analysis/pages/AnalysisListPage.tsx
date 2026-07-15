@@ -16,12 +16,14 @@ const STATUS_RAIL: Record<AnalysisRunStatus, string> = {
   COMPLETE: 'bg-leaf-500',
   PROCESSING: 'bg-sky-700',
   FAILED: 'bg-red-700',
+  INSUFFICIENT_EVIDENCE: 'bg-amber-700',
 };
 
 const STATUS_CONTEXT: Record<AnalysisRunStatus, string> = {
   COMPLETE: 'Sample result ready for human review',
   PROCESSING: 'Sample processing state · No AI service running',
   FAILED: 'Controlled preview failure · No provider contacted',
+  INSUFFICIENT_EVIDENCE: 'Source lacked enough structured data to summarize',
 };
 
 export function AnalysisListPage() {

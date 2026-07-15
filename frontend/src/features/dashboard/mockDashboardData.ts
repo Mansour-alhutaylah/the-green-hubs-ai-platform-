@@ -203,3 +203,26 @@ export const PROCESSING_QUEUE: MockQueueItem[] = [
   { id: 'queue-2', name: 'Facility Energy Log — August.csv', eta: '~15 min' },
   { id: 'queue-3', name: 'Supplier Scorecard 2025.xlsx', eta: '~20 min' },
 ];
+
+export interface MonthlyActivityPoint {
+  monthKey: StringKey;
+  value: number;
+}
+
+/** Analyses completed per month — feeds the dashboard's Analysis Activity
+ * chart. Quarterly/yearly views are derived from this same series (summed
+ * per bucket), not separate fabricated datasets. */
+export const MONTHLY_ANALYSIS_ACTIVITY: MonthlyActivityPoint[] = [
+  { monthKey: 'dashboard.chart.month.jan', value: 42 },
+  { monthKey: 'dashboard.chart.month.feb', value: 48 },
+  { monthKey: 'dashboard.chart.month.mar', value: 51 },
+  { monthKey: 'dashboard.chart.month.apr', value: 46 },
+  { monthKey: 'dashboard.chart.month.may', value: 58 },
+  { monthKey: 'dashboard.chart.month.jun', value: 63 },
+  { monthKey: 'dashboard.chart.month.jul', value: 71 },
+  { monthKey: 'dashboard.chart.month.aug', value: 68 },
+  { monthKey: 'dashboard.chart.month.sep', value: 75 },
+  { monthKey: 'dashboard.chart.month.oct', value: 82 },
+  { monthKey: 'dashboard.chart.month.nov', value: 79 },
+  { monthKey: 'dashboard.chart.month.dec', value: 88 },
+];

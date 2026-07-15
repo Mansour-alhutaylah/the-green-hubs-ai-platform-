@@ -1,11 +1,14 @@
 import { Link } from 'react-router';
 import { DemoDataBadge, Icon } from '@/design-system';
 import { ROUTES } from '@/app/navigation/routePaths';
+import { findNavItem } from '@/app/navigation/navConfig';
+import { useHasMinTier } from '@/features/rbac/useHasMinTier';
 import type { DemoUser } from '@/features/auth/types';
 import { useLocale } from '@/lib/i18n/useLocale';
 
 export function DashboardHero({ user }: { user?: DemoUser | null }) {
   const { t } = useLocale();
+  const canUpload = useHasMinTier(findNavItem('upload').minTier);
   const displayName = user?.name ?? 'Green Hubs team';
 
   return (
@@ -54,6 +57,15 @@ export function DashboardHero({ user }: { user?: DemoUser | null }) {
             <Icon name="analysis" size={17} />
             {t('dashboard.hero.openAnalysis')}
           </Link>
+          {canUpload && (
+            <Link
+              to={ROUTES.documentUpload}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-m border border-white/20 bg-white/7 px-4 text-meta font-bold text-white transition-colors hover:bg-white/12 active:scale-[var(--scale-press)]"
+            >
+              <Icon name="upload" size={17} />
+              {t('dashboard.hero.openUpload')}
+            </Link>
+          )}
         </div>
       </div>
 

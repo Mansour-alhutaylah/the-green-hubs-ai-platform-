@@ -17,6 +17,8 @@ import {
   type ActivityAction,
   type DocumentStatus,
 } from '../mockDashboardData';
+import { AnalysisActivityChart } from '../components/AnalysisActivityChart';
+import { AnalysisSummaryDonut } from '../components/AnalysisSummaryDonut';
 import { DashboardCard } from '../components/DashboardCard';
 import { DashboardHero } from '../components/DashboardHero';
 import { DashboardKpiCard } from '../components/DashboardKpiCard';
@@ -60,6 +62,17 @@ export function DashboardPage() {
           ))}
         </div>
       </section>
+
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:mt-6 xl:grid-cols-3 xl:gap-6">
+        <div className="xl:col-span-2">
+          <DashboardCard title={t('dashboard.section.analysisActivity')} icon="analysis" eyebrow={t('dashboard.section.insights')}>
+            <AnalysisActivityChart />
+          </DashboardCard>
+        </div>
+        <DashboardCard title={t('dashboard.section.analysisSummary')} icon="reports" eyebrow={t('dashboard.section.insights')}>
+          <AnalysisSummaryDonut />
+        </DashboardCard>
+      </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:mt-6 xl:grid-cols-3 xl:gap-6">
         <div className="flex flex-col gap-5 xl:col-span-2 xl:gap-6">
