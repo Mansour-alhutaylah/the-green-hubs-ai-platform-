@@ -350,25 +350,39 @@
   mask-image: linear-gradient(to bottom, black, transparent 62%);
 }
 
-.brand-rail {
-  position: relative;
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 24% 14%, rgb(79 175 114 / 0.2), transparent 18rem),
-    linear-gradient(165deg, var(--color-forest-800), var(--color-forest-900) 58%, var(--color-forest-950));
-}
+/* Layered under Tailwind's own `components` layer (below `utilities` in
+   Tailwind v4's declared `theme, base, components, utilities` order) so a
+   Tailwind position utility placed alongside this class — `fixed` on both
+   real usages, CommandRail and MobileDrawer — always wins the cascade.
+   Left unlayered, this rule's `position: relative` silently overrode the
+   layered `fixed` utility (an unlayered rule always outranks a layered one
+   regardless of source order or specificity), pulling the ~264px-wide,
+   full-height rail into normal document flow and pushing every routed page
+   down by its own content height — the root cause of the protected-page
+   vertical-offset bug. `position: relative` itself is only needed so
+   `.brand-rail::before`'s `position: absolute` has a containing block;
+   `fixed` already provides that once it's no longer overridden. */
+@layer components {
+  .brand-rail {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 24% 14%, rgb(79 175 114 / 0.2), transparent 18rem),
+      linear-gradient(165deg, var(--color-forest-800), var(--color-forest-900) 58%, var(--color-forest-950));
+  }
 
-.brand-rail::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  content: '';
-  opacity: 0.28;
-  background-image:
-    radial-gradient(circle at 12% 22%, transparent 0 4rem, rgb(184 222 195 / 0.24) 4.1rem 4.16rem, transparent 4.25rem),
-    radial-gradient(circle at 82% 64%, transparent 0 7rem, rgb(184 222 195 / 0.18) 7.1rem 7.16rem, transparent 7.25rem),
-    linear-gradient(115deg, transparent 0 46%, rgb(255 255 255 / 0.055) 46.2% 46.45%, transparent 46.7%);
+  .brand-rail::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    content: '';
+    opacity: 0.28;
+    background-image:
+      radial-gradient(circle at 12% 22%, transparent 0 4rem, rgb(184 222 195 / 0.24) 4.1rem 4.16rem, transparent 4.25rem),
+      radial-gradient(circle at 82% 64%, transparent 0 7rem, rgb(184 222 195 / 0.18) 7.1rem 7.16rem, transparent 7.25rem),
+      linear-gradient(115deg, transparent 0 46%, rgb(255 255 255 / 0.055) 46.2% 46.45%, transparent 46.7%);
+  }
 }
 
 .page-header-frame {
