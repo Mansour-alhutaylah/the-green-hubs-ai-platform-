@@ -8,6 +8,7 @@ import {
   Pagination,
   SectionCard,
 } from '@/design-system';
+import { useAuth } from '@/features/auth/useAuth';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { PageHeader } from '@/shell/PageHeader';
 import { cn } from '@/lib/utils/cn';
@@ -45,6 +46,43 @@ const TAB_LABEL_KEY: Record<TabValue, StringKey> = {
 const ORGANIZATIONS = Array.from(new Set(MOCK_ANALYSIS_RUNS.map((run) => run.orgName)));
 
 export function AnalysisListPage() {
+  const { t } = useLocale();
+  const { sessionKind } = useAuth();
+
+  // Live mode: the backend does not yet provide a tenant-safe
+  // analysis-runs list endpoint (deferred work), so this page shows a
+  // truthful limited state instead of ever mixing mock rows into a live
+  // session. Individual runs are reachable from their document page and
+  // via /analysis/{runId}.
+  if (sessionKind === 'live') {
+    return (
+      <div>
+        <PageHeader
+          eyebrow={t('analysis.eyebrow')}
+          title={t('nav.analysis')}
+          subtitle={t('analysis.live.subtitle')}
+        />
+        <SectionCard className="rounded-xl">
+          <EmptyState
+            title={t('analysis.live.noHistory.title')}
+            description={t('analysis.live.noHistory.description')}
+            action={
+              <Link to="/documents" className="font-semibold text-leaf-700 hover:underline">
+                {t('analysis.live.noHistory.action')}
+              </Link>
+            }
+          />
+        </SectionCard>
+      </div>
+    );
+  }
+
+  return <DemoAnalysisList />;
+}
+
+/** Unchanged demo/preview rendering — the exact pre-live mock-data page,
+ * preserved verbatim so the live branch above adds no risk to it. */
+function DemoAnalysisList() {
   const { t } = useLocale();
   const [tab, setTab] = useState<TabValue>('ALL');
   const [search, setSearch] = useState('');

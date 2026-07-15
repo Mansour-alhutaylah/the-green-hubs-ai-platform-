@@ -252,9 +252,10 @@ export function DocumentIntelligencePanel({ document, onRefresh }: DocumentIntel
             </h3>
             {latestAnalysis ? (
               <StatusBadge tone={ANALYSIS_STATUS_TONE[latestAnalysis.status] ?? 'neutral'}>
-                {ANALYSIS_STATUS_LABEL_KEY[latestAnalysis.status]
-                  ? t(ANALYSIS_STATUS_LABEL_KEY[latestAnalysis.status])
-                  : latestAnalysis.status}
+                {(() => {
+                  const labelKey = ANALYSIS_STATUS_LABEL_KEY[latestAnalysis.status];
+                  return labelKey ? t(labelKey) : <span dir="ltr">{latestAnalysis.status}</span>;
+                })()}
               </StatusBadge>
             ) : (
               <StatusBadge tone="neutral">
