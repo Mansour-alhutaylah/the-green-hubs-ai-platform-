@@ -14,6 +14,16 @@ transition (the sole mechanism preventing two concurrent processors from
 both claiming the same Document); ``complete_processing`` flushes only,
 as part of ``DocumentProcessingService``'s own transaction via
 ``IProcessingUnitOfWork``.
+
+``get_read_model_for_organization``/``list_read_models_for_organization``/
+``count_for_organization`` (Sprint 3, Document Read API Foundation) are
+the tenant-scoped read methods behind ``GET /api/v1/documents`` and
+``GET /api/v1/documents/{document_id}``. ``documents`` has no
+``organization_id`` column of its own -- these methods derive tenant
+scope through ``engagement_id -> engagements.organization_id`` inside
+the query itself (never an unscoped fetch followed by an
+in-application comparison), mirroring ``IEngagementRepository``'s
+``get_for_organization`` convention.
 """
 
 from abc import ABC, abstractmethod
@@ -21,6 +31,7 @@ from typing import Sequence
 from uuid import UUID
 
 from app.domain.entities.document import Document
+from app.domain.entities.document_read_model import DocumentReadModel
 from app.domain.repositories.base import IRepository
 
 
@@ -48,4 +59,42 @@ class IDocumentRepository(IRepository[Document], ABC):
         the caller's own transaction (see ``IProcessingUnitOfWork``), not
         committed here. Raises ``NotFoundError`` if the document no
         longer exists."""
+        ...
+
+    @abstractmethod
+    async def get_read_model_for_organization(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> DocumentReadModel | None:
+        """Tenant-scoped single-document read, with the derived fields
+        the Document detail API needs. Returns ``None`` for a
+        nonexistent or foreign-tenant document -- indistinguishable, by
+        design."""
+        ...
+
+    @abstractmethod
+    async def list_read_models_for_organization(
+        self,
+        *,
+        organization_id: UUID,
+        engagement_id: UUID | None = None,
+        processing_status: str | None = None,
+        limit: int,
+        offset: int,
+    ) -> Sequence[DocumentReadModel]:
+        """Tenant-scoped, paginated, newest-first (``created_at`` desc,
+        ``id`` desc tiebreak) document listing with derived fields.
+        ``engagement_id``/``processing_status`` are optional
+        already-validated filters applied at query time."""
+        ...
+
+    @abstractmethod
+    async def count_for_organization(
+        self,
+        *,
+        organization_id: UUID,
+        engagement_id: UUID | None = None,
+        processing_status: str | None = None,
+    ) -> int:
+        """Total row count for the same tenant scope and filters as
+        ``list_read_models_for_organization``, for pagination."""
         ...
