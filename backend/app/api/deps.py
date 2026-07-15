@@ -53,6 +53,7 @@ from app.infrastructure.security.supabase_jwt import (
 from app.infrastructure.storage.supabase_document_storage import SupabaseDocumentStorage
 from app.services.analysis.rag_analysis import RagAnalysisService
 from app.services.document_processing import DocumentProcessingService
+from app.services.document_read import DocumentReadService
 from app.services.document_upload import DocumentUploadService
 from app.services.embedding_generation import EmbeddingGenerationService
 from app.services.engagement import EngagementService
@@ -153,6 +154,13 @@ def get_document_upload_service(
         storage,
         max_upload_size_bytes=settings.max_upload_size_bytes,
     )
+
+
+def get_document_read_service(
+    document_repository: IDocumentRepository = Depends(get_document_repository),
+    engagement_repository: IEngagementRepository = Depends(get_engagement_repository),
+) -> DocumentReadService:
+    return DocumentReadService(document_repository, engagement_repository)
 
 
 def get_extracted_text_repository(

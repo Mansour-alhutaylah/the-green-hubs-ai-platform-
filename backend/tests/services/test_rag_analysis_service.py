@@ -100,6 +100,15 @@ class FakeDocumentRepository(IDocumentRepository):
     async def complete_processing(self, document_id: uuid.UUID) -> Document:
         raise NotImplementedError
 
+    async def get_read_model_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
+        raise NotImplementedError
+
+    async def list_read_models_for_organization(self, *, organization_id: uuid.UUID, engagement_id=None, processing_status=None, limit: int, offset: int):
+        raise NotImplementedError
+
+    async def count_for_organization(self, *, organization_id: uuid.UUID, engagement_id=None, processing_status=None) -> int:
+        raise NotImplementedError
+
 
 class FakeEngagementRepository(IEngagementRepository):
     def __init__(self) -> None:
