@@ -4,10 +4,12 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   Eye,
   EyeOff,
+  Filter,
   FileText,
   Folder,
   Globe,
@@ -57,6 +59,7 @@ export const ICON_REGISTRY = {
   search: Search,
   globe: Globe,
   'chevron-down': ChevronDown,
+  'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   check: Check,
   x: X,
@@ -65,6 +68,7 @@ export const ICON_REGISTRY = {
   lock: Lock,
   eye: Eye,
   'eye-off': EyeOff,
+  filter: Filter,
   'more-horizontal': MoreHorizontal,
   'triangle-alert': TriangleAlert,
   'circle-alert': CircleAlert,
@@ -74,4 +78,4 @@ export type IconName = keyof typeof ICON_REGISTRY | 'hub-diamond';
 
 /** Icons that encode direction and must flip in RTL (§3.3: "icons that
  * encode direction flip; icons that don't (documents, bell) do not"). */
-export const MIRRORED_ICONS: ReadonlySet<IconName> = new Set(['chevron-right']);
+export const MIRRORED_ICONS: ReadonlySet<IconName> = new Set(['chevron-right', 'chevron-left']);

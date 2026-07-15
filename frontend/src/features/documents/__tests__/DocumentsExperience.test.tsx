@@ -14,23 +14,25 @@ describe('document experience', () => {
     renderWithProviders(<DocumentsListPage />);
 
     expect(screen.getByText(/sample data/i)).toBeInTheDocument();
-    expect(screen.getByText('PENDING')).toBeInTheDocument();
-    expect(screen.getByText('PROCESSING')).toBeInTheDocument();
-    expect(screen.getByText('PROCESSED')).toBeInTheDocument();
-    expect(screen.getByText('FAILED')).toBeInTheDocument();
+    expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Processing').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Processed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /q3 2025 sustainability report/i })).toHaveAttribute(
       'href',
       '/documents/doc-1',
     );
   });
 
-  it.each(['PENDING', 'PROCESSING', 'PROCESSED', 'FAILED'] as const)(
-    'communicates %s without relying on color alone',
-    (status) => {
-      renderWithProviders(<DocumentStatusBadge status={status} />);
-      expect(screen.getByText(status)).toBeVisible();
-    },
-  );
+  it.each([
+    ['PENDING', 'Pending'],
+    ['PROCESSING', 'Processing'],
+    ['PROCESSED', 'Processed'],
+    ['FAILED', 'Failed'],
+  ] as const)('communicates %s without relying on color alone', (status, label) => {
+    renderWithProviders(<DocumentStatusBadge status={status} />);
+    expect(screen.getByText(label)).toBeVisible();
+  });
 
   it('renders loading, empty, and error states with accessible messaging', () => {
     const view = renderWithProviders(<DocumentCollectionState state="loading" />);
@@ -65,6 +67,34 @@ describe('document experience', () => {
     renderWithProviders(<DocumentsListPage />);
 
     expect(document.documentElement).toHaveAttribute('dir', 'rtl');
-    expect(screen.getByRole('list', { name: /sample documents/i })).toBeVisible();
+    expect(screen.getByRole('list', { name: /مستندات بيئة العمل/ })).toBeVisible();
+  });
+
+  it('filters by status tab, search, and engagement, and paginates the results', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+
+    // 9 seeded rows, 5 per page -> a second page exists.
+    expect(screen.getByText('Showing 1–5 of 9')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '2' }));
+    expect(screen.getByText('Showing 6–9 of 9')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Failed' }));
+    expect(screen.getByText(/showing 1–2 of 2/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '2' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'All' }));
+    await user.type(screen.getByLabelText(/search documents/i), 'Scope 1');
+    expect(screen.getByText(/showing 1–1 of 1/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /scope 1 emissions ledger/i })).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/search documents/i));
+    await user.selectOptions(
+      screen.getByLabelText(/filter by engagement/i),
+      'FY 2026 sustainability disclosure',
+    );
+    expect(screen.getByText(/showing 1–3 of 3/i)).toBeInTheDocument();
   });
 });

@@ -31,3 +31,4 @@ export {
 } from './primitives/StatusBadge/StatusBadge';
 export { DemoDataBadge } from './primitives/DemoDataBadge/DemoDataBadge';
 export { LoadingSkeleton } from './primitives/LoadingSkeleton/LoadingSkeleton';
+export { Pagination, type PaginationProps } from './primitives/Pagination/Pagination';
