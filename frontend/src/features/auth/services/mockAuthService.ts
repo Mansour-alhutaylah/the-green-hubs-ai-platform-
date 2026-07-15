@@ -8,7 +8,7 @@ import {
   InvalidOtpError,
   RateLimitedError,
   type AuthService,
-  type LoginChallenge,
+  type LoginResult,
 } from './AuthService';
 import { DEMO_PASSWORD, DEMO_USERS, findDemoUserByEmail } from './demoUsers';
 import {
@@ -55,7 +55,7 @@ function randomId(): string {
 }
 
 class MockAuthService implements AuthService {
-  async requestLogin(email: string, password: string): Promise<LoginChallenge> {
+  async requestLogin(email: string, password: string): Promise<LoginResult> {
     await delay();
     const normalizedEmail = email.trim().toLowerCase();
     const attempt = failedAttempts.get(normalizedEmail);
@@ -81,7 +81,7 @@ class MockAuthService implements AuthService {
     const challengeId = randomId();
     pendingChallenges.set(challengeId, { email: normalizedEmail, createdAt: Date.now() });
 
-    return { challengeId, maskedContact: maskEmail(normalizedEmail) };
+    return { kind: 'otpRequired', challengeId, maskedContact: maskEmail(normalizedEmail) };
   }
 
   async verifyOtp(challengeId: string, code: string): Promise<Session> {
@@ -102,6 +102,7 @@ class MockAuthService implements AuthService {
     pendingChallenges.delete(challengeId);
 
     const session: Session = {
+      kind: 'demo',
       user,
       token: randomId(),
       expiresAt: Date.now() + SESSION_TTL_MS,
@@ -129,6 +130,7 @@ class MockAuthService implements AuthService {
     }
 
     const session: Session = {
+      kind: 'demo',
       user,
       token: LOCAL_DEMO_TOKEN,
       expiresAt: Date.now() + SESSION_TTL_MS,
