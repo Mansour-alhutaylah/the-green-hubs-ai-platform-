@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import type { AuthService, LoginResult } from '@/features/auth/services/AuthService';
 import type { DemoUser, Session } from '@/features/auth/types';
+import { WorkspaceProvider } from '@/features/organizations/workspace/WorkspaceProvider';
 import { LocaleProvider } from '@/lib/i18n/LocaleContext';
 import { TooltipProvider, ToastProvider } from '@/design-system';
 
@@ -60,9 +61,11 @@ export function renderWithProviders(ui: ReactElement, options: RenderWithProvide
       <MemoryRouter initialEntries={initialEntries}>
         <LocaleProvider>
           <AuthProvider service={service}>
-            <TooltipProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </TooltipProvider>
+            <WorkspaceProvider>
+              <TooltipProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </TooltipProvider>
+            </WorkspaceProvider>
           </AuthProvider>
         </LocaleProvider>
       </MemoryRouter>

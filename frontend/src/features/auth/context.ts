@@ -1,11 +1,16 @@
 import { createContext } from 'react';
 import type { LoginResult } from './services/AuthService';
-import type { AuthStatus, DemoUser } from './types';
+import type { AuthStatus, DemoUser, SessionKind } from './types';
 
 export interface AuthContextValue {
   status: AuthStatus;
   user: DemoUser | null;
   activeOrgId: string | null;
+  /** `null` when unauthenticated. Every business page that must not mix
+   * mock and live data branches on this — `'live'` only when a real
+   * Supabase-backed session resolved; everything else (including no
+   * session at all) is treated as the safe, mock-data default. */
+  sessionKind: SessionKind | null;
   /** Resolves to `{kind: 'otpRequired', ...}` (mock two-step login — the
    * UI must then call `verifyOtp`) or `{kind: 'authenticated'}` (live
    * Supabase login — the session is already established). */

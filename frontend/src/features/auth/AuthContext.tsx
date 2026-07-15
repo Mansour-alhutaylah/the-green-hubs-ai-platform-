@@ -149,6 +149,7 @@ export function AuthProvider({
       status,
       user: session?.user ?? null,
       activeOrgId: session?.activeOrgId ?? null,
+      sessionKind: session?.kind ?? null,
       requestLogin,
       verifyOtp,
       resendOtp,

@@ -20,6 +20,7 @@ import {
   Menu,
   MoreHorizontal,
   RadioTower,
+  RefreshCw,
   ScanSearch,
   Search,
   Settings,
@@ -72,6 +73,7 @@ export const ICON_REGISTRY = {
   'more-horizontal': MoreHorizontal,
   'triangle-alert': TriangleAlert,
   'circle-alert': CircleAlert,
+  refresh: RefreshCw,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICON_REGISTRY | 'hub-diamond';
