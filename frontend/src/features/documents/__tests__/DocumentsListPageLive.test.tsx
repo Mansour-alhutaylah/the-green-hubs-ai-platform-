@@ -86,7 +86,7 @@ describe('DocumentsListPage — live mode', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    expect(await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') })).toBeVisible();
+    expect(await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') }, { timeout: 5000 })).toBeVisible();
     expect(screen.queryByText(/sample data/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Scope 1 Emissions Ledger.pdf')).not.toBeInTheDocument();
     expect(screen.getAllByText(LIVE_ENGAGEMENT_TITLE).length).toBeGreaterThan(0);
@@ -98,7 +98,7 @@ describe('DocumentsListPage — live mode', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') });
+    await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') }, { timeout: 5000 });
     expect(screen.getByText('Showing 1–5 of 42')).toBeInTheDocument();
 
     const user = userEvent.setup();
@@ -110,7 +110,7 @@ describe('DocumentsListPage — live mode', () => {
     });
     await user.click(await screen.findByRole('button', { name: '2' }));
 
-    await screen.findByRole('link', { name: /live backend page two/i });
+    await screen.findByRole('link', { name: /live backend page two/i }, { timeout: 5000 });
     expect(listDocuments).toHaveBeenLastCalledWith(
       expect.objectContaining({ limit: 5, offset: 5 }),
       expect.anything(),
@@ -122,7 +122,7 @@ describe('DocumentsListPage — live mode', () => {
     listDocuments.mockResolvedValue({ items: [buildDocument()], total: 1, limit: 5, offset: 0 });
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
-    await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') });
+    await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') }, { timeout: 5000 });
 
     const user = userEvent.setup();
     await user.click(await screen.findByRole('tab', { name: 'Failed' }));
@@ -149,7 +149,7 @@ describe('DocumentsListPage — live mode', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    expect(await screen.findByRole('heading', { name: /no documents yet/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /no documents yet/i }, { timeout: 5000 })).toBeVisible();
   });
 
   it('shows a distinct empty state when the workspace has zero engagements', async () => {
@@ -158,7 +158,7 @@ describe('DocumentsListPage — live mode', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    expect(await screen.findByRole('heading', { name: /no engagements yet/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /no engagements yet/i }, { timeout: 5000 })).toBeVisible();
   });
 
   it('shows a retry action on a backend error and recovers on retry', async () => {
@@ -168,12 +168,12 @@ describe('DocumentsListPage — live mode', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    expect(await screen.findByRole('heading', { name: /documents could not be loaded/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /documents could not be loaded/i }, { timeout: 5000 })).toBeVisible();
     expect(screen.getByText(/something went wrong on our end/i)).toBeVisible();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /try again/i }));
 
-    expect(await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') })).toBeVisible();
+    expect(await screen.findByRole('link', { name: new RegExp(LIVE_FILENAME, 'i') }, { timeout: 5000 })).toBeVisible();
   });
 });

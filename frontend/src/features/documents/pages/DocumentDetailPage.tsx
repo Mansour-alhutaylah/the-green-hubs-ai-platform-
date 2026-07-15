@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, DemoDataBadge, EmptyState, Icon, LoadingSkeleton, SectionCard } from '@/design-system';
 import { PageHeader } from '@/shell/PageHeader';
@@ -6,10 +7,13 @@ import { useAuth } from '@/features/auth/useAuth';
 import { useEngagements } from '@/features/engagements/useEngagements';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { formatDateTime } from '@/lib/utils/formatDate';
+import { getDocument, processDocument } from '@/lib/api/endpoints/documents';
+import type { DocumentReadResponse } from '@/lib/api/types';
 import type { StringKey } from '@/lib/i18n/strings/en';
 import { MOCK_DOCUMENTS, type DocumentProcessingStatus } from '../mockDocuments';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
 import { useDocumentQuery } from '../useDocumentQuery';
+import { useDocumentProcessingPoll } from '../useDocumentProcessingPoll';
 
 const TIMELINE_STATUSES: readonly DocumentProcessingStatus[] = ['PENDING', 'PROCESSING', 'PROCESSED'];
 
@@ -52,6 +56,44 @@ export function DocumentDetailPage() {
 
   const liveQuery = useDocumentQuery(isLive, id);
   const engagementsState = useEngagements();
+
+  const [polledDocument, setPolledDocument] = useState<DocumentReadResponse | null>(null);
+  useEffect(() => {
+    setPolledDocument(null);
+  }, [id]);
+
+  const pollState = useDocumentProcessingPoll(
+    isLive ? id : undefined,
+    polledDocument ?? liveQuery.document,
+    setPolledDocument,
+  );
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
+
+  async function refreshDocument() {
+    if (!id) return;
+    try {
+      setPolledDocument(await getDocument(id));
+    } catch {
+      // A manual refresh failure just leaves the visible state unchanged
+      // — the user can try again.
+    }
+  }
+
+  async function handleProcess() {
+    if (!id || isProcessing) return;
+    setIsProcessing(true);
+    setProcessError(null);
+    try {
+      await processDocument(id);
+    } catch (error) {
+      setProcessError(error instanceof Error ? error.message : t('documents.detail.process.error'));
+    } finally {
+      await refreshDocument();
+      setIsProcessing(false);
+    }
+  }
 
   if (!isLive) {
     return <DemoDocumentDetail id={id} />;
@@ -109,7 +151,8 @@ export function DocumentDetailPage() {
     );
   }
 
-  const document = liveQuery.document;
+  const confirmedDocument = liveQuery.document;
+  const document = polledDocument ?? confirmedDocument;
   const status = document.processing_status as DocumentProcessingStatus;
   const currentStep = STEP_ORDER[status];
   const engagementTitle =
@@ -155,8 +198,42 @@ export function DocumentDetailPage() {
           className="rounded-xl border-leaf-300/60"
           title={t('documents.detail.timeline.title')}
           description={t('documents.detail.timeline.description')}
-          action={<DocumentStatusBadge status={status} />}
+          action={
+            <div className="flex items-center gap-2">
+              <DocumentStatusBadge status={status} />
+              {status === 'PENDING' && (
+                <Button
+                  size="sm"
+                  isLoading={isProcessing}
+                  loadingLabel={t('documents.detail.process.submitting')}
+                  onClick={() => void handleProcess()}
+                >
+                  {t('documents.detail.process.action')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={t('documents.detail.refresh')}
+                onClick={() => void refreshDocument()}
+              >
+                <Icon name="refresh" size={14} />
+              </Button>
+            </div>
+          }
         >
+          {processError && (
+            <div className="mb-4 flex items-start gap-3 rounded-l border border-red-100 bg-red-100 p-3 text-red-700">
+              <Icon name="circle-alert" size={16} className="mt-0.5 shrink-0" />
+              <p className="text-meta font-semibold">{processError}</p>
+            </div>
+          )}
+          {pollState.timedOut && (
+            <div className="mb-4 rounded-l border border-amber-100 bg-amber-100 p-3 text-amber-700">
+              <p className="text-meta font-semibold">{t('documents.detail.process.timeout.title')}</p>
+              <p className="mt-1 text-caption">{t('documents.detail.process.timeout.description')}</p>
+            </div>
+          )}
           <ol className="space-y-0">
             {TIMELINE_STATUSES.map((stepStatus, index) => {
               const complete = index < currentStep || status === 'PROCESSED';

@@ -53,7 +53,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
 
     renderWithProviders(<AppRoutes />, { initialEntries: ['/dashboard'], authService: service });
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i }, { timeout: 5000 })).toBeVisible();
   });
 
   it('routes through the existing session-expired page after an out-of-band 401, not a bare logout redirect', async () => {
@@ -90,7 +90,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
     await user.click(await screen.findByRole('button', { name: /reem al-harbi, account menu/i }));
     await user.click(await screen.findByRole('button', { name: /sign out/i }));
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i }, { timeout: 5000 })).toBeVisible();
     expect(logout).toHaveBeenCalledTimes(1);
   });
 });

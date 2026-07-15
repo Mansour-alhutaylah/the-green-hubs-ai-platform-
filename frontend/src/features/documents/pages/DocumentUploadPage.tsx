@@ -1,12 +1,240 @@
-import { useState, type ChangeEvent } from 'react';
-import { Button, DemoDataBadge, Icon, SectionCard, StatusBadge } from '@/design-system';
+import { useEffect, useState, type ChangeEvent } from 'react';
+import { useNavigate } from 'react-router';
+import { Button, DemoDataBadge, EmptyState, Icon, LoadingSkeleton, SectionCard, StatusBadge } from '@/design-system';
+import { useAuth } from '@/features/auth/useAuth';
+import { useEngagements } from '@/features/engagements/useEngagements';
 import { useLocale } from '@/lib/i18n/useLocale';
+import { uploadDocument } from '@/lib/api/endpoints/documents';
 import { PageHeader } from '@/shell/PageHeader';
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
+/** Mirrors the backend's documented default (`Settings.max_upload_size_bytes`,
+ * backend/app/core/config.py) — not an invented limit. */
+const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-/** Frontend validation preview only. It never sends or persists the selected file. */
 export function DocumentUploadPage() {
+  const { sessionKind } = useAuth();
+  if (sessionKind === 'live') return <LiveDocumentUpload />;
+  return <DemoDocumentUpload />;
+}
+
+function LiveDocumentUpload() {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const engagementsState = useEngagements();
+
+  const [selectedEngagementId, setSelectedEngagementId] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File>();
+  const [validationError, setValidationError] = useState<string>();
+  const [submitError, setSubmitError] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Exactly one engagement auto-selects; more than one requires an
+  // explicit choice (never silently the first) — zero disables upload
+  // entirely below.
+  useEffect(() => {
+    if (engagementsState.status === 'ready' && engagementsState.engagements.length === 1) {
+      setSelectedEngagementId(engagementsState.engagements[0]!.id);
+    }
+  }, [engagementsState.status, engagementsState.engagements]);
+
+  function handleFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setSelectedFile(undefined);
+    setValidationError(undefined);
+    setSubmitError(undefined);
+    if (!file) return;
+    if (file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf')) {
+      setValidationError(t('documents.upload.error.invalidType'));
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setValidationError(t('documents.upload.error.tooLarge', { size: MAX_FILE_SIZE_MB }));
+      return;
+    }
+    setSelectedFile(file);
+  }
+
+  async function handleSubmit() {
+    if (!selectedFile || !selectedEngagementId || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(undefined);
+    try {
+      const created = await uploadDocument({ engagementId: selectedEngagementId, file: selectedFile });
+      navigate(`/documents/${created.id}`);
+    } catch (error) {
+      // The selected file is deliberately left in place on a recoverable
+      // failure — the user can fix the engagement choice or retry without
+      // re-selecting the file.
+      setSubmitError(error instanceof Error ? error.message : t('documents.upload.error.generic'));
+      setIsSubmitting(false);
+    }
+  }
+
+  const hasNoEngagements = engagementsState.status === 'ready' && engagementsState.engagements.length === 0;
+  const needsEngagementChoice = engagementsState.engagements.length > 1;
+  const canSubmit = Boolean(selectedFile) && Boolean(selectedEngagementId) && !isSubmitting;
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow={t('documents.upload.eyebrow')}
+        title={t('nav.upload')}
+        subtitle={t('documents.upload.live.subtitle')}
+      />
+
+      {engagementsState.status === 'loading' ? (
+        <SectionCard className="rounded-xl" contentClassName="space-y-5" aria-live="polite" aria-busy="true">
+          {Array.from({ length: 3 }, (_, index) => (
+            <LoadingSkeleton key={index} lines={2} label="Loading engagements" />
+          ))}
+        </SectionCard>
+      ) : engagementsState.status === 'error' ? (
+        <SectionCard className="rounded-xl border-red-100 bg-red-100/35" aria-live="assertive">
+          <EmptyState
+            title={t('documents.live.error.title')}
+            description={engagementsState.error ?? undefined}
+            action={
+              <Button size="sm" variant="ghost" onClick={engagementsState.retry}>
+                <Icon name="refresh" size={14} />
+                {t('documents.retry')}
+              </Button>
+            }
+          />
+        </SectionCard>
+      ) : hasNoEngagements ? (
+        <SectionCard className="rounded-xl border-leaf-300/60 bg-mist-50">
+          <EmptyState
+            title={t('documents.upload.noEngagements.title')}
+            description={t('documents.upload.noEngagements.description')}
+          />
+        </SectionCard>
+      ) : (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(19rem,1fr)]">
+          <SectionCard
+            className="rounded-xl border-leaf-300/70"
+            title={t('documents.upload.dropzone.title')}
+            description={t('documents.upload.engagement.title')}
+            action={
+              <div className="flex gap-2">
+                <span className="rounded-full border border-leaf-300 bg-leaf-100 px-2.5 py-1 text-caption font-bold text-leaf-700">
+                  {t('documents.upload.pdfOnly')}
+                </span>
+                <span className="rounded-full border border-line-200 bg-tint-100 px-2.5 py-1 text-caption font-bold text-gray-600">
+                  {t('documents.upload.maxSize', { size: MAX_FILE_SIZE_MB })}
+                </span>
+              </div>
+            }
+          >
+            {needsEngagementChoice ? (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-meta font-bold text-ink-900" htmlFor="upload-engagement">
+                  {t('documents.upload.engagement.label')}
+                </label>
+                <select
+                  id="upload-engagement"
+                  value={selectedEngagementId}
+                  onChange={(event) => setSelectedEngagementId(event.target.value)}
+                  className="h-10 w-full rounded-m border border-line-300 bg-surface-0 px-3 text-body text-ink-900 outline-none transition-colors focus:border-forest-900 sm:w-80"
+                >
+                  <option value="">{t('documents.upload.engagement.placeholder')}</option>
+                  {engagementsState.engagements.map((engagement) => (
+                    <option key={engagement.id} value={engagement.id}>
+                      {engagement.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <p className="mb-4 text-meta font-semibold text-gray-600" data-user-content>
+                {t('documents.upload.engagement.single', { name: engagementsState.engagements[0]?.title ?? '' })}
+              </p>
+            )}
+
+            <label className="group relative flex min-h-72 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-leaf-500 bg-forest-900 px-6 py-10 text-center text-white shadow-brand transition-colors hover:border-leaf-300 hover:bg-forest-800 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-forest-900">
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                className="sr-only"
+                onChange={handleFile}
+                aria-describedby="upload-support upload-error"
+              />
+              <span className="absolute -end-14 -top-20 h-52 w-52 rounded-full border border-leaf-300/20 shadow-[0_0_0_44px_rgb(184_222_195_/_0.04)]" aria-hidden />
+              <span className="absolute -bottom-24 -start-10 h-52 w-52 rounded-full border border-leaf-300/15" aria-hidden />
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-leaf-300 shadow-float transition-transform duration-[var(--motion-base)] group-hover:-translate-y-1" aria-hidden>
+                <Icon name="upload" size={28} />
+              </span>
+              <span className="relative mt-5 text-title text-white">{t('documents.upload.dropzone.title')}</span>
+              <span id="upload-support" className="relative mt-2 max-w-md text-meta text-white/68">
+                {t('documents.upload.dropzone.support')}
+              </span>
+              <span className="relative mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/7 px-3 py-1.5 text-caption font-semibold text-white/78">
+                <Icon name="shield-check" size={15} />
+                {t('documents.upload.dropzone.safe')}
+              </span>
+            </label>
+
+            <div id="upload-error" aria-live="polite">
+              {(validationError || submitError) && (
+                <div className="mt-4 flex items-start gap-3 rounded-l border border-red-100 bg-red-100 p-4 text-red-700">
+                  <Icon name="circle-alert" size={18} className="mt-0.5 shrink-0" />
+                  <p className="text-meta font-semibold">{validationError ?? submitError}</p>
+                </div>
+              )}
+              {selectedFile && (
+                <div className="mt-4 flex flex-col gap-4 rounded-xl border border-leaf-300 bg-mist-50 p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-l bg-forest-900 text-leaf-300">
+                      <Icon name="documents" size={20} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-body font-bold text-ink-900" data-user-content>
+                        {selectedFile.name}
+                      </p>
+                      <p className="mt-0.5 text-caption text-gray-600" dir="ltr">
+                        {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <StatusBadge tone="success">{t('documents.upload.validated')}</StatusBadge>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <Button
+                className="w-full sm:w-auto"
+                disabled={!canSubmit}
+                isLoading={isSubmitting}
+                loadingLabel={t('documents.upload.submitting')}
+                onClick={() => void handleSubmit()}
+              >
+                {t('documents.upload.submit')}
+              </Button>
+              {needsEngagementChoice && !selectedEngagementId && (
+                <p className="mt-2 text-caption text-gray-600">{t('documents.upload.engagement.required')}</p>
+              )}
+            </div>
+          </SectionCard>
+
+          <div className="space-y-5">
+            <section className="rounded-xl border border-leaf-300 bg-mist-50 p-5 shadow-card">
+              <span className="flex h-10 w-10 items-center justify-center rounded-l bg-forest-900 text-leaf-300">
+                <Icon name="shield-check" size={20} />
+              </span>
+              <h2 className="mt-4 text-panel text-forest-900">{t('documents.upload.safeguard.title')}</h2>
+              <p className="mt-1 text-meta text-gray-600">{t('documents.upload.safeguard.description')}</p>
+            </section>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Unchanged demo/preview rendering — the exact Phase-1 mock component,
+ * extracted verbatim so the live branch above adds no risk to it. */
+function DemoDocumentUpload() {
   const { t } = useLocale();
   const [selectedFile, setSelectedFile] = useState<File>();
   const [error, setError] = useState<string>();
@@ -20,7 +248,7 @@ export function DocumentUploadPage() {
       setError('Choose a PDF file. Other formats are not accepted in this preview.');
       return;
     }
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
       setError('This file is larger than the 25 MB preview limit.');
       return;
     }
