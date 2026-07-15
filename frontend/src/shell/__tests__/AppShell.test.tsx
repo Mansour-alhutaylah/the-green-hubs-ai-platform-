@@ -27,7 +27,11 @@ describe('AppShell', () => {
     );
 
     expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'The Green Hubs' })).toHaveAttribute(
+      'src',
+      '/brand/logo-lockup-white-on-forest.png',
+    );
     expect(screen.getByTestId('context-bar')).toBeInTheDocument();
-    expect(screen.getByText('Sovereign Saudi Cloud')).toBeInTheDocument();
+    expect(screen.getByText('Secure sustainability workspace')).toBeInTheDocument();
   });
 });

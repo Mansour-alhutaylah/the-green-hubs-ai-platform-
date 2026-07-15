@@ -12,6 +12,8 @@ export interface AuthService {
   /** Step 2 of login: verify the OTP code, establish a session. */
   verifyOtp(challengeId: string, code: string): Promise<Session>;
   resendOtp(challengeId: string): Promise<void>;
+  /** Explicit local-session entry point exposed only by a development mock. */
+  enterDemoWorkspace?(): Promise<Session>;
   logout(): Promise<void>;
   getSession(): Session | null;
   setActiveOrg(orgId: string): Session | null;

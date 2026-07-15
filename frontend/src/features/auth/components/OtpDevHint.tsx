@@ -11,7 +11,8 @@ export function OtpDevHint() {
   if (!devOtpHint) return null;
 
   return (
-    <p className="rounded-m bg-tint-100 px-3 py-2 text-caption text-gray-600">
+    <p className="rounded-l border border-leaf-300 bg-mist-50 px-3 py-2.5 text-caption text-gray-600">
+      <span className="font-bold text-leaf-700">Demo verification · </span>
       {t('auth.otp.devHint', { code: devOtpHint })}
     </p>
   );

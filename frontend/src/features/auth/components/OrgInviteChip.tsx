@@ -12,13 +12,13 @@ export interface OrgInviteChipProps {
 export function OrgInviteChip({ organization }: OrgInviteChipProps) {
   const { locale } = useLocale();
   return (
-    <div className="mb-7 flex items-center gap-3 rounded-m border border-line-200 bg-surface-0 px-3.5 py-2.5">
+    <div className="mb-7 flex min-w-0 items-center gap-3 rounded-l border border-leaf-300 bg-mist-50 px-3.5 py-3 shadow-card">
       <Avatar name={organization.name} shape="square" size={32} />
-      <div>
-        <p className="text-meta font-bold text-ink-900" data-user-content>
+      <div className="min-w-0">
+        <p className="break-words text-meta font-bold text-ink-900" data-user-content>
           {localizedOrgName(organization, locale)}
         </p>
-        <p className="text-caption text-gray-600">{organization.sector}</p>
+        <p className="mt-0.5 break-words text-caption text-gray-600" data-user-content>{organization.sector}</p>
       </div>
     </div>
   );

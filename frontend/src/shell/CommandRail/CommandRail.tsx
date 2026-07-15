@@ -38,11 +38,11 @@ export function CommandRail({ isCollapsed, onToggle }: CommandRailProps) {
       aria-label="Primary"
       onKeyDown={handleArrowKeys}
       style={{ width: isCollapsed ? 'var(--size-rail-collapsed)' : 'var(--size-rail)' }}
-      className="rail-scrollbar fixed inset-y-0 start-0 z-[var(--z-rail)] flex h-full shrink-0 flex-col overflow-y-auto bg-forest-900 transition-[width] duration-[var(--motion-base)]"
+      className="brand-rail rail-scrollbar fixed inset-y-0 start-0 z-[var(--z-rail)] flex h-full shrink-0 flex-col overflow-y-auto border-e border-rail-hairline transition-[width] duration-[var(--motion-base)]"
     >
       <BrandBlock collapsed={isCollapsed} />
 
-      <div className="flex-1 py-2">
+      <div className="relative z-10 flex-1 py-3">
         {NAV_DOMAIN_ORDER.map((domain) => (
           <VisibleRailGroup key={domain} domain={domain} collapsed={isCollapsed} />
         ))}
@@ -53,9 +53,13 @@ export function CommandRail({ isCollapsed, onToggle }: CommandRailProps) {
         onClick={onToggle}
         aria-pressed={isCollapsed}
         aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-        className="focus-on-forest mx-6 mb-2 flex h-8 items-center justify-center rounded-s text-rail-muted hover:bg-rail-hover hover:text-white"
+        className="focus-on-forest relative z-10 mx-3 mb-2 flex h-9 items-center justify-center rounded-m border border-rail-hairline bg-white/5 text-rail-muted transition-colors hover:bg-rail-hover hover:text-white"
       >
-        <Icon name={isCollapsed ? 'chevron-right' : 'chevron-down'} size={16} />
+        <Icon
+          name="chevron-right"
+          size={16}
+          className={isCollapsed ? undefined : 'rotate-180'}
+        />
       </button>
 
       <SovereigntySeal collapsed={isCollapsed} />

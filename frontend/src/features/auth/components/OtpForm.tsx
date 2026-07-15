@@ -46,18 +46,18 @@ export function OtpForm({
           error={Boolean(error)}
           onComplete={(code) => void onComplete(code)}
         />
-        {error && <p className="text-meta text-amber-700">{error}</p>}
-        {isSubmitting && <p className="text-caption text-gray-600">{t('auth.otp.verifying')}</p>}
+        {error && <p className="text-meta text-amber-700" role="alert">{error}</p>}
+        {isSubmitting && <output className="block text-caption text-gray-600">{t('auth.otp.verifying')}</output>}
 
-        <div className="mt-1 flex items-center justify-between text-meta">
-          <button type="button" onClick={onBack} className="font-medium text-leaf-700 hover:underline">
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-meta">
+          <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center rounded-m px-2 font-semibold text-leaf-700 hover:bg-leaf-100">
             {t('auth.otp.back')}
           </button>
           {isDone ? (
             <button
               type="button"
               onClick={onResend}
-              className="font-medium text-leaf-700 hover:underline"
+              className="inline-flex min-h-10 items-center rounded-m px-2 font-semibold text-leaf-700 hover:bg-leaf-100"
             >
               {t('auth.otp.resendAction')}
             </button>

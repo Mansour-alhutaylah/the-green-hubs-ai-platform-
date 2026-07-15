@@ -7,7 +7,7 @@ export function LocaleToggle() {
     <button
       type="button"
       onClick={toggleLocale}
-      className="type-label shrink-0 whitespace-nowrap rounded-m px-2 py-1.5 text-gray-600 hover:bg-tint-100 hover:text-forest-900"
+      className="type-label min-h-10 shrink-0 whitespace-nowrap rounded-m px-2 text-gray-600 transition-colors hover:bg-mist-50 hover:text-forest-900"
     >
       {locale === 'en' ? 'AR / EN' : 'EN / AR'}
     </button>

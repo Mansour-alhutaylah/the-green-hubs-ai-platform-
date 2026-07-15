@@ -1,4 +1,5 @@
 import type { StringKey } from '@/lib/i18n/strings/en';
+import type { IconName } from '@/design-system';
 
 /**
  * Static, local, presentation-only fixture data for the executive dashboard
@@ -22,6 +23,9 @@ export interface MockKpi {
   value: string;
   captionKey: StringKey;
   tone: KpiTone;
+  icon: IconName;
+  visual: 'documents' | 'reports' | 'compliance' | 'approval';
+  progress?: number;
 }
 
 export interface MockRecentDocument {
@@ -34,9 +38,11 @@ export interface MockRecentDocument {
 
 export interface MockAnalysisInsight {
   id: string;
+  runId: string;
   documentName: string;
   status: DocumentStatus;
   detail: string;
+  progress?: number;
 }
 
 export interface MockActivityEntry {
@@ -66,6 +72,8 @@ export const DASHBOARD_KPIS: MockKpi[] = [
     value: '128',
     captionKey: 'dashboard.kpi.documentsAnalyzed.caption',
     tone: 'positive',
+    icon: 'documents',
+    visual: 'documents',
   },
   {
     id: 'active-reports',
@@ -73,6 +81,8 @@ export const DASHBOARD_KPIS: MockKpi[] = [
     value: '6',
     captionKey: 'dashboard.kpi.activeReports.caption',
     tone: 'neutral',
+    icon: 'reports',
+    visual: 'reports',
   },
   {
     id: 'compliance-score',
@@ -80,6 +90,9 @@ export const DASHBOARD_KPIS: MockKpi[] = [
     value: '86%',
     captionKey: 'dashboard.kpi.complianceScore.caption',
     tone: 'positive',
+    icon: 'frameworks',
+    visual: 'compliance',
+    progress: 86,
   },
   {
     id: 'pending-approvals',
@@ -87,6 +100,8 @@ export const DASHBOARD_KPIS: MockKpi[] = [
     value: '3',
     captionKey: 'dashboard.kpi.pendingApprovals.caption',
     tone: 'attention',
+    icon: 'audit',
+    visual: 'approval',
   },
 ];
 
@@ -124,18 +139,22 @@ export const RECENT_DOCUMENTS: MockRecentDocument[] = [
 export const RECENT_ANALYSIS: MockAnalysisInsight[] = [
   {
     id: 'insight-1',
+    runId: 'run-1',
     documentName: 'Q3 2025 Sustainability Report.pdf',
     status: 'analyzed',
     detail: '42 figures extracted, 3 flagged for review',
   },
   {
     id: 'insight-2',
+    runId: 'run-2',
     documentName: 'Scope 1 Emissions Ledger.xlsx',
     status: 'processing',
     detail: 'Running extraction — 60% complete',
+    progress: 60,
   },
   {
     id: 'insight-3',
+    runId: 'run-3',
     documentName: 'Water Usage Audit.pdf',
     status: 'queued',
     detail: 'Queued for analysis',
@@ -183,4 +202,27 @@ export const PROCESSING_QUEUE: MockQueueItem[] = [
   { id: 'queue-1', name: 'Water Usage Audit.pdf', eta: '~10 min' },
   { id: 'queue-2', name: 'Facility Energy Log — August.csv', eta: '~15 min' },
   { id: 'queue-3', name: 'Supplier Scorecard 2025.xlsx', eta: '~20 min' },
+];
+
+export interface MonthlyActivityPoint {
+  monthKey: StringKey;
+  value: number;
+}
+
+/** Analyses completed per month — feeds the dashboard's Analysis Activity
+ * chart. Quarterly/yearly views are derived from this same series (summed
+ * per bucket), not separate fabricated datasets. */
+export const MONTHLY_ANALYSIS_ACTIVITY: MonthlyActivityPoint[] = [
+  { monthKey: 'dashboard.chart.month.jan', value: 42 },
+  { monthKey: 'dashboard.chart.month.feb', value: 48 },
+  { monthKey: 'dashboard.chart.month.mar', value: 51 },
+  { monthKey: 'dashboard.chart.month.apr', value: 46 },
+  { monthKey: 'dashboard.chart.month.may', value: 58 },
+  { monthKey: 'dashboard.chart.month.jun', value: 63 },
+  { monthKey: 'dashboard.chart.month.jul', value: 71 },
+  { monthKey: 'dashboard.chart.month.aug', value: 68 },
+  { monthKey: 'dashboard.chart.month.sep', value: 75 },
+  { monthKey: 'dashboard.chart.month.oct', value: 82 },
+  { monthKey: 'dashboard.chart.month.nov', value: 79 },
+  { monthKey: 'dashboard.chart.month.dec', value: 88 },
 ];

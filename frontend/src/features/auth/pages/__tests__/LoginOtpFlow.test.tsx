@@ -18,11 +18,18 @@ describe('Login -> OTP -> Dashboard flow', () => {
       authService: mockAuthService,
     });
 
-    await screen.findByRole('heading', { name: /sign in to your hub/i });
+    await screen.findByRole('heading', { name: /welcome back/i });
+    expect(screen.getByRole('checkbox', { name: /remember me/i })).toBeChecked();
+    expect(screen.getByPlaceholderText('name@company.com')).toBeVisible();
+    const passwordInput = screen.getByPlaceholderText(/enter your password/i);
+    expect(passwordInput).toHaveAttribute('type', 'password');
+    await user.click(screen.getByRole('button', { name: /show password/i }));
+    expect(passwordInput).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: /hide password/i })).toBeVisible();
 
     await user.type(screen.getByLabelText(/work email/i), viewer.email);
     await user.type(screen.getByLabelText(/^password$/i), DEMO_PASSWORD);
-    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
     const otpCells = await screen.findAllByLabelText(/Digit \d of 6/);
     expect(otpCells).toHaveLength(6);
@@ -36,5 +43,5 @@ describe('Login -> OTP -> Dashboard flow', () => {
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(new RegExp(viewer.email))).toBeInTheDocument();
-  });
+  }, 10_000);
 });

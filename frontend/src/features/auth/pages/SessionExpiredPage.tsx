@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router';
-import { Button, Icon } from '@/design-system';
+import { Button } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { ROUTES } from '@/app/navigation/routePaths';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
 import { AuthPageHeader } from '../components/AuthPageHeader';
+import { AuthStateMark } from '../components/AuthStateMark';
 
 /** Reached when a stored session has aged out — distinct from
  * `NoAccessPage` (an in-shell RBAC denial): this is a full auth-flow page,
@@ -15,7 +16,7 @@ export function SessionExpiredPage() {
   return (
     <AuthSplitLayout>
       <div>
-        <Icon name="circle-alert" size={28} className="mb-5 text-amber-700" />
+        <AuthStateMark />
         <AuthPageHeader
           eyebrow={t('auth.sessionExpired.eyebrow')}
           heading={t('auth.sessionExpired.heading')}

@@ -26,7 +26,7 @@ export function AppShell() {
   useGlobalShortcuts();
 
   return (
-    <div className="min-h-screen bg-paper-50">
+    <div className="app-atmosphere min-h-screen bg-paper-50">
       <SkipLink />
       {!isMobile && <CommandRail isCollapsed={isCollapsed} onToggle={toggle} />}
       {isMobile && <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />}
@@ -39,7 +39,7 @@ export function AppShell() {
               ? 'var(--size-rail-collapsed)'
               : 'var(--size-rail)',
         }}
-        className="flex min-h-screen flex-col transition-[margin] duration-[var(--motion-base)]"
+        className="relative z-10 flex min-h-screen flex-col transition-[margin] duration-[var(--motion-base)]"
       >
         <ContextBar
           menuButton={
@@ -48,7 +48,7 @@ export function AppShell() {
                 type="button"
                 aria-label="Open navigation"
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-m p-2 text-gray-600 hover:bg-tint-100"
+                className="rounded-m border border-leaf-300 bg-mist-50 p-2 text-forest-800 shadow-card transition-colors hover:bg-mint-100"
               >
                 <Icon name="menu" size={20} />
               </button>

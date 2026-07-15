@@ -12,6 +12,8 @@ export interface MockOrganization {
   sector: string;
 }
 
+export const DEMO_WORKSPACE_ORG_ID = 'org-green-hubs-demo';
+
 export const MOCK_ORGANIZATIONS: MockOrganization[] = [
   {
     id: 'org-riyadh-industrial',
@@ -30,6 +32,12 @@ export const MOCK_ORGANIZATIONS: MockOrganization[] = [
     name: 'NEOM Utilities Authority',
     nameAr: 'هيئة مرافق نيوم',
     sector: 'Utilities',
+  },
+  {
+    id: DEMO_WORKSPACE_ORG_ID,
+    name: 'The Green Hubs Demo Workspace',
+    nameAr: 'مساحة عمل ذا جرين هبز التجريبية',
+    sector: 'Development preview',
   },
 ];
 

@@ -1,6 +1,5 @@
-import { Button, Icon, useToast, type IconName } from '@/design-system';
-import { useLocale } from '@/lib/i18n/useLocale';
-import { PageHeader } from '@/shell/PageHeader';
+import type { IconName } from '@/design-system';
+import { ComingSoonPage } from './ComingSoonPage';
 
 export interface PlaceholderModulePageProps {
   title: string;
@@ -28,29 +27,5 @@ export function PlaceholderModulePage({
   description,
   unlock,
 }: PlaceholderModulePageProps) {
-  const { t } = useLocale();
-  const { showToast } = useToast();
-
-  return (
-    <div>
-      <PageHeader title={title} />
-      <div className="rounded-l border border-line-200 bg-surface-0 px-8 py-14">
-        <div className="mx-auto flex max-w-105 flex-col items-center text-center">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-tint-100 text-gray-500">
-            <Icon name={icon} size={24} />
-          </div>
-          <p className="type-label mt-5 text-leaf-700">{t('placeholder.eyebrow')}</p>
-          <h2 className="mt-2 text-panel text-forest-900">{description}</h2>
-          <p className="mt-2 text-body text-gray-600">{unlock}</p>
-          <Button
-            variant="ghost"
-            className="mt-6"
-            onClick={() => showToast(t('placeholder.notify'), { kind: 'success' })}
-          >
-            {t('placeholder.notify')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  return <ComingSoonPage title={title} icon={icon} description={description} unlock={unlock} />;
 }

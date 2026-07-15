@@ -24,17 +24,21 @@
 
   /* Color — §16 / §14.1 */
   --color-forest-900: #122618;
+  --color-forest-800: #193524;
+  --color-forest-700: #24563a;
   /* §15 Button spec: Primary's explicit hover shade ("hover deepens to
      #0C1A10") — named as a token rather than an inline hex per §19. */
   --color-forest-950: #0c1a10;
-  --color-leaf-100: #edf5e4;
-  --color-leaf-300: #c9e5ac;
-  --color-leaf-500: #7fc344;
-  --color-leaf-700: #2f6d1f;
-  --color-paper-50: #fbf7f3;
+  --color-leaf-100: #e6f3ea;
+  --color-leaf-300: #b8dec3;
+  --color-leaf-500: #4faf72;
+  --color-leaf-700: #2e7d4f;
+  --color-mint-100: #ddefe3;
+  --color-mist-50: #eef7f0;
+  --color-paper-50: #f7f9f6;
   --color-surface-0: #ffffff;
-  --color-ink-900: #1a2420;
-  --color-gray-400: #9aa49d;
+  --color-ink-900: #172019;
+  --color-gray-400: #758079;
   /* §16 gives #6B7570, verified "4.9:1" against pure white — but gray-600
      is used constantly as body/caption text directly on --color-paper-50
      (the app's own default background) and --color-tint-100 (well
@@ -44,13 +48,17 @@
      actually used on, not just the one background it was checked against;
      the spec's own §17 AA commitment wins over the literal hex here. */
   --color-gray-600: #66706b;
-  --color-line-200: #e2e6e0;
+  --color-line-200: #dfe7e1;
   /* §11.1/§15 Input border — a distinct, slightly darker hairline used only
      on form controls at rest (vs. --color-line-200's general dividers). */
-  --color-line-300: #cdd4cc;
-  --color-tint-100: #f4f6f2;
+  --color-line-300: #89978c;
+  --color-tint-100: #f0f5f1;
   --color-amber-100: #f6ebe1;
   --color-amber-700: #8a4b27;
+  --color-red-100: #f8e9e7;
+  --color-red-700: #973b32;
+  --color-sky-100: #eaf2f1;
+  --color-sky-700: #35645f;
 
   /* Rail-only states (rgba over Forest) — kept as first-class color tokens
      so hover:bg-rail-hover / bg-rail-active work like any other color. */
@@ -62,8 +70,8 @@
      not decoration; the spec's own accessibility target wins over the
      literal opacity figure here. */
   --color-rail-muted: rgb(255 255 255 / 0.55);
-  --color-rail-hover: rgb(255 255 255 / 0.06);
-  --color-rail-active: rgb(127 195 68 / 0.12);
+  --color-rail-hover: rgb(255 255 255 / 0.075);
+  --color-rail-active: rgb(79 175 114 / 0.16);
   /* §3.1: "1px hairline rgba(255,255,255,0.10)" — the rail's internal
      dividers (brand block, sovereignty seal, collapsed-group separators). */
   --color-rail-hairline: rgb(255 255 255 / 0.1);
@@ -73,9 +81,9 @@
   --color-chart-neutral-1: #122618;
   --color-chart-neutral-2: #5a6e5c;
   --color-chart-neutral-3: #b9c6b4;
-  --color-chart-accent-1: #2f6d1f;
-  --color-chart-accent-2: #7fc344;
-  --color-chart-accent-3: #c9e5ac;
+  --color-chart-accent-1: #2e7d4f;
+  --color-chart-accent-2: #4faf72;
+  --color-chart-accent-3: #b8dec3;
 
   /* Type families — §0.5 assumption: Aeonik / Bahij TheSansArabic are
      commercially licensed; ship the spec's own documented fallback pair.
@@ -89,6 +97,10 @@
   --text-display: 28px;
   --text-display--line-height: 34px;
   --text-display--font-weight: 800;
+
+  --text-hero: 36px;
+  --text-hero--line-height: 42px;
+  --text-hero--font-weight: 800;
 
   --text-metric: 30px;
   --text-metric--line-height: 36px;
@@ -133,8 +145,12 @@
   --radius-s: 4px;
   --radius-m: 6px;
   --radius-l: 8px;
-  --shadow-raise: 0 2px 8px rgb(18 38 24 / 0.08);
-  --shadow-float: 0 12px 40px rgb(18 38 24 / 0.18);
+  --radius-xl: 12px;
+  --shadow-raise: 0 3px 12px rgb(18 38 24 / 0.1);
+  --shadow-float: 0 18px 48px rgb(18 38 24 / 0.2);
+  --shadow-card: 0 1px 2px rgb(18 38 24 / 0.04), 0 10px 28px rgb(18 38 24 / 0.055);
+  --shadow-brand: 0 18px 50px rgb(18 38 24 / 0.14);
+  --shadow-signal: 0 0 12px rgb(79 175 114 / 0.55);
 }
 
 /* Tokens that are not first-class Tailwind theme namespaces (sizing,
@@ -153,13 +169,14 @@
 
   --size-rail: 264px;
   --size-rail-collapsed: 72px;
-  --size-contextbar: 64px;
+  --size-contextbar: 68px;
   --size-row: 56px;
   --size-row-compact: 44px;
   --size-control-xl: 54px;
   --size-control-l: 48px;
   --size-control-m: 40px;
   --size-control-s: 32px;
+  --size-otp-group: 364px;
   --content-max: 1376px;
   /* Authentication system's form column (approved auth redesign) — wider
      than the general 400px auth column the rest of §11.1 implies, per the

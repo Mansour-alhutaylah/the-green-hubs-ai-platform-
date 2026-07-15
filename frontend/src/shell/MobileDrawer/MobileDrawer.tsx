@@ -24,14 +24,14 @@ export function MobileDrawer({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[var(--z-overlay)] bg-overlay [animation:overlay-fade-in_var(--motion-base)_var(--ease-out)]" />
         <DialogPrimitive.Content
-          className="rail-scrollbar fixed inset-y-0 start-0 z-[var(--z-rail)] flex w-66 max-w-[80vw] flex-col overflow-y-auto bg-forest-900 focus:outline-none"
+          className="brand-rail rail-scrollbar fixed inset-y-0 start-0 z-[var(--z-rail)] flex w-66 max-w-[86vw] flex-col overflow-y-auto border-e border-rail-hairline focus:outline-none"
           style={{
             animation: `${dir === 'rtl' ? 'drawer-in-rtl' : 'drawer-in-ltr'} var(--motion-base) var(--ease-out)`,
           }}
         >
           <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
           <BrandBlock collapsed={false} />
-          <div className="flex-1 py-2">
+          <div className="relative z-10 flex-1 py-3">
             {NAV_DOMAIN_ORDER.map((domain) => (
               <RailGroup
                 key={domain}

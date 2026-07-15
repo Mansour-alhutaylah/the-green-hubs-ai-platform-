@@ -91,7 +91,7 @@ export function InviteAcceptPage() {
               error={Boolean(otpError)}
               onComplete={handleOtpComplete}
             />
-            {otpError && <p className="text-meta text-amber-700">{otpError}</p>}
+            {otpError && <p className="text-meta text-amber-700" role="alert">{otpError}</p>}
           </div>
         </div>
       )}

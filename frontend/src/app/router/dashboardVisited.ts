@@ -10,9 +10,20 @@
 const KEY = 'ghp:dashboard-visited';
 
 export function hasDashboardBeenVisited(): boolean {
-  return window.sessionStorage.getItem(KEY) === '1';
+  try {
+    return window.sessionStorage.getItem(KEY) === '1';
+  } catch {
+    // Storage can throw (disabled by browser policy, private-mode quota,
+    // sandboxed iframe/webview) — fail safe to "not visited" rather than
+    // crashing the whole app on every protected-route render.
+    return false;
+  }
 }
 
 export function markDashboardVisited(): void {
-  window.sessionStorage.setItem(KEY, '1');
+  try {
+    window.sessionStorage.setItem(KEY, '1');
+  } catch {
+    // Non-fatal: worst case the landing rule re-applies on the next render.
+  }
 }

@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router';
-import { Button, Icon } from '@/design-system';
+import { Button } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { ROUTES } from '@/app/navigation/routePaths';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
 import { AuthPageHeader } from '../components/AuthPageHeader';
+import { AuthStateMark } from '../components/AuthStateMark';
 
 /** Reached when an unauthenticated/unauthorized visitor lands on a route
  * that requires a different account entirely — distinct from
@@ -16,7 +17,7 @@ export function AccessDeniedPage() {
   return (
     <AuthSplitLayout>
       <div>
-        <Icon name="circle-alert" size={28} className="mb-5 text-amber-700" />
+        <AuthStateMark />
         <AuthPageHeader
           eyebrow={t('auth.accessDenied.eyebrow')}
           heading={t('auth.accessDenied.heading')}

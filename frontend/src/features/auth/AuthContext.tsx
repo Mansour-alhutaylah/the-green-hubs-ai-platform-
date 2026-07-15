@@ -4,7 +4,7 @@ import type { AuthService } from './services/AuthService';
 import { mockAuthService } from './services/mockAuthService';
 import type { AuthStatus, Session } from './types';
 import { AuthContext, type AuthContextValue } from './context';
-import { getDevBypassSession } from './devAuthBypass';
+import { isDevAuthBypassEnabled } from './devAuthBypass';
 
 /** Injected so tests can seed a session without going through the mock
  * service's localStorage side effects. */
@@ -23,8 +23,7 @@ export function AuthProvider({
     // tick (ProtectedRoute renders a LoadingDiamond during it) rather than
     // synchronously resolving before first paint.
     Promise.resolve().then(() => {
-      const bypassSession = getDevBypassSession();
-      const restored = bypassSession ?? service.getSession();
+      const restored = service.getSession();
       setSession(restored);
       setStatus(restored ? 'authenticated' : 'unauthenticated');
     });
@@ -45,6 +44,18 @@ export function AuthProvider({
   );
 
   const resendOtp = useCallback((challengeId: string) => service.resendOtp(challengeId), [service]);
+
+  const enterDemoWorkspace = useMemo(() => {
+    if (!isDevAuthBypassEnabled() || !service.enterDemoWorkspace) return null;
+    return async () => {
+      if (!isDevAuthBypassEnabled() || !service.enterDemoWorkspace) {
+        throw new Error('Development authentication bypass is disabled.');
+      }
+      const nextSession = await service.enterDemoWorkspace();
+      setSession(nextSession);
+      setStatus('authenticated');
+    };
+  }, [service]);
 
   const logout = useCallback(async () => {
     await service.logout();
@@ -73,6 +84,7 @@ export function AuthProvider({
       requestLogin,
       verifyOtp,
       resendOtp,
+      enterDemoWorkspace,
       logout,
       setActiveOrg,
       devOtpHint: service.getDevOtpHint?.() ?? null,
@@ -84,6 +96,7 @@ export function AuthProvider({
       requestLogin,
       verifyOtp,
       resendOtp,
+      enterDemoWorkspace,
       logout,
       setActiveOrg,
       service,

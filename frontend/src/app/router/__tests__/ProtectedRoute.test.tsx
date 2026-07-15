@@ -8,7 +8,7 @@ describe('ProtectedRoute', () => {
     renderWithProviders(<AppRoutes />, { initialEntries: ['/documents'], session: null });
 
     expect(
-      await screen.findByRole('heading', { name: /sign in to your hub/i }),
+      await screen.findByRole('heading', { name: /welcome back/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/this module ships/i)).not.toBeInTheDocument();
   });
