@@ -70,6 +70,22 @@ class Settings(BaseSettings):
     # LangChain dependency is introduced yet.
     openai_api_key: Optional[str] = None
 
+    # Configurable OpenAI-compatible base URL, so the same provider code
+    # can target any OpenAI-compatible API (e.g. OpenRouter) without a
+    # code change -- only ever used to build request URLs, never logged.
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    # OpenRouter (https://openrouter.ai) is an OpenAI-compatible gateway.
+    # `openrouter_api_key` is a distinct credential from `openai_api_key`
+    # so both can be present in `.env` without ambiguity. When set and
+    # `openai_api_key` is not, `resolve_ai_credentials()` below selects it
+    # automatically together with `openrouter_base_url` -- e.g. model
+    # names then take OpenRouter's vendor-prefixed form such as
+    # `openai/text-embedding-3-small`. Never read for anything but
+    # Authorization headers, never logged.
+    openrouter_api_key: Optional[str] = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
     # LLM gateway (Sprint 3.6B, RAG + Structured Sustainability Analysis
     # Foundation). `openai_model` was reserved in Sprint 3.6A specifically
     # "for a future chat/completion use" -- this is that use, so it is
@@ -110,3 +126,23 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def resolve_ai_credentials(settings: Settings) -> tuple[Optional[str], str]:
+    """Resolves which OpenAI-compatible credential and base URL an AI
+    provider (embeddings or chat/completion) should use.
+
+    Prefers direct OpenAI (`openai_api_key`) when set, keeping today's
+    behavior unchanged. Falls back to OpenRouter (`openrouter_api_key`)
+    with `openrouter_base_url` when no direct key is configured -- this
+    lets `.env` switch to OpenRouter by setting only
+    `OPENROUTER_API_KEY`, without also having to override
+    `openai_base_url`. Returns `(None, openai_base_url)` when neither
+    credential is set, so callers can still raise their own
+    provider-specific "missing API key" error.
+    """
+    if settings.openai_api_key:
+        return settings.openai_api_key, settings.openai_base_url
+    if settings.openrouter_api_key:
+        return settings.openrouter_api_key, settings.openrouter_base_url
+    return None, settings.openai_base_url

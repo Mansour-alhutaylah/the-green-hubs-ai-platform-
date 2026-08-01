@@ -23,7 +23,7 @@ from typing import Callable
 
 import httpx
 
-from app.core.config import Settings
+from app.core.config import Settings, resolve_ai_credentials
 from app.domain.llm_gateway import (
     LLMAuthenticationError,
     LLMGateway,
@@ -35,7 +35,6 @@ from app.domain.llm_gateway import (
 
 logger = logging.getLogger(__name__)
 
-_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 _MAX_TRANSIENT_ATTEMPTS = 2
 
 
@@ -43,8 +42,11 @@ class OpenAILLMGateway(LLMGateway):
     def __init__(
         self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
-        if not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is required to construct OpenAILLMGateway")
+        api_key, base_url = resolve_ai_credentials(settings)
+        if not api_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY or OPENROUTER_API_KEY is required to construct OpenAILLMGateway"
+            )
         if not settings.openai_model:
             raise RuntimeError("openai_model is required to construct OpenAILLMGateway")
         if settings.llm_provider_timeout_seconds <= 0:
@@ -54,7 +56,8 @@ class OpenAILLMGateway(LLMGateway):
         if not (0.0 <= settings.llm_temperature <= 2.0):
             raise RuntimeError("llm_temperature must be between 0.0 and 2.0")
 
-        self._api_key = settings.openai_api_key
+        self._api_key = api_key
+        self._chat_completions_url = f"{base_url.rstrip('/')}/chat/completions"
         self._model = settings.openai_model
         self._timeout = settings.llm_provider_timeout_seconds
         self._max_tokens = settings.llm_max_tokens
@@ -101,7 +104,7 @@ class OpenAILLMGateway(LLMGateway):
             try:
                 async with self._client() as client:
                     response = await client.post(
-                        _CHAT_COMPLETIONS_URL, json=payload, headers=headers
+                        self._chat_completions_url, json=payload, headers=headers
                     )
             except httpx.HTTPError as exc:
                 last_exc = exc

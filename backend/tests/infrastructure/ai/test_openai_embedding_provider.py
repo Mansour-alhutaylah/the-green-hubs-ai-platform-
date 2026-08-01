@@ -23,6 +23,8 @@ DIMENSION = 1536
 def _settings(**overrides: object) -> Settings:
     defaults: dict = {
         "openai_api_key": "test-api-key",
+        "openai_base_url": "https://api.openai.com/v1",
+        "openrouter_api_key": None,
         "embedding_model": "text-embedding-3-small",
         "embedding_dimension": DIMENSION,
         "embedding_provider_timeout_seconds": 5.0,
@@ -59,6 +61,11 @@ def _embeddings_response(texts: list[str], *, shuffle: bool = False) -> dict:
 def test_raises_when_api_key_missing() -> None:
     with pytest.raises(RuntimeError):
         OpenAIEmbeddingProvider(_settings(openai_api_key=None))
+
+
+def test_raises_when_no_api_key_and_no_openrouter_key() -> None:
+    with pytest.raises(RuntimeError):
+        OpenAIEmbeddingProvider(_settings(openai_api_key=None, openrouter_api_key=None))
 
 
 def test_raises_when_dimension_is_not_1536() -> None:
@@ -330,3 +337,110 @@ async def test_generic_400_maps_to_malformed_response_and_is_not_retried() -> No
         await provider.embed_texts(["hello"])
 
     assert call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible base URL / OpenRouter configuration
+# ---------------------------------------------------------------------------
+
+
+async def test_direct_openai_uses_default_base_url_and_model() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        captured["body"] = request.content
+        return httpx.Response(200, json=_embeddings_response(["hello"]))
+
+    provider = OpenAIEmbeddingProvider(
+        _settings(openai_api_key="direct-key", embedding_model="text-embedding-3-small"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.embed_texts(["hello"])
+
+    assert captured["url"] == "https://api.openai.com/v1/embeddings"
+    assert captured["headers"]["authorization"] == "Bearer direct-key"
+    assert b'"model":"text-embedding-3-small"' in captured["body"]
+
+
+async def test_openrouter_configuration_used_when_openai_key_absent() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        captured["body"] = request.content
+        return httpx.Response(200, json=_embeddings_response(["hello"]))
+
+    provider = OpenAIEmbeddingProvider(
+        _settings(
+            openai_api_key=None,
+            openrouter_api_key="or-test-key",
+            embedding_model="openai/text-embedding-3-small",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.embed_texts(["hello"])
+
+    assert captured["url"] == "https://openrouter.ai/api/v1/embeddings"
+    assert captured["headers"]["authorization"] == "Bearer or-test-key"
+    assert b'"model":"openai/text-embedding-3-small"' in captured["body"]
+    assert b"or-test-key" not in captured["body"]  # key never leaks into the payload
+
+
+async def test_direct_openai_key_takes_precedence_over_openrouter() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        return httpx.Response(200, json=_embeddings_response(["hello"]))
+
+    provider = OpenAIEmbeddingProvider(
+        _settings(openai_api_key="direct-key", openrouter_api_key="or-test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.embed_texts(["hello"])
+
+    assert captured["url"] == "https://api.openai.com/v1/embeddings"
+    assert captured["headers"]["authorization"] == "Bearer direct-key"
+
+
+async def test_explicit_base_url_override_is_respected() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=_embeddings_response(["hello"]))
+
+    provider = OpenAIEmbeddingProvider(
+        _settings(openai_base_url="https://custom.example.com/v1/"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await provider.embed_texts(["hello"])
+
+    assert captured["url"] == "https://custom.example.com/v1/embeddings"
+
+
+async def test_openrouter_authentication_failure_is_never_reported_as_success() -> None:
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(401, json={"error": {"message": "No auth credentials found"}})
+
+    provider = OpenAIEmbeddingProvider(
+        _settings(openai_api_key=None, openrouter_api_key="or-bad-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EmbeddingAuthenticationError):
+        await provider.embed_texts(["hello"])
+
+    assert call_count == 1  # never retried, never treated as success

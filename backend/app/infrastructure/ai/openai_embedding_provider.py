@@ -19,7 +19,7 @@ from typing import Sequence
 
 import httpx
 
-from app.core.config import Settings
+from app.core.config import Settings, resolve_ai_credentials
 from app.domain.embedding_provider import (
     EmbeddingAuthenticationError,
     EmbeddingDimensionMismatchError,
@@ -33,7 +33,6 @@ from app.domain.embedding_provider import (
 
 logger = logging.getLogger(__name__)
 
-_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
 _MAX_ATTEMPTS = 2
 
 
@@ -41,8 +40,12 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     def __init__(
         self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
-        if not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is required to construct OpenAIEmbeddingProvider")
+        api_key, base_url = resolve_ai_credentials(settings)
+        if not api_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY or OPENROUTER_API_KEY is required to construct "
+                "OpenAIEmbeddingProvider"
+            )
         if settings.embedding_dimension != 1536:
             raise RuntimeError(
                 f"Unsupported embedding_dimension {settings.embedding_dimension}: "
@@ -55,7 +58,8 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         if settings.embedding_max_input_characters <= 0:
             raise RuntimeError("embedding_max_input_characters must be positive")
 
-        self._api_key = settings.openai_api_key
+        self._api_key = api_key
+        self._embeddings_url = f"{base_url.rstrip('/')}/embeddings"
         self._model = settings.embedding_model
         self._dimension = settings.embedding_dimension
         self._timeout = settings.embedding_provider_timeout_seconds
@@ -84,7 +88,9 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         for _attempt in range(_MAX_ATTEMPTS):
             try:
                 async with self._client() as client:
-                    response = await client.post(_EMBEDDINGS_URL, json=payload, headers=headers)
+                    response = await client.post(
+                        self._embeddings_url, json=payload, headers=headers
+                    )
             except httpx.HTTPError as exc:
                 last_exc = exc
                 logger.warning("Embedding provider request failed, will retry: %r", exc)
