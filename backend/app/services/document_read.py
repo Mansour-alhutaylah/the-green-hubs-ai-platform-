@@ -11,6 +11,15 @@ to the document repository -- a missing or foreign-tenant engagement
 raises ``NotFoundError`` (404), indistinguishable from any other
 nonexistent resource, never revealing whether the engagement exists
 under a different organization.
+
+``embedding_provider``/``embedding_model``/``embedding_model_version``
+(constructor-supplied, mirroring ``EmbeddingGenerationService``'s own
+identity parameters) are the app's one currently configured embedding
+identity. Every read forwards them to the repository so each
+document's ``embedding_summary`` reflects only that identity's
+attempts -- never a sum across every (provider, model, model_version)
+a document happens to have historical rows under, e.g. from before a
+provider/model configuration change.
 """
 
 from typing import Sequence
@@ -28,9 +37,16 @@ class DocumentReadService:
         self,
         document_repository: IDocumentRepository,
         engagement_repository: IEngagementRepository,
+        *,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> None:
         self._document_repository = document_repository
         self._engagement_repository = engagement_repository
+        self._embedding_provider = embedding_provider
+        self._embedding_model = embedding_model
+        self._embedding_model_version = embedding_model_version
 
     def _require_user_organization(self, current_user: User) -> UUID:
         if current_user.organization_id is None:
@@ -59,6 +75,9 @@ class DocumentReadService:
             processing_status=processing_status,
             limit=limit,
             offset=offset,
+            embedding_provider=self._embedding_provider,
+            embedding_model=self._embedding_model,
+            embedding_model_version=self._embedding_model_version,
         )
         total = await self._document_repository.count_for_organization(
             organization_id=organization_id,
@@ -70,7 +89,11 @@ class DocumentReadService:
     async def get(self, document_id: UUID, current_user: User) -> DocumentReadModel:
         organization_id = self._require_user_organization(current_user)
         document = await self._document_repository.get_read_model_for_organization(
-            document_id, organization_id=organization_id
+            document_id,
+            organization_id=organization_id,
+            embedding_provider=self._embedding_provider,
+            embedding_model=self._embedding_model,
+            embedding_model_version=self._embedding_model_version,
         )
         if document is None:
             raise NotFoundError(f"Document {document_id} not found")

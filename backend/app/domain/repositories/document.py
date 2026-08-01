@@ -63,12 +63,29 @@ class IDocumentRepository(IRepository[Document], ABC):
 
     @abstractmethod
     async def get_read_model_for_organization(
-        self, document_id: UUID, *, organization_id: UUID
+        self,
+        document_id: UUID,
+        *,
+        organization_id: UUID,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> DocumentReadModel | None:
         """Tenant-scoped single-document read, with the derived fields
         the Document detail API needs. Returns ``None`` for a
         nonexistent or foreign-tenant document -- indistinguishable, by
-        design."""
+        design.
+
+        ``embedding_provider``/``embedding_model``/``embedding_model_version``
+        scope the returned ``embedding_summary`` to that one (provider,
+        model, model_version) identity -- the app's currently configured
+        one, passed by the caller, never inferred here. A document can
+        carry ``document_chunk_embeddings`` rows under other, historical
+        identities (e.g. a prior provider/model before a configuration
+        change); those rows are real attempt history worth keeping, but
+        must never be summed into the *current* embedding status, or a
+        stale FAILED attempt under an old identity would forever mark an
+        otherwise fully-embedded document as failed/incomplete."""
         ...
 
     @abstractmethod
@@ -80,11 +97,17 @@ class IDocumentRepository(IRepository[Document], ABC):
         processing_status: str | None = None,
         limit: int,
         offset: int,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> Sequence[DocumentReadModel]:
         """Tenant-scoped, paginated, newest-first (``created_at`` desc,
         ``id`` desc tiebreak) document listing with derived fields.
         ``engagement_id``/``processing_status`` are optional
-        already-validated filters applied at query time."""
+        already-validated filters applied at query time.
+        ``embedding_provider``/``embedding_model``/``embedding_model_version``
+        scope each item's ``embedding_summary`` exactly as documented on
+        ``get_read_model_for_organization`` above."""
         ...
 
     @abstractmethod
