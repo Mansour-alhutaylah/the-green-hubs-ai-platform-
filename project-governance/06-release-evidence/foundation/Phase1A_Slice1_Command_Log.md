@@ -113,9 +113,23 @@ An initial regression attempt inherited stale `DEBUG=release` in its new PowerSh
 090ae91bb4dda50dc558a69cf1e09d4396daa844  ci(backend): run integration tests against isolated database
 ```
 
-## Hosted status at evidence creation
+## Hosted status after the first push
 
-Hosted CI had not started because the branch had not yet been pushed. This is not recorded as a pass. Push and hosted-run status must be appended after the remote operation.
+Push of `56e26e34ed47402b134bd724f628d0ac8049d40f` succeeded without force and set the upstream branch. GitHub Actions run `30741152175` completed with overall failure:
+
+- `backend-integration`: **passed**, including service health, marker, all migrations, pgvector/head proof, collection, and execution.
+- `frontend`: **passed**.
+- Existing `backend`: failed at `ruff check .` before typecheck/tests.
+
+The backend log showed that the unbounded `ruff>=0.7` installed newly released Ruff 0.16.1, which reported 266 pre-existing findings across historical application, migration, and test files. The locally verified environment used Ruff 0.15.20, where the exact CI command `ruff check .` passed. To make the existing job deterministic without changing its steps or rewriting product/history files, the dev requirement was pinned to `ruff==0.15.20` in commit `5018e9bc1a2683b9ca48761c0ab48f3f8d97a70b`.
+
+Follow-up run `30741341196` then produced:
+
+- `backend`: **passed**, confirming the deterministic Ruff correction plus MyPy and non-integration tests.
+- `frontend`: **passed**.
+- `backend-integration`: failed in the final execution step with 146 passed and one historical integration failure.
+
+The failing historical test was `test_search_returns_only_same_tenant_results_ordered_by_similarity`. Its helper creates `[0.9] * 1536` and `[0.1] * 1536`; both are positive collinear vectors and therefore have equal zero cosine distance to the query. The repository query orders only by cosine distance, so the tied row order is unspecified. This same unchanged test passed locally and in hosted run `30741152175`, then failed in `30741341196`, objectively demonstrating nondeterminism. The historical test module and product query were not changed, and no automatic retry was added. No overall hosted pass is claimed.
 
 ## Safe teardown
 

@@ -71,4 +71,12 @@ Frontend commands were not rerun because no frontend or shared frontend tooling 
 
 ## Hosted CI
 
-At the time this file was created, the branch was not yet pushed and hosted CI had not started. No hosted pass is claimed. See the command log and final delivery response for the post-push run status.
+The first hosted run (`30741152175`, commit `56e26e34ed47402b134bd724f628d0ac8049d40f`) produced:
+
+- `backend-integration`: passed every step.
+- `frontend`: passed every step.
+- `backend`: failed at lint because its unbounded dev requirement installed Ruff 0.16.1 instead of the locally verified 0.15.20 and surfaced 266 historical findings.
+
+The existing job steps remain unchanged. The Ruff development dependency was pinned to the locally and repository-verified version 0.15.20. In follow-up run `30741341196`, backend and frontend passed, while backend-integration reported 146 passed and one failure in the unchanged historical similarity-order test.
+
+The test constructs two positive constant vectors, `[0.9] * 1536` and `[0.1] * 1536`. They are collinear and have equal cosine distance, while the production query intentionally orders only by cosine distance. Their tied order is therefore undefined. The test passed locally and in the first hosted integration job, then failed in the second hosted job. No test retry, skip, product tie-breaker, or historical-test edit was introduced to mask it. Overall hosted CI remains failed with this documented limitation.

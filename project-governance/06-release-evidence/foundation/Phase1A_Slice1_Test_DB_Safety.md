@@ -84,7 +84,9 @@ The functional proof created a temporary `vector(1536)` table, inserted a synthe
 
 The separate `backend-integration` job starts the same digest-pinned pgvector service with synthetic CI credentials, waits for Docker health, bootstraps and verifies the marker, applies migrations, verifies Alembic and pgvector, collects the suite through the guarded runner, then runs it through the same fail-closed outcome check. Existing backend and frontend jobs were not changed.
 
-Hosted CI was not started at evidence creation because the branch was not yet pushed; no hosted success is claimed here.
+Hosted run `30741152175` proved the `backend-integration` job successful end to end, including service teardown. The overall workflow failed in the separate existing backend lint step because an unbounded dependency installed Ruff 0.16.1. Ruff was pinned to the locally verified 0.15.20 without changing any existing job step.
+
+Follow-up run `30741341196` passed backend and frontend, while the integration job correctly failed one nondeterministic historical similarity-order assertion after 146 passes. The database safety, marker, migration, pgvector, collection, and zero/all-skip controls all passed before that assertion. The historical module and product ordering were left unchanged, and no retry was added. Overall hosted CI is therefore recorded as failed, not passed.
 
 ## Teardown and rollback
 
@@ -99,6 +101,7 @@ This removes only the Slice 1 container, network, and named disposable volume. T
 Code rollback after delivery should use normal revert commits, not reset or force-push:
 
 ```powershell
+git revert 5018e9bc1a2683b9ca48761c0ab48f3f8d97a70b
 git revert 090ae91bb4dda50dc558a69cf1e09d4396daa844
 git revert 42ba0197d7cfa939a387c8200d74386c8d0b2707
 ```
