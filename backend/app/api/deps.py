@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AuthenticationError, ProfileNotProvisionedError
+from app.core.request_context import enrich_request_context
 from app.domain.embedding_provider import EmbeddingProvider
 from app.domain.entities.user import User
 from app.domain.llm_gateway import LLMGateway
@@ -134,6 +135,7 @@ async def get_current_user(
     user = await repository.get(identity)
     if user is None:
         raise ProfileNotProvisionedError("No application profile found for this account")
+    enrich_request_context(user_id=user.id, organization_id=user.organization_id)
     return user
 
 
