@@ -38,6 +38,33 @@ Open http://localhost:8000/api/v1/health and http://localhost:8000/api/v1/health
 > way. `--reload` is fine inside the Linux-based Docker container; it's just
 > not used for local Windows development.
 
+## Correlation IDs and RequestContext
+
+Every HTTP response includes `X-Correlation-ID`. A client-supplied value is
+accepted only when it is one canonical UUID; accepted values are normalized to
+lowercase. Missing, malformed, duplicated, oversized, whitespace-containing,
+or control-character-containing values are silently replaced with a generated
+UUID4 and the unsafe value is never reflected or logged. CORS-enabled browser
+clients may read the response header.
+
+Application code may call `app.core.request_context.get_request_context()` to
+read the immutable request-local `RequestContext`. It contains the correlation
+ID and optional user and organization UUIDs. Authentication enriches those
+identity fields only after the access-token identity and application profile
+have been resolved on the server; client headers, query parameters, and bodies
+are never identity sources. A profile without an organization keeps
+`organization_id=None`.
+
+Request logs can include `correlation_id`, `user_id`, and `organization_id`.
+The request completion event logs only method, path without query string,
+status, duration, and those safe identifiers. Authorization values, cookies,
+request/response bodies, query strings, credentials, keys, and document
+contents must not be logged.
+
+RequestContext is an observability and future audit foundation. It is not an
+authorization decision or a permanent audit record, and must never be used as
+an authorization input.
+
 ## Migrations
 
 ```bash
