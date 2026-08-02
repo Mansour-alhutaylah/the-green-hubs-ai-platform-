@@ -472,7 +472,7 @@ async def test_search_returns_only_same_tenant_results_ordered_by_similarity(
     _track(cleanup_ids, claimed_a)
     _track(cleanup_ids, claimed_far)
     await repository.mark_completed([(claimed_a[0].id, _vector(0.9))])
-    await repository.mark_completed([(claimed_far[0].id, _vector(0.1))])
+    await repository.mark_completed([(claimed_far[0].id, _vector(-0.1))])
 
     results = await repository.search(
         organization_id=organization_a, provider=PROVIDER, model=MODEL,
