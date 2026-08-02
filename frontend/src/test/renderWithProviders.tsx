@@ -2,8 +2,9 @@ import type { ReactElement, ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthContext';
-import type { AuthService, LoginChallenge } from '@/features/auth/services/AuthService';
+import type { AuthService, LoginResult } from '@/features/auth/services/AuthService';
 import type { DemoUser, Session } from '@/features/auth/types';
+import { WorkspaceProvider } from '@/features/organizations/workspace/WorkspaceProvider';
 import { LocaleProvider } from '@/lib/i18n/LocaleContext';
 import { TooltipProvider, ToastProvider } from '@/design-system';
 
@@ -13,7 +14,7 @@ import { TooltipProvider, ToastProvider } from '@/design-system';
 function createSeededAuthService(session: Session | null): AuthService {
   let current = session;
   return {
-    async requestLogin(): Promise<LoginChallenge> {
+    async requestLogin(): Promise<LoginResult> {
       throw new Error('not implemented in test stub');
     },
     async verifyOtp(): Promise<Session> {
@@ -34,6 +35,7 @@ function createSeededAuthService(session: Session | null): AuthService {
 
 export function buildTestSession(user: DemoUser): Session {
   return {
+    kind: 'demo',
     user,
     token: 'test-token',
     expiresAt: Date.now() + 60 * 60 * 1000,
@@ -59,9 +61,11 @@ export function renderWithProviders(ui: ReactElement, options: RenderWithProvide
       <MemoryRouter initialEntries={initialEntries}>
         <LocaleProvider>
           <AuthProvider service={service}>
-            <TooltipProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </TooltipProvider>
+            <WorkspaceProvider>
+              <TooltipProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </TooltipProvider>
+            </WorkspaceProvider>
           </AuthProvider>
         </LocaleProvider>
       </MemoryRouter>

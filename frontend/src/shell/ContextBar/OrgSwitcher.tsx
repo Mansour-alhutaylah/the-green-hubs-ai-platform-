@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Avatar, Icon, PopoverMenu } from '@/design-system';
 import { useAuth } from '@/features/auth/useAuth';
+import { useWorkspace } from '@/features/organizations/workspace/WorkspaceContext';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { MOCK_ORGANIZATIONS, localizedOrgName } from '@/features/organizations/mockOrgs';
 import { OrgSwitcherOverlay } from './OrgSwitcherOverlay';
@@ -11,15 +12,42 @@ import { OrgSwitcherOverlay } from './OrgSwitcherOverlay';
  * new scope — it never navigates away. Business pages don't yet fetch
  * anything org-scoped, so "reload" here just updates the active-org
  * context; later phases' data hooks read `activeOrgId` and refetch.
+ *
+ * Live sessions belong to exactly one organization (the real backend has
+ * no multi-organization membership model) — for those, this renders the
+ * same chrome as a static, non-interactive label instead of a switcher:
+ * there is never a second organization to switch to, so a popover with
+ * one inert item would be a fake affordance.
  */
 export function OrgSwitcher() {
-  const { user, activeOrgId, setActiveOrg } = useAuth();
+  const { user, sessionKind, activeOrgId, setActiveOrg } = useAuth();
   const { locale, t } = useLocale();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const workspace = useWorkspace();
 
   if (!user) return null;
+
+  if (sessionKind === 'live') {
+    if (workspace.status !== 'ready' || !workspace.organization) return null;
+    return (
+      <span className="flex min-h-10 min-w-0 items-center gap-2 rounded-m border border-line-200 bg-surface-0 px-2.5 py-1.5 shadow-card">
+        <Avatar
+          name={workspace.organization.name}
+          shape="square"
+          size={24}
+          className="hidden ring-2 ring-leaf-100 sm:inline-flex"
+        />
+        <span
+          className="min-w-0 max-w-20 truncate text-body font-bold text-forest-900 sm:max-w-30 md:max-w-45"
+          data-user-content
+        >
+          {workspace.organization.name}
+        </span>
+      </span>
+    );
+  }
 
   const myOrgs = MOCK_ORGANIZATIONS.filter((org) => user.orgIds.includes(org.id));
   const activeOrg = myOrgs.find((org) => org.id === activeOrgId) ?? myOrgs[0];

@@ -1,0 +1,41 @@
+name: green-hubs-slice1-test
+
+services:
+  test-postgres:
+    image: pgvector/pgvector:pg16@sha256:a36250871de0833b8757561c72f2477ef1ddd1101afa4e617fb552e0de514c6b
+    container_name: green-hubs-slice1-test-postgres
+    restart: "no"
+    environment:
+      POSTGRES_USER: gh_test
+      POSTGRES_PASSWORD: gh_test_local_only
+      POSTGRES_DB: green_hubs_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - gh-test-db-data:/var/lib/postgresql/data
+      - ./backend/tests/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gh_test -d green_hubs_test"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    labels:
+      com.greenhubs.environment: disposable-test
+      com.greenhubs.slice: phase1a-slice1
+    networks:
+      - gh-test-network
+
+volumes:
+  gh-test-db-data:
+    name: green-hubs-slice1-test-db-data
+    labels:
+      com.greenhubs.environment: disposable-test
+      com.greenhubs.slice: phase1a-slice1
+
+networks:
+  gh-test-network:
+    name: green-hubs-slice1-test-network
+    labels:
+      com.greenhubs.environment: disposable-test
+      com.greenhubs.slice: phase1a-slice1

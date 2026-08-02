@@ -24,6 +24,48 @@ jobs:
       - name: Test
         run: pytest -m "not integration"
 
+  backend-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      test-postgres:
+        image: pgvector/pgvector:pg16@sha256:a36250871de0833b8757561c72f2477ef1ddd1101afa4e617fb552e0de514c6b
+        env:
+          POSTGRES_USER: gh_test
+          POSTGRES_PASSWORD: gh_test_ci_only
+          POSTGRES_DB: green_hubs_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U gh_test -d green_hubs_test"
+          --health-interval 3s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      GH_INTEGRATION_TEST_MODE: "true"
+      GH_TEST_DATABASE_URL: postgresql+asyncpg://gh_test:gh_test_ci_only@127.0.0.1:55432/green_hubs_test
+      ENVIRONMENT: test
+      DEBUG: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Create and verify disposable test marker
+        run: python scripts/test_db.py bootstrap-marker
+      - name: Apply all Alembic migrations
+        run: python scripts/test_db.py migrate
+      - name: Verify marker, Alembic head, and pgvector
+        run: python scripts/test_db.py verify
+      - name: Collect guarded integration tests
+        run: python scripts/run_integration_tests.py collect
+      - name: Run guarded integration tests
+        run: python scripts/run_integration_tests.py run
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

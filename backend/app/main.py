@@ -34,6 +34,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    register_exception_handlers(app)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.backend_cors_origins,
@@ -42,7 +44,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    register_exception_handlers(app)
     app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
     return app

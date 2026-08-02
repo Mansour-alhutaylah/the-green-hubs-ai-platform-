@@ -21,6 +21,8 @@ from app.infrastructure.ai.openai_llm_gateway import OpenAILLMGateway
 def _settings(**overrides: object) -> Settings:
     defaults: dict = {
         "openai_api_key": "test-api-key",
+        "openai_base_url": "https://api.openai.com/v1",
+        "openrouter_api_key": None,
         "openai_model": "gpt-4o-mini",
         "llm_provider_timeout_seconds": 5.0,
         "llm_max_tokens": 1500,
@@ -48,6 +50,11 @@ def _chat_response(content: dict, *, model: str = "gpt-4o-mini") -> dict:
 def test_raises_when_api_key_missing() -> None:
     with pytest.raises(RuntimeError):
         OpenAILLMGateway(_settings(openai_api_key=None))
+
+
+def test_raises_when_no_api_key_and_no_openrouter_key() -> None:
+    with pytest.raises(RuntimeError):
+        OpenAILLMGateway(_settings(openai_api_key=None, openrouter_api_key=None))
 
 
 def test_raises_when_model_missing() -> None:
@@ -365,3 +372,110 @@ async def test_validator_accepting_first_attempt_makes_exactly_one_call() -> Non
     )
 
     assert call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible base URL / OpenRouter configuration
+# ---------------------------------------------------------------------------
+
+
+async def test_direct_openai_uses_default_base_url_and_model() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=_chat_response({"ok": True}))
+
+    gateway = OpenAILLMGateway(
+        _settings(openai_api_key="direct-key", openai_model="gpt-4o-mini"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await gateway.complete_structured(system_prompt="sys", user_prompt="user")
+
+    assert captured["url"] == "https://api.openai.com/v1/chat/completions"
+    assert captured["headers"]["authorization"] == "Bearer direct-key"
+    assert captured["body"]["model"] == "gpt-4o-mini"
+
+
+async def test_openrouter_configuration_used_when_openai_key_absent() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=_chat_response({"ok": True}))
+
+    gateway = OpenAILLMGateway(
+        _settings(
+            openai_api_key=None,
+            openrouter_api_key="or-test-key",
+            openai_model="openai/gpt-4o-mini",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await gateway.complete_structured(system_prompt="sys", user_prompt="user")
+
+    assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert captured["headers"]["authorization"] == "Bearer or-test-key"
+    assert captured["body"]["model"] == "openai/gpt-4o-mini"
+    assert "or-test-key" not in json.dumps(captured["body"])  # key never leaks into the payload
+
+
+async def test_direct_openai_key_takes_precedence_over_openrouter() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["headers"] = request.headers
+        return httpx.Response(200, json=_chat_response({"ok": True}))
+
+    gateway = OpenAILLMGateway(
+        _settings(openai_api_key="direct-key", openrouter_api_key="or-test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await gateway.complete_structured(system_prompt="sys", user_prompt="user")
+
+    assert captured["url"] == "https://api.openai.com/v1/chat/completions"
+    assert captured["headers"]["authorization"] == "Bearer direct-key"
+
+
+async def test_explicit_base_url_override_is_respected() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=_chat_response({"ok": True}))
+
+    gateway = OpenAILLMGateway(
+        _settings(openai_base_url="https://custom.example.com/v1/"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    await gateway.complete_structured(system_prompt="sys", user_prompt="user")
+
+    assert captured["url"] == "https://custom.example.com/v1/chat/completions"
+
+
+async def test_openrouter_authentication_failure_is_never_reported_as_success() -> None:
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(401, json={"error": {"message": "No auth credentials found"}})
+
+    gateway = OpenAILLMGateway(
+        _settings(openai_api_key=None, openrouter_api_key="or-bad-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(LLMAuthenticationError):
+        await gateway.complete_structured(system_prompt="sys", user_prompt="user")
+
+    assert call_count == 1  # never retried, never treated as success

@@ -60,14 +60,30 @@ class FakeDocumentRepository(IDocumentRepository):
         self.rows: dict[uuid.UUID, tuple[DocumentReadModel, uuid.UUID]] = {}
         self.list_calls: list[dict] = []
         self.count_calls: list[dict] = []
+        self.get_calls: list[dict] = []
 
     def seed(self, document: DocumentReadModel, *, organization_id: uuid.UUID) -> DocumentReadModel:
         self.rows[document.id] = (document, organization_id)
         return document
 
     async def get_read_model_for_organization(
-        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+        self,
+        document_id: uuid.UUID,
+        *,
+        organization_id: uuid.UUID,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> DocumentReadModel | None:
+        self.get_calls.append(
+            {
+                "document_id": document_id,
+                "organization_id": organization_id,
+                "embedding_provider": embedding_provider,
+                "embedding_model": embedding_model,
+                "embedding_model_version": embedding_model_version,
+            }
+        )
         entry = self.rows.get(document_id)
         if entry is None:
             return None
@@ -84,6 +100,9 @@ class FakeDocumentRepository(IDocumentRepository):
         processing_status: str | None = None,
         limit: int,
         offset: int,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> Sequence[DocumentReadModel]:
         self.list_calls.append(
             {
@@ -92,6 +111,9 @@ class FakeDocumentRepository(IDocumentRepository):
                 "processing_status": processing_status,
                 "limit": limit,
                 "offset": offset,
+                "embedding_provider": embedding_provider,
+                "embedding_model": embedding_model,
+                "embedding_model_version": embedding_model_version,
             }
         )
         matches = [
@@ -224,11 +246,22 @@ def engagement_repository() -> FakeEngagementRepository:
     return FakeEngagementRepository()
 
 
+_EMBEDDING_PROVIDER = "openai"
+_EMBEDDING_MODEL = "text-embedding-3-small"
+_EMBEDDING_MODEL_VERSION = ""
+
+
 @pytest.fixture
 def service(
     document_repository: FakeDocumentRepository, engagement_repository: FakeEngagementRepository
 ) -> DocumentReadService:
-    return DocumentReadService(document_repository, engagement_repository)
+    return DocumentReadService(
+        document_repository,
+        engagement_repository,
+        embedding_provider=_EMBEDDING_PROVIDER,
+        embedding_model=_EMBEDDING_MODEL,
+        embedding_model_version=_EMBEDDING_MODEL_VERSION,
+    )
 
 
 @pytest.fixture
@@ -354,6 +387,21 @@ async def test_list_forwards_processing_status_filter(
     assert items[0].processing_status == "FAILED"
 
 
+async def test_list_forwards_the_current_embedding_identity_to_the_repository(
+    service: DocumentReadService, document_repository: FakeDocumentRepository, user_a: User
+) -> None:
+    """The embedding identity forwarded here is what scopes each
+    document's ``embedding_summary`` to only the app's currently
+    configured (provider, model, model_version) -- so it must reach the
+    repository call, not be silently dropped."""
+    await service.list(user_a, engagement_id=None, processing_status=None, limit=20, offset=0)
+
+    call = document_repository.list_calls[-1]
+    assert call["embedding_provider"] == _EMBEDDING_PROVIDER
+    assert call["embedding_model"] == _EMBEDDING_MODEL
+    assert call["embedding_model_version"] == _EMBEDDING_MODEL_VERSION
+
+
 async def test_list_forwards_pagination_to_repository(
     service: DocumentReadService, document_repository: FakeDocumentRepository, user_a: User
 ) -> None:
@@ -425,6 +473,23 @@ async def test_get_rejected_for_user_with_null_organization(service: DocumentRea
     user = _user(None)
     with pytest.raises(AuthorizationError):
         await service.get(uuid.uuid4(), user)
+
+
+async def test_get_forwards_the_current_embedding_identity_to_the_repository(
+    service: DocumentReadService,
+    document_repository: FakeDocumentRepository,
+    user_a: User,
+    organization_a_id: uuid.UUID,
+) -> None:
+    document = _read_model(engagement_id=uuid.uuid4())
+    document_repository.seed(document, organization_id=organization_a_id)
+
+    await service.get(document.id, user_a)
+
+    call = document_repository.get_calls[-1]
+    assert call["embedding_provider"] == _EMBEDDING_PROVIDER
+    assert call["embedding_model"] == _EMBEDDING_MODEL
+    assert call["embedding_model_version"] == _EMBEDDING_MODEL_VERSION
 
 
 async def test_get_maps_embedding_and_analysis_summaries_through_untouched(

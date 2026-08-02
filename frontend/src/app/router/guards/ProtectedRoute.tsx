@@ -7,12 +7,14 @@ import { hasDashboardBeenVisited } from '../dashboardVisited';
 /**
  * Gate for the whole authenticated shell. Order matters: (1) still
  * restoring session → full-page loading diamond, (2) no session →
- * /login, (3) session exists but /dashboard hasn't been visited this
- * browser session yet → bounce to /dashboard first (the "landing rule",
- * §7), (4) otherwise render the requested route.
+ * /login (or /session-expired when a previously-valid live session was
+ * just found invalid out of band — see `AuthContextValue.sessionExpired`),
+ * (3) session exists but /dashboard hasn't been visited this browser
+ * session yet → bounce to /dashboard first (the "landing rule", §7),
+ * (4) otherwise render the requested route.
  */
 export function ProtectedRoute() {
-  const { status } = useAuth();
+  const { status, sessionExpired } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') {
@@ -20,7 +22,13 @@ export function ProtectedRoute() {
   }
 
   if (status === 'unauthenticated') {
-    return <Navigate to={ROUTES.login} state={{ from: location }} replace />;
+    return (
+      <Navigate
+        to={sessionExpired ? ROUTES.sessionExpired : ROUTES.login}
+        state={{ from: location }}
+        replace
+      />
+    );
   }
 
   if (!hasDashboardBeenVisited() && location.pathname !== ROUTES.dashboard) {

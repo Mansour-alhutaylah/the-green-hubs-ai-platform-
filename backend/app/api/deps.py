@@ -159,8 +159,15 @@ def get_document_upload_service(
 def get_document_read_service(
     document_repository: IDocumentRepository = Depends(get_document_repository),
     engagement_repository: IEngagementRepository = Depends(get_engagement_repository),
+    settings: Settings = Depends(get_app_settings),
 ) -> DocumentReadService:
-    return DocumentReadService(document_repository, engagement_repository)
+    return DocumentReadService(
+        document_repository,
+        engagement_repository,
+        embedding_provider=_EMBEDDING_PROVIDER_NAME,
+        embedding_model=settings.embedding_model,
+        embedding_model_version=_EMBEDDING_MODEL_VERSION,
+    )
 
 
 def get_extracted_text_repository(

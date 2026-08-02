@@ -1,0 +1,143 @@
+%% SIP Phase 0 — Verified Current System Map
+%% Built ONLY from repository evidence at commit 079efef (branch feature/frontend-live-integration).
+%% Legend:
+%%   LIVE      = implemented, wired end-to-end, covered by executed automated tests
+%%   LIVE*     = implemented and wired, but its end-to-end proof lives in the 144
+%%               integration tests that were NOT executed in this audit
+%%   DEMO      = renders mock/seeded data only, no backend call
+%%   STUB      = placeholder page, no functionality
+%%   MISSING   = required by the approved Foundation Plan, absent from the repository
+%%   EXTERNAL  = third-party service / trust boundary crossing
+
+flowchart TD
+
+  subgraph BROWSER["Browser — React 19 + Vite 8 + TypeScript (frontend/)"]
+    LOGIN["LoginPage LIVE<br/>features/auth/pages/LoginPage.tsx"]
+    AUTHCTX["AuthProvider LIVE<br/>features/auth/AuthContext.tsx<br/>resolvedAuthService.ts (hybrid live+mock)"]
+    GUARD["ProtectedRoute / RoleGuard<br/>UX-ONLY RBAC — no server enforcement<br/>app/router/guards/"]
+    WS["WorkspaceProvider LIVE<br/>features/organizations/workspace/WorkspaceProvider.tsx"]
+    APICLIENT["apiRequest LIVE<br/>lib/api/client.ts<br/>Bearer token read fresh from Supabase SDK"]
+    DOCS["Documents list / detail / upload LIVE<br/>features/documents/pages/"]
+    ANRUN["AnalysisRunPage LIVE<br/>features/analysis/pages/AnalysisRunPage.tsx"]
+    ANLIST["AnalysisListPage DEMO/limited<br/>no list endpoint exists on the backend"]
+    DASH["DashboardPage DEMO<br/>features/dashboard/mockDashboardData.ts"]
+    STUBS["Reports · Organizations · Users · Settings ·<br/>Notifications · Audit · Frameworks · Carbon ·<br/>Telemetry · HubZero — STUB<br/>features/placeholders/ · shell/StubModulePage.tsx"]
+  end
+
+  subgraph SUPA["Supabase — EXTERNAL trust boundary"]
+    SBAUTH["Supabase Auth EXTERNAL<br/>ES256 access tokens<br/>lib/supabase/client.ts"]
+    SBSTORE["Supabase Storage EXTERNAL<br/>bucket from SUPABASE_STORAGE_BUCKET<br/>service-role key — bypasses RLS"]
+  end
+
+  subgraph API["FastAPI backend (backend/app/) — CORS allow-list, AppError JSON envelope"]
+    JWTV["SupabaseJWTVerifier LIVE<br/>infrastructure/security/supabase_jwt.py<br/>JWKS + kid, ES256 only, iss/aud/exp enforced"]
+    DEPS["get_current_user LIVE<br/>api/deps.py:121-137<br/>token sub -> public.users profile"]
+    R_AUTH["GET /api/v1/auth/me LIVE"]
+    R_ORG["GET/PATCH /api/v1/organizations LIVE<br/>POST returns 403 by design"]
+    R_ENG["GET/POST/PATCH /api/v1/engagements LIVE"]
+    R_DOC["POST /api/v1/documents (upload) LIVE<br/>POST /{id}/process LIVE<br/>POST /{id}/embeddings LIVE<br/>GET / and GET /{id} LIVE"]
+    R_RET["POST /api/v1/retrieval/search LIVE"]
+    R_AN["POST /analysis/documents/{id}/analyze LIVE<br/>POST /analysis/engagements/{id}/analyze LIVE<br/>GET /analysis/runs/{id} LIVE"]
+    R_HLT["GET /api/v1/health · /health/db LIVE"]
+  end
+
+  subgraph SVC["Service layer — framework-independent (backend/app/services/)"]
+    S_ORG["OrganizationService<br/>tenant check: own org only"]
+    S_ENG["EngagementService<br/>org_id re-derived from current_user"]
+    S_UP["DocumentUploadService<br/>PDF magic-byte + type + size validation<br/>storage-write compensation"]
+    S_PROC["DocumentProcessingService<br/>claim -> extract -> normalize -> chunk -> commit"]
+    S_EMB["EmbeddingGenerationService<br/>idempotent claim/retry/stale-reclaim"]
+    S_RET["VectorRetrievalService<br/>org scope from current_user only"]
+    S_RAG["RagAnalysisService<br/>request-hash idempotency, SOURCE_n indirection,<br/>server-side citation mapping"]
+    S_READ["DocumentReadService<br/>tenant-scoped list/detail read model"]
+  end
+
+  subgraph INFRA["Infrastructure adapters (backend/app/infrastructure/)"]
+    EXTRACT["text_extractor.py<br/>pdf · docx · xlsx · xls · txt<br/>NO OCR · NO CSV · page numbers DISCARDED"]
+    NORM["normalizer.py — whitespace only"]
+    CHUNK["chunker.py — char_start/char_end preserved"]
+    EMBP["OpenAIEmbeddingProvider<br/>text-embedding-3-small, dim 1536 enforced"]
+    LLMG["OpenAILLMGateway<br/>model from OPENAI_MODEL, structured JSON + validator"]
+    STOR["SupabaseDocumentStorage<br/>key: organizations/{org}/engagements/{eng}/documents/{id}.pdf"]
+    REPOS["SQLAlchemy repositories<br/>embedding repo derives tenant lineage in SQL via JOIN"]
+  end
+
+  subgraph AIEXT["AI provider — EXTERNAL trust boundary"]
+    OAI["OpenAI or OpenRouter EXTERNAL<br/>resolve_ai_credentials(core/config.py:131)<br/>DOCUMENT TEXT LEAVES THE SYSTEM HERE"]
+  end
+
+  subgraph DB["PostgreSQL / Supabase + pgvector — 9 tables under Alembic"]
+    T1[("organizations")]
+    T2[("users — role column, NEVER enforced server-side")]
+    T3[("engagements")]
+    T4[("documents — no checksum, no version, no evidence_status")]
+    T5[("extracted_text")]
+    T6[("document_chunks — char_start/char_end, no page_number")]
+    T7[("document_chunk_embeddings — vector(1536), org/eng/doc lineage")]
+    T8[("analysis_runs — provider/model/prompt_version/tokens/status")]
+    T9[("analysis_source_references — citations, unique per run+order")]
+    TL[("ai_analysis_results — LEGACY, orphaned, no service uses it")]
+  end
+
+  subgraph GAP["Required by the approved Foundation Plan — MISSING from the repository"]
+    G1["Decision / Approval / Commitment registers — FND-GOV-01..03 MISSING"]
+    G2["Master Portfolio · six-gate lifecycle · risk/issue/action/change — FND-PMO-01..03 MISSING"]
+    G3["Requirement · Deliverable · RFI · Procurement · Quality registers — FND-PRJ-01..03 MISSING"]
+    G4["Evidence review states + human verification — FND-KC-05 MISSING"]
+    G5["Agent registry · tool permissions · kill switch — FND-AI-01 MISSING"]
+    G6["Controlled calculation / method engine — FND-MTH-01 MISSING"]
+    G7["Tamper-evident audit trail — FND-SEC-03 MISSING"]
+    G8["Backup + tested restore — FND-REL-01 MISSING"]
+    G9["OneDrive controlled source repository — FND-KC-01 NOT IMPLEMENTED"]
+    G10["Server-side role/authority enforcement — part of FND-SEC-01 MISSING"]
+  end
+
+  LOGIN --> AUTHCTX
+  AUTHCTX -->|signInWithPassword| SBAUTH
+  AUTHCTX --> GUARD
+  GUARD --> WS
+  WS --> APICLIENT
+  DOCS --> APICLIENT
+  ANRUN --> APICLIENT
+  ANLIST -. no backend list endpoint .-> API
+  DASH -. mock only, no call .-> API
+  STUBS -. no call .-> API
+
+  APICLIENT -->|Bearer access_token| JWTV
+  SBAUTH -.->|JWKS public keys| JWTV
+  JWTV --> DEPS
+  DEPS --> R_AUTH & R_ORG & R_ENG & R_DOC & R_RET & R_AN
+
+  R_ORG --> S_ORG
+  R_ENG --> S_ENG
+  R_DOC --> S_UP & S_PROC & S_EMB & S_READ
+  R_RET --> S_RET
+  R_AN --> S_RAG
+
+  S_UP --> STOR
+  STOR --> SBSTORE
+  S_PROC --> STOR
+  S_PROC --> EXTRACT --> NORM --> CHUNK
+  S_EMB --> EMBP
+  S_RET --> EMBP
+  EMBP --> OAI
+  S_RAG --> S_RET
+  S_RAG --> LLMG --> OAI
+
+  S_ORG & S_ENG & S_UP & S_PROC & S_EMB & S_RET & S_RAG & S_READ --> REPOS
+  REPOS --> T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & T9
+  DB -.-> TL
+
+  R_HLT --> DB
+
+  classDef live fill:#0f5132,stroke:#0a3622,color:#ffffff
+  classDef demo fill:#664d03,stroke:#332701,color:#ffffff
+  classDef missing fill:#842029,stroke:#58151c,color:#ffffff
+  classDef ext fill:#084298,stroke:#052c65,color:#ffffff
+  classDef data fill:#41464b,stroke:#212529,color:#ffffff
+
+  class LOGIN,AUTHCTX,WS,APICLIENT,DOCS,ANRUN,JWTV,DEPS,R_AUTH,R_ORG,R_ENG,R_DOC,R_RET,R_AN,R_HLT,S_ORG,S_ENG,S_UP,S_PROC,S_EMB,S_RET,S_RAG,S_READ,EXTRACT,NORM,CHUNK,EMBP,LLMG,STOR,REPOS live
+  class ANLIST,DASH,STUBS,GUARD demo
+  class G1,G2,G3,G4,G5,G6,G7,G8,G9,G10 missing
+  class SBAUTH,SBSTORE,OAI ext
+  class T1,T2,T3,T4,T5,T6,T7,T8,T9,TL data

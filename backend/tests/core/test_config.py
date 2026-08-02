@@ -1,0 +1,83 @@
+"""Unit tests for ``resolve_ai_credentials`` -- the shared logic that
+decides whether ``OpenAIEmbeddingProvider`` and ``OpenAILLMGateway`` talk
+to direct OpenAI or an OpenAI-compatible gateway such as OpenRouter.
+
+Every ``Settings(...)`` call below pins every field ``resolve_ai_credentials``
+reads (``openai_api_key``, ``openai_base_url``, ``openrouter_api_key``),
+even where a default would otherwise apply -- ``Settings`` loads a real
+local ``.env`` by default, and this developer's has live
+``OPENROUTER_API_KEY``/``OPENAI_BASE_URL`` values that must never leak into
+these results.
+"""
+
+from app.core.config import Settings, resolve_ai_credentials
+
+_DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+
+
+def test_direct_openai_key_resolves_to_openai_default_base_url() -> None:
+    settings = Settings(
+        openai_api_key="direct-key",
+        openai_base_url=_DEFAULT_OPENAI_BASE_URL,
+        openrouter_api_key=None,
+    )
+
+    api_key, base_url = resolve_ai_credentials(settings)
+
+    assert api_key == "direct-key"
+    assert base_url == _DEFAULT_OPENAI_BASE_URL
+
+
+def test_openrouter_key_resolves_when_openai_key_absent() -> None:
+    settings = Settings(
+        openai_api_key=None, openai_base_url=_DEFAULT_OPENAI_BASE_URL, openrouter_api_key="or-key"
+    )
+
+    api_key, base_url = resolve_ai_credentials(settings)
+
+    assert api_key == "or-key"
+    assert base_url == "https://openrouter.ai/api/v1"
+
+
+def test_direct_openai_key_takes_precedence_when_both_are_set() -> None:
+    settings = Settings(
+        openai_api_key="direct-key",
+        openai_base_url=_DEFAULT_OPENAI_BASE_URL,
+        openrouter_api_key="or-key",
+    )
+
+    api_key, base_url = resolve_ai_credentials(settings)
+
+    assert api_key == "direct-key"
+    assert base_url == _DEFAULT_OPENAI_BASE_URL
+
+
+def test_explicit_base_url_override_is_respected_for_direct_openai() -> None:
+    settings = Settings(
+        openai_api_key="direct-key",
+        openai_base_url="https://custom.example.com/v1",
+        openrouter_api_key=None,
+    )
+
+    api_key, base_url = resolve_ai_credentials(settings)
+
+    assert api_key == "direct-key"
+    assert base_url == "https://custom.example.com/v1"
+
+
+def test_no_credentials_returns_none_api_key_and_default_base_url() -> None:
+    settings = Settings(
+        openai_api_key=None, openai_base_url=_DEFAULT_OPENAI_BASE_URL, openrouter_api_key=None
+    )
+
+    api_key, base_url = resolve_ai_credentials(settings)
+
+    assert api_key is None
+    assert base_url == _DEFAULT_OPENAI_BASE_URL
+
+
+def test_embedding_dimension_default_is_1536() -> None:
+    # Inspects the declared field default directly (not an instantiated
+    # Settings()) so this assertion can't be masked by a real .env file
+    # setting EMBEDDING_DIMENSION during a local test run.
+    assert Settings.model_fields["embedding_dimension"].default == 1536

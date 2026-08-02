@@ -55,6 +55,32 @@ ruff check .
 mypy app
 ```
 
+### Isolated integration tests
+
+Integration tests must use the separate disposable PostgreSQL + pgvector
+environment. Never use the root `docker-compose.yml`; it starts the API with
+the development configuration and does not provide a test database.
+
+From the repository root in PowerShell:
+
+```powershell
+$env:DEBUG = "false"
+$env:GH_INTEGRATION_TEST_MODE = "true"
+$env:ENVIRONMENT = "test"
+$env:GH_TEST_DATABASE_URL = "postgresql+asyncpg://gh_test:gh_test_local_only@127.0.0.1:55432/green_hubs_test"
+docker compose -f docker-compose.test.yml up -d
+backend\.venv\Scripts\python.exe backend\scripts\test_db.py migrate
+backend\.venv\Scripts\python.exe backend\scripts\test_db.py verify
+backend\.venv\Scripts\python.exe backend\scripts\run_integration_tests.py all
+docker compose -f docker-compose.test.yml down -v
+```
+
+The official runner rejects missing explicit test mode, unsafe database
+names or hosts, absent marker/migration state, zero collected tests, zero
+executed tests, and an all-skipped result. It removes external-provider
+credentials from the pytest subprocess and uses a loopback-only auth issuer.
+The test Compose file never loads `backend/.env`.
+
 ## Docker (optional)
 
 ```bash

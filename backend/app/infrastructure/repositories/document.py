@@ -47,6 +47,21 @@ parameters that may be ``NULL`` are always wrapped ``CAST(:param AS
 type)``, never a bare ``::type`` shorthand -- see
 ``SQLAlchemyAnalysisRunRepository``'s docstring for why asyncpg needs
 this.
+
+The embedding lateral join additionally filters on
+``(provider, model, model_version)`` -- the app's one currently
+configured embedding identity, passed in by the caller (ultimately
+``Settings``/``deps.py``), never inferred from the data. Without this
+filter, a document that was ever embedded under a since-changed
+provider/model configuration (e.g. switching from direct OpenAI to
+OpenRouter, whose model names take a different vendor-prefixed form)
+would have its old, now-irrelevant attempt rows summed together with
+its current ones under ``uq_document_chunk_embeddings_identity``'s
+per-(chunk, provider, model, model_version) uniqueness -- inflating
+``total_chunks`` and resurrecting long-since-superseded ``FAILED`` rows
+into the live status. The old rows are never deleted or modified here;
+they simply fall outside this scope, exactly as intended attempt
+history should.
 """
 
 from typing import Any, Sequence
@@ -105,6 +120,9 @@ _READ_MODEL_FROM_JOINS = """
             COUNT(*) FILTER (WHERE dce.status = 'FAILED') AS failed
         FROM document_chunk_embeddings dce
         WHERE dce.document_id = d.id AND dce.organization_id = e.organization_id
+          AND dce.provider = :embedding_provider
+          AND dce.model = :embedding_model
+          AND dce.model_version = :embedding_model_version
     ) ea ON true
     LEFT JOIN LATERAL (
         SELECT ar.id, ar.status, ar.analysis_type, ar.created_at, ar.completed_at,
@@ -305,7 +323,13 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         return _to_domain(model)
 
     async def get_read_model_for_organization(
-        self, document_id: UUID, *, organization_id: UUID
+        self,
+        document_id: UUID,
+        *,
+        organization_id: UUID,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> DocumentReadModel | None:
         stmt = text(
             f"SELECT {_READ_MODEL_COLUMNS} {_READ_MODEL_FROM_JOINS} "
@@ -318,6 +342,9 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
                 "engagement_id": None,
                 "processing_status": None,
                 "document_id": document_id,
+                "embedding_provider": embedding_provider,
+                "embedding_model": embedding_model,
+                "embedding_model_version": embedding_model_version,
             },
         )
         row = result.mappings().first()
@@ -331,6 +358,9 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         processing_status: str | None = None,
         limit: int,
         offset: int,
+        embedding_provider: str,
+        embedding_model: str,
+        embedding_model_version: str,
     ) -> Sequence[DocumentReadModel]:
         stmt = text(
             f"SELECT {_READ_MODEL_COLUMNS} {_READ_MODEL_FROM_JOINS} "
@@ -346,6 +376,9 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
                 "processing_status": processing_status,
                 "limit": limit,
                 "offset": offset,
+                "embedding_provider": embedding_provider,
+                "embedding_model": embedding_model,
+                "embedding_model_version": embedding_model_version,
             },
         )
         return [_read_model_from_row(row) for row in result.mappings().all()]

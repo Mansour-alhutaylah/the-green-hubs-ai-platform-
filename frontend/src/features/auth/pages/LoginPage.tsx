@@ -5,6 +5,7 @@ import {
   ChallengeExpiredError,
   InvalidCredentialsError,
   InvalidOtpError,
+  ProfileNotProvisionedError,
   RateLimitedError,
 } from '../services/AuthService';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
@@ -19,6 +20,11 @@ type Step = { name: 'credentials' } | { name: 'otp'; challengeId: string; masked
  * credentials step and the OTP step, rather than two separate pages.
  * OTP success always navigates to /dashboard (the landing rule, §7) —
  * never to whatever deep link was originally attempted.
+ *
+ * Live (Supabase) sign-in has no OTP step — `requestLogin` resolves with
+ * `kind: 'authenticated'` directly and this navigates straight to
+ * /dashboard, exactly like the demo-workspace path below. Only the mock's
+ * two-step login ever produces `kind: 'otpRequired'`.
  */
 export function LoginPage() {
   const { requestLogin, verifyOtp, resendOtp, enterDemoWorkspace } = useAuth();
@@ -33,16 +39,22 @@ export function LoginPage() {
     setIsSubmitting(true);
     setError(undefined);
     try {
-      const challenge = await requestLogin(email, password);
-      setStep({
-        name: 'otp',
-        challengeId: challenge.challengeId,
-        maskedContact: challenge.maskedContact,
-      });
+      const result = await requestLogin(email, password);
+      if (result.kind === 'otpRequired') {
+        setStep({
+          name: 'otp',
+          challengeId: result.challengeId,
+          maskedContact: result.maskedContact,
+        });
+      } else {
+        navigate(ROUTES.dashboard, { replace: true });
+      }
     } catch (caught) {
       if (caught instanceof RateLimitedError) {
         setLockoutSeconds(caught.retryAfterSec);
       } else if (caught instanceof InvalidCredentialsError) {
+        setError(caught.message);
+      } else if (caught instanceof ProfileNotProvisionedError) {
         setError(caught.message);
       } else {
         setError('Something went wrong. Try again.');
