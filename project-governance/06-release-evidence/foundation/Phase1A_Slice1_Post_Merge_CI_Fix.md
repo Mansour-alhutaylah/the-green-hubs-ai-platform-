@@ -69,7 +69,18 @@ No frontend file changed, so frontend checks were not rerun locally.
 
 ## New hosted verification
 
-Pending push and pull-request creation. This section must be updated from the actual hosted checks; no hosted success is claimed yet.
+The fix commit `fe086fc5285999e8c3576e1600b756ec6ff98290` was pushed without force and opened as pull request #3 targeting `main`. It was not merged automatically.
+
+- Branch push run `30743100076`: completed successfully.
+  - `backend`: passed.
+  - `backend-integration`: passed.
+  - `frontend`: passed.
+- Pull-request run `30743110419`: completed successfully.
+  - `backend`: passed.
+  - `backend-integration`: passed.
+  - `frontend`: passed.
+
+These are new fix-branch results and do not rewrite or replace the failed post-merge `main` run documented above.
 
 ## Safety and limitations
 
@@ -77,5 +88,5 @@ Pending push and pull-request creation. This section must be updated from the ac
 - Only `docker-compose.test.yml` was used. Supabase, Supabase Storage, OpenAI, OpenRouter, production data, and customer data were not used.
 - No historical migration or unrelated product feature changed.
 - No revert, reset, clean, stash, rebase, force push, direct commit to `main`, or automatic PR merge was performed.
-- Known limitation before hosted verification: local Python/OS differed from the runner and the local full suite was slower, but the relevant package, PostgreSQL, pgvector, image digest, locale, timezone, and guarded environment matched.
+- Known limitation: local Python/OS differed from the runner and the local full suite was slower, but the relevant package, PostgreSQL, pgvector, image digest, locale, timezone, and guarded environment matched; both hosted workflows passed.
 - Teardown command: `docker compose -f docker-compose.test.yml down`. It is scoped to the Slice 1 container and network and does not remove unrelated Docker resources.
