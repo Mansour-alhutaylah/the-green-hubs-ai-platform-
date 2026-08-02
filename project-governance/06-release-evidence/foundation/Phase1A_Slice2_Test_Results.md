@@ -54,13 +54,24 @@ Local guarded result: **NOT RUN — Docker unavailable**. The `docker` command
 was not installed or available on PATH. No shared database was contacted and
 no guard was bypassed. No disposable resource was created.
 
-Hosted `backend-integration`: **PENDING**.
+Hosted guarded integration result: **147 selected, 147 executed, 147 passed,
+0 failed, 0 errors, 0 skipped, 485 deselected in 42.81s**.
+
+The hosted job verified:
+
+- isolated marker: verified;
+- PostgreSQL: 16.14;
+- pgvector: 0.8.6;
+- Alembic head: `da0298a9c722`;
+- public tables: 12.
 
 ## Hosted CI
 
-- `backend`: **PENDING**
-- `backend-integration`: **PENDING**
-- `frontend`: **PENDING** (frontend source and shared TypeScript tooling were untouched)
-- Run ID/URL: **PENDING**
+- `backend`: **SUCCESS**, job `91488960915`
+- `backend-integration`: **SUCCESS**, job `91488960923`
+- `frontend`: **SUCCESS**, job `91488960896` (frontend source and shared TypeScript tooling were untouched)
+- Push run ID: `30744997516` (run number 42)
+- Run URL: <https://github.com/Mansour-alhutaylah/the-green-hubs-ai-platform-/actions/runs/30744997516>
 
-No hosted success is claimed until all required jobs finish successfully.
+All required hosted jobs reached terminal success on commit
+`4691579df97d83d6602a077a469b54aea4577693`.
