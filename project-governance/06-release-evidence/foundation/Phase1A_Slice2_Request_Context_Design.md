@@ -1,7 +1,9 @@
 # Phase 1A Slice 2 Request Context Design
 
-Evidence ID: **EV-ARC-CTX-01**  
-Branch: `feat/fnd-phase1a-correlation-request-context`  
+Evidence ID: **EV-ARC-CTX-01**
+
+Branch: `feat/fnd-phase1a-correlation-request-context`
+
 Starting commit: `3e54a87b0ba295adb5e0109faafc6b12c30a46b3`
 
 ## Architecture

@@ -1,7 +1,9 @@
 # Phase 1A Slice 2 Command Log
 
-Evidence IDs: **EV-ARC-CTX-01**, **EV-REL-CID-01**, **EV-SEC-LOG-01**, **EV-CI-02**  
-Date: 2026-08-02 (Asia/Riyadh)  
+Evidence IDs: **EV-ARC-CTX-01**, **EV-REL-CID-01**, **EV-SEC-LOG-01**, **EV-CI-02**
+
+Date: 2026-08-02 (Asia/Riyadh)
+
 Branch: `feat/fnd-phase1a-correlation-request-context`
 
 ## Repository gate

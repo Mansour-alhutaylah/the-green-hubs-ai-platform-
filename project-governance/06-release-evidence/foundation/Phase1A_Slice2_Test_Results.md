@@ -1,7 +1,9 @@
 # Phase 1A Slice 2 Test Results
 
-Evidence IDs: **EV-REL-CID-01**, **EV-SEC-LOG-01**, **EV-CI-02**  
-Date: 2026-08-02 (Asia/Riyadh)  
+Evidence IDs: **EV-REL-CID-01**, **EV-SEC-LOG-01**, **EV-CI-02**
+
+Date: 2026-08-02 (Asia/Riyadh)
+
 Starting commit: `3e54a87b0ba295adb5e0109faafc6b12c30a46b3`
 
 ## Focused verification
