@@ -32,12 +32,14 @@ from app.api.deps import (
     get_document_read_service,
     get_document_upload_service,
     get_embedding_generation_service,
+    require_permission,
 )
 from app.core.config import Settings
 from app.core.exceptions import ValidationError
 from app.domain.entities.document import Document
 from app.domain.entities.document_read_model import DocumentReadModel
 from app.domain.entities.user import User
+from app.domain.security import Permission
 from app.schemas.document import (
     AnalysisSummaryResponse,
     DocumentListResponse,
@@ -133,7 +135,7 @@ def _to_read_response(document: DocumentReadModel) -> DocumentReadResponse:
 async def upload_document(
     engagement_id: UUID = Form(...),
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.DOCUMENT_UPLOAD)),
     service: DocumentUploadService = Depends(get_document_upload_service),
     settings: Settings = Depends(get_app_settings),
 ) -> DocumentResponse:
@@ -160,7 +162,7 @@ async def upload_document(
 )
 async def process_document(
     document_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.DOCUMENT_PROCESS)),
     service: DocumentProcessingService = Depends(get_document_processing_service),
 ) -> DocumentResponse:
     document = await service.process(document_id, current_user)
@@ -179,7 +181,7 @@ async def process_document(
 )
 async def generate_document_embeddings(
     document_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.DOCUMENT_PROCESS)),
     service: EmbeddingGenerationService = Depends(get_embedding_generation_service),
 ) -> EmbeddingGenerationSummaryResponse:
     summary = await service.generate_for_document(document_id, current_user)
