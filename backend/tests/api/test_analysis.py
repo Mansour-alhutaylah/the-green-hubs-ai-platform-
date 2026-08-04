@@ -132,7 +132,9 @@ def _authenticated_headers(fake_verifier: FakeVerifier, fake_repository: FakeUse
     fake_repository.seed(
         User(
             id=user_id, organization_id=uuid.uuid4(), full_name="Test User",
-            email="test@example.com", role=None, created_at=datetime.now(timezone.utc),
+            # Write-capable so these tests still reach the behaviour they
+            # assert; role denial is covered in tests/api/test_authorization.py.
+            email="test@example.com", role="admin", created_at=datetime.now(timezone.utc),
         )
     )
     return {"Authorization": "Bearer valid-token"}

@@ -102,6 +102,7 @@ def _register_user(
     *,
     token: str = "valid-token",
     organization_id: uuid.UUID | None,
+    role: str | None = "admin",
 ) -> dict:
     user_id = uuid.uuid4()
     fake_verifier.register(token, user_id)
@@ -111,7 +112,10 @@ def _register_user(
             organization_id=organization_id,
             full_name="Test User",
             email="test@example.com",
-            role=None,
+            # Write-capable by default so these tests still reach the
+            # tenant/validation behaviour they exist to assert. Role-based
+            # denial itself is covered in tests/api/test_authorization.py.
+            role=role,
             created_at=datetime.now(timezone.utc),
         )
     )
