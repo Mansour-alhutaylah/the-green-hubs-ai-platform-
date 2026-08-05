@@ -8,9 +8,10 @@ machinery. Future tasks add further per-entity providers here following the
 same shape as ``get_document_repository``.
 """
 
+import logging
 from decimal import Decimal
 from functools import lru_cache
-from typing import AsyncIterator
+from typing import AsyncIterator, Awaitable, Callable
 from uuid import UUID
 
 from fastapi import Depends
@@ -18,8 +19,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.exceptions import AuthenticationError, ProfileNotProvisionedError
+from app.core.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    ProfileNotProvisionedError,
+)
 from app.core.request_context import enrich_request_context
+from app.domain.security import Permission, has_permission, resolve_trusted_role
 from app.domain.embedding_provider import EmbeddingProvider
 from app.domain.entities.user import User
 from app.domain.llm_gateway import LLMGateway
@@ -66,6 +72,12 @@ _EMBEDDING_MODEL_VERSION = ""
 _LLM_PROVIDER_NAME = "openai"
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+_authorization_logger = logging.getLogger("app.authorization")
+
+# Deliberately generic: a denied caller learns that they may not perform the
+# action, never which permission was required nor how roles map to it.
+_PERMISSION_DENIED_DETAIL = "You do not have permission to perform this action."
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -137,6 +149,41 @@ async def get_current_user(
         raise ProfileNotProvisionedError("No application profile found for this account")
     enrich_request_context(user_id=user.id, organization_id=user.organization_id)
     return user
+
+
+def require_permission(
+    permission: Permission,
+) -> Callable[[User], Awaitable[User]]:
+    """Build a dependency that admits only callers holding ``permission``.
+
+    Layers on top of ``get_current_user``, so authentication still runs
+    first and still produces 401 on its own terms; this adds the separate
+    authorization decision and produces 403. The authenticated ``User`` is
+    returned unchanged, letting a route swap
+    ``Depends(get_current_user)`` for ``Depends(require_permission(...))``
+    without any other signature change -- existing tenant checks inside the
+    services keep receiving the same ``current_user``.
+
+    The decision reads only the server-resolved profile. Nothing from the
+    request body, query string or headers participates, so no client value
+    -- and no LLM output, document text or filename that later reaches a
+    service -- can influence it.
+    """
+
+    async def dependency(current_user: User = Depends(get_current_user)) -> User:
+        role = resolve_trusted_role(current_user)
+        if not has_permission(role, permission):
+            # correlation_id/user_id/organization_id are attached to every
+            # record by the logging factory; only safe fields are added here.
+            _authorization_logger.warning(
+                "Authorization denied permission=%s role=%s",
+                permission.value,
+                role.value if role is not None else "-",
+            )
+            raise AuthorizationError(_PERMISSION_DENIED_DETAIL)
+        return current_user
+
+    return dependency
 
 
 @lru_cache

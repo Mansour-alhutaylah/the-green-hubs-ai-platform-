@@ -14,9 +14,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import get_current_user, get_organization_service
+from app.api.deps import get_current_user, get_organization_service, require_permission
 from app.domain.entities.organization import Organization
 from app.domain.entities.user import User
+from app.domain.security import Permission
 from app.schemas.organization import (
     OrganizationCreateRequest,
     OrganizationListResponse,
@@ -48,7 +49,7 @@ def _to_response(organization: Organization) -> OrganizationResponse:
 )
 async def create_organization(
     payload: OrganizationCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ORGANIZATION_MANAGE)),
     service: OrganizationService = Depends(get_organization_service),
 ) -> OrganizationResponse:
     organization = await service.create(payload.name, current_user)
@@ -92,7 +93,7 @@ async def get_organization(
 async def update_organization(
     organization_id: UUID,
     payload: OrganizationUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ORGANIZATION_MANAGE)),
     service: OrganizationService = Depends(get_organization_service),
 ) -> OrganizationResponse:
     organization = await service.update(organization_id, payload.name, current_user)

@@ -1,0 +1,164 @@
+"""Focused tests for the permission catalog and role policy.
+
+Pure unit tests: no FastAPI, no database, no network. They pin the
+fail-closed contract that the route layer depends on.
+"""
+
+import re
+import socket
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+from app.domain.entities.user import User
+from app.domain.security import (
+    ROLE_PERMISSIONS,
+    Permission,
+    Role,
+    has_permission,
+    permissions_for_role,
+    resolve_trusted_role,
+)
+
+_ADMIN_CLASS_PERMISSIONS = frozenset({Permission.ORGANIZATION_MANAGE})
+_ROLES_TS = (
+    Path(__file__).resolve().parents[3].parent
+    / "frontend"
+    / "src"
+    / "features"
+    / "rbac"
+    / "roles.ts"
+)
+
+
+def _user(role: object) -> User:
+    return User(
+        id=uuid.uuid4(),
+        organization_id=uuid.uuid4(),
+        full_name="Test User",
+        email="test@example.com",
+        role=role,  # type: ignore[arg-type]
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Catalog completeness
+# ---------------------------------------------------------------------------
+
+
+def test_every_role_has_an_explicit_permission_set() -> None:
+    for role in Role:
+        assert role in ROLE_PERMISSIONS, f"{role} has no explicit policy entry"
+
+
+def test_backend_roles_match_the_frontend_role_vocabulary() -> None:
+    """Guards backlog A-1: the UI tiers and the server policy must not drift."""
+
+    source = _ROLES_TS.read_text(encoding="utf-8")
+    block = source.split("export const Role = {", 1)[1].split("} as const;", 1)[0]
+    frontend_roles = set(re.findall(r"'([a-z]+)'", block))
+    assert frontend_roles == {role.value for role in Role}
+
+
+# ---------------------------------------------------------------------------
+# Fail-closed behaviour
+# ---------------------------------------------------------------------------
+
+
+def test_missing_role_is_denied_every_permission() -> None:
+    assert resolve_trusted_role(_user(None)) is None
+    for permission in Permission:
+        assert has_permission(None, permission) is False
+
+
+@pytest.mark.parametrize("raw", ["member", "superuser", "", "  ", "admin ; drop", 42, None])
+def test_unrecognized_role_values_resolve_to_none(raw: object) -> None:
+    assert resolve_trusted_role(_user(raw)) is None
+
+
+def test_unknown_role_is_denied_every_permission() -> None:
+    unknown = resolve_trusted_role(_user("member"))
+    for permission in Permission:
+        assert has_permission(unknown, permission) is False
+
+
+@pytest.mark.parametrize("unknown", ["document.destroy", "organization.*", "*", ""])
+def test_unknown_permission_is_denied_even_for_the_highest_role(unknown: str) -> None:
+    assert has_permission(Role.OWNER, unknown) is False
+
+
+def test_permissions_for_an_unknown_role_is_empty() -> None:
+    assert permissions_for_role(None) == frozenset()
+
+
+# ---------------------------------------------------------------------------
+# Least privilege
+# ---------------------------------------------------------------------------
+
+
+def test_viewer_holds_no_permission_at_all() -> None:
+    assert permissions_for_role(Role.VIEWER) == frozenset()
+
+
+@pytest.mark.parametrize("permission", list(Permission))
+def test_viewer_is_denied_every_catalogued_permission(permission: Permission) -> None:
+    assert has_permission(Role.VIEWER, permission) is False
+
+
+@pytest.mark.parametrize("role", [Role.VIEWER, Role.EDITOR, Role.APPROVER])
+def test_non_administrative_roles_do_not_hold_administrative_permissions(role: Role) -> None:
+    assert permissions_for_role(role).isdisjoint(_ADMIN_CLASS_PERMISSIONS)
+
+
+@pytest.mark.parametrize("role", [Role.ADMIN, Role.OWNER])
+def test_administrative_roles_hold_the_administrative_permission(role: Role) -> None:
+    assert Permission.ORGANIZATION_MANAGE in permissions_for_role(role)
+
+
+def test_write_capable_roles_can_upload_a_document() -> None:
+    for role in (Role.EDITOR, Role.APPROVER, Role.ADMIN, Role.OWNER):
+        assert has_permission(role, Permission.DOCUMENT_UPLOAD) is True
+
+
+def test_role_resolution_normalizes_case_and_surrounding_whitespace() -> None:
+    assert resolve_trusted_role(_user("  Admin ")) is Role.ADMIN
+
+
+# ---------------------------------------------------------------------------
+# Immutability and determinism
+# ---------------------------------------------------------------------------
+
+
+def test_the_policy_mapping_cannot_be_reassigned_at_runtime() -> None:
+    with pytest.raises(TypeError):
+        ROLE_PERMISSIONS[Role.VIEWER] = frozenset(Permission)  # type: ignore[index]
+
+
+def test_individual_permission_sets_cannot_be_mutated() -> None:
+    granted = permissions_for_role(Role.VIEWER)
+    assert isinstance(granted, frozenset)
+    with pytest.raises(AttributeError):
+        granted.add(Permission.DOCUMENT_UPLOAD)  # type: ignore[attr-defined]
+
+
+def test_repeated_evaluation_is_deterministic() -> None:
+    first = [has_permission(Role.EDITOR, p) for p in Permission]
+    second = [has_permission(Role.EDITOR, p) for p in Permission]
+    assert first == second
+
+
+def test_permission_evaluation_opens_no_socket(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No LLM, model provider or other network call may gate a decision."""
+
+    def _forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("permission evaluation attempted a network call")
+
+    monkeypatch.setattr(socket, "socket", _forbidden)
+    monkeypatch.setattr(socket, "create_connection", _forbidden)
+
+    assert has_permission(Role.ADMIN, Permission.DOCUMENT_UPLOAD) is True
+    assert has_permission(Role.VIEWER, Permission.DOCUMENT_UPLOAD) is False
+    assert resolve_trusted_role(_user("owner")) is Role.OWNER

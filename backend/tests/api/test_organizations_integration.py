@@ -114,7 +114,9 @@ async def _make_organization_and_profile(
             organization_id=organization.id,
             full_name="Organization Integration Test User",
             email=f"org-integration-{profile_id}@example.com",
-            role=None,
+            # Write-capable so these tests still reach the tenant behaviour
+            # they assert; role denial is covered in tests/api/test_authorization.py.
+            role="admin",
         )
         session.add(profile)
         await session.commit()

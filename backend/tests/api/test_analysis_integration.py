@@ -258,7 +258,9 @@ async def _make_org_engagement_document_with_embedded_chunks(
             UserModel(
                 id=profile_id, organization_id=organization.id,
                 full_name="Analysis Integration Test User",
-                email=f"analysis-integration-{profile_id}@example.com", role=None,
+                # Write-capable so this test still reaches the behaviour it
+                # asserts; role denial is covered in tests/api/test_authorization.py.
+                email=f"analysis-integration-{profile_id}@example.com", role="admin",
             )
         )
         await session.commit()

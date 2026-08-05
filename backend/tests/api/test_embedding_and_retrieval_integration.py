@@ -172,7 +172,9 @@ async def _make_org_engagement_document_with_chunks(
             UserModel(
                 id=profile_id, organization_id=organization.id,
                 full_name="Embedding Integration Test User",
-                email=f"embedding-integration-{profile_id}@example.com", role=None,
+                # Write-capable so this test still reaches the behaviour it
+                # asserts; role denial is covered in tests/api/test_authorization.py.
+                email=f"embedding-integration-{profile_id}@example.com", role="admin",
             )
         )
         await session.commit()
@@ -310,7 +312,9 @@ async def test_unprocessed_document_returns_409(
         session.add(
             UserModel(
                 id=profile_id, organization_id=organization.id, full_name="Test User",
-                email=f"unprocessed-{profile_id}@example.com", role=None,
+                # Write-capable so this test still reaches the behaviour it
+                # asserts; role denial is covered in tests/api/test_authorization.py.
+                email=f"unprocessed-{profile_id}@example.com", role="admin",
             )
         )
         await session.commit()

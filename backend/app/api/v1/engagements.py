@@ -20,9 +20,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import get_current_user, get_engagement_service
+from app.api.deps import get_current_user, get_engagement_service, require_permission
 from app.domain.entities.engagement import Engagement
 from app.domain.entities.user import User
+from app.domain.security import Permission
 from app.schemas.engagement import (
     EngagementCreateRequest,
     EngagementListResponse,
@@ -61,7 +62,7 @@ def _to_response(engagement: Engagement) -> EngagementResponse:
 )
 async def create_engagement(
     payload: EngagementCreateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ENGAGEMENT_MANAGE)),
     service: EngagementService = Depends(get_engagement_service),
 ) -> EngagementResponse:
     engagement = await service.create(
@@ -115,7 +116,7 @@ async def get_engagement(
 async def update_engagement(
     engagement_id: UUID,
     payload: EngagementUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ENGAGEMENT_MANAGE)),
     service: EngagementService = Depends(get_engagement_service),
 ) -> EngagementResponse:
     engagement = await service.update(

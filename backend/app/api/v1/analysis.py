@@ -14,8 +14,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_current_user, get_rag_analysis_service
+from app.api.deps import get_current_user, get_rag_analysis_service, require_permission
 from app.domain.entities.user import User
+from app.domain.security import Permission
 from app.schemas.analysis import AnalysisRunResponse, AnalyzeRequest, CitationOut
 from app.services.analysis.rag_analysis import AnalysisResultView, RagAnalysisService
 
@@ -64,7 +65,7 @@ def _to_response(view: AnalysisResultView) -> AnalysisRunResponse:
 async def analyze_document(
     document_id: UUID,
     payload: AnalyzeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ANALYSIS_RUN)),
     service: RagAnalysisService = Depends(get_rag_analysis_service),
 ) -> AnalysisRunResponse:
     view = await service.analyze_document(
@@ -89,7 +90,7 @@ async def analyze_document(
 async def analyze_engagement(
     engagement_id: UUID,
     payload: AnalyzeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Permission.ANALYSIS_RUN)),
     service: RagAnalysisService = Depends(get_rag_analysis_service),
 ) -> AnalysisRunResponse:
     view = await service.analyze_engagement(
