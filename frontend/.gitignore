@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local environment files. `*.local` above already covers .env.local, but
+# a plain .env / .env.production would otherwise be committable — Vite
+# loads those at build time and they hold real project values.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

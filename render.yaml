@@ -1,0 +1,69 @@
+# Render blueprint for the FastAPI backend (controlled manager preview).
+#
+# Deliberately declares NAMES ONLY: every secret is `sync: false`, which
+# makes Render prompt for the value in the dashboard instead of storing it
+# in this repository. Never add a value for any `sync: false` key here.
+#
+# The start command binds Render's injected $PORT explicitly. Neither
+# existing entrypoint does: backend/run_backend.py and backend/Dockerfile
+# both hardcode 8000, so Render's port scan would fail with either.
+services:
+  - type: web
+    name: the-green-hubs-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Liveness only. Deliberately NOT /api/v1/health/db -- that endpoint
+    # returns 503 when Supabase is briefly unreachable, which would make
+    # Render cycle an otherwise healthy instance.
+    healthCheckPath: /api/v1/health
+    envVars:
+      # Fully qualified: Render resolves PYTHON_VERSION as an exact version,
+      # so a bare minor like "3.12" is not reliably honoured. Stays on the
+      # 3.12 line CI already builds and tests against
+      # (.github/workflows/ci.yml) and that backend/Dockerfile uses.
+      - key: PYTHON_VERSION
+        value: "3.12.13"
+
+      - key: ENVIRONMENT
+        value: preview
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+
+      # pydantic-settings parses list[str] as JSON -- this must be a JSON
+      # array, e.g. ["https://<project>.vercel.app"]. Exact origins only;
+      # app/main.py never uses a wildcard and sends credentials.
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+
+      # postgresql+asyncpg://... (Supabase pooler connection string).
+      - key: DATABASE_URL
+        sync: false
+
+      # Required: JWKS issuer derivation for Supabase access-token
+      # verification (app/infrastructure/security/supabase_jwt.py).
+      - key: SUPABASE_URL
+        sync: false
+      # Backend-only. Never exposed to the browser; used solely for
+      # Supabase Storage object access.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+
+      # AI provider. Set exactly one of these two; when only
+      # OPENROUTER_API_KEY is set, resolve_ai_credentials() also switches
+      # the base URL, and model names must take OpenRouter's
+      # vendor-prefixed form (e.g. openai/text-embedding-3-small).
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
