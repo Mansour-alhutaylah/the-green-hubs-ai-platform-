@@ -1,6 +1,7 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { Icon, LoadingDiamond } from '@/design-system';
+import { useLocale } from '@/lib/i18n/useLocale';
 import { useResponsiveNav } from './useResponsiveNav';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 import { CommandRail } from './CommandRail/CommandRail';
@@ -22,8 +23,25 @@ export function AppShell() {
   const { isCollapsed, toggle } = useRailPreference(navMode);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+  const { t } = useLocale();
 
   useGlobalShortcuts();
+
+  // Tapping a drawer nav item navigates but leaves the dialog mounted over
+  // the destination page — the drawer owns no route state of its own, so
+  // the shell closes it on every navigation. Keyed on `location.key` rather
+  // than `pathname` so tapping the item for the page you're already on
+  // still dismisses the drawer instead of appearing to do nothing.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.key]);
+
+  // Rotating a phone to landscape (or any resize past 768px) unmounts the
+  // drawer; without clearing the flag, coming back to mobile width would
+  // re-open a drawer the user never asked for.
+  useEffect(() => {
+    if (!isMobile) setDrawerOpen(false);
+  }, [isMobile]);
 
   return (
     <div className="app-atmosphere min-h-screen bg-paper-50">
@@ -46,9 +64,13 @@ export function AppShell() {
             isMobile ? (
               <button
                 type="button"
-                aria-label="Open navigation"
+                aria-label={t('shell.nav.open')}
+                aria-expanded={drawerOpen}
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-m border border-leaf-300 bg-mist-50 p-2 text-forest-800 shadow-card transition-colors hover:bg-mint-100"
+                // 44px square: the drawer trigger is the only way back to
+                // navigation on a phone, so it carries a full touch target
+                // instead of the icon's own 20px box.
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-m border border-leaf-300 bg-mist-50 text-forest-800 shadow-card transition-colors hover:bg-mint-100"
               >
                 <Icon name="menu" size={20} />
               </button>
