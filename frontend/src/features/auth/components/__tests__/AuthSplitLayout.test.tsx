@@ -5,9 +5,11 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 
 const EN_HERO_HEADING = 'Sustainability intelligence, grounded in evidence.';
-const EN_HERO_SUPPORTING = 'Manage documents, analyses, and verified insights in one secure workspace.';
+const EN_HERO_SUPPORTING =
+  'Manage documents, analyses, and evidence-grounded insights in one secure workspace.';
 const AR_HERO_HEADING = 'ذكاء استدامة قائم على الأدلة';
-const AR_HERO_SUPPORTING = 'أدر المستندات والتحليلات والرؤى الموثّقة في مساحة عمل آمنة واحدة.';
+const AR_HERO_SUPPORTING =
+  'أدر المستندات والتحليلات والرؤى المستندة إلى الأدلة في مساحة عمل آمنة واحدة.';
 
 describe('Login hero copy — single active locale only', () => {
   it('shows only English hero copy by default', async () => {

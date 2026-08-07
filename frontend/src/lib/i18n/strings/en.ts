@@ -1,3 +1,9 @@
+/** The single factual line every not-yet-available module shows, so the
+ * MVP/future boundary reads identically on each of them rather than as N
+ * differently-worded promises. */
+const LATER_RELEASE_NOTICE =
+  'This capability is not included in the current MVP scope and will be activated in a later release.';
+
 /**
  * English string anchors. Voice law (Appendix B): institutional,
  * declarative, never apologetic, never cute — no exclamation marks
@@ -8,6 +14,9 @@ export const en = {
   'brand.mission': 'The operating system for sustainability.',
   'brand.name': 'The Green Hubs',
   'shell.skipToContent': 'Skip to main content',
+  'shell.nav.title': 'Navigation',
+  'shell.nav.open': 'Open navigation',
+  'shell.nav.close': 'Close navigation',
 
   'nav.dashboard': 'Dashboard',
   'nav.reports': 'Reports',
@@ -46,7 +55,7 @@ export const en = {
   'auth.signin.submit': 'Sign in',
   'auth.welcome.title': 'Sustainability intelligence, grounded in evidence.',
   'auth.welcome.supporting':
-    'Manage documents, analyses, and verified insights in one secure workspace.',
+    'Manage documents, analyses, and evidence-grounded insights in one secure workspace.',
   'auth.copyright': '© 2026 The Green Hubs. All rights reserved.',
   'auth.demo.or': 'or',
   'auth.demo.label': 'Development demo access',
@@ -119,7 +128,11 @@ export const en = {
   'errors.routeCrash.title': 'This page hit an error',
   'errors.routeCrash.body': 'Try reloading. If the problem continues, contact your administrator.',
 
-  'stub.laterPhase': 'Full functionality for this module unlocks in an upcoming release.',
+  'stub.laterPhase': LATER_RELEASE_NOTICE,
+
+  'preview.label': 'Internal MVP Preview',
+  'preview.notice':
+    'Some dashboard metrics are sample data. Current live functionality focuses on document upload, processing, and document-level analysis.',
 
   'dashboard.sampleData': 'Sample data · Demo workspace',
   'dashboard.hero.eyebrow': 'Sustainability intelligence',
@@ -363,7 +376,7 @@ export const en = {
     'Run analyses from a processed document and review their evidence-grounded results.',
   'analysis.live.noHistory.title': 'Analysis history is not available yet',
   'analysis.live.noHistory.description':
-    'This workspace does not provide an analysis history view yet. Open a document to run or review its latest analysis.',
+    'Analysis is currently launched from a processed document. A dedicated analysis history view will be added in a later MVP scope.',
   'analysis.live.noHistory.action': 'Go to documents',
   'analysis.run.eyebrow': 'Analysis intelligence',
   'analysis.run.live.title': 'Sustainability summary',
@@ -384,9 +397,9 @@ export const en = {
   'analysis.run.failed.description': 'No result was produced for this run.',
   'analysis.run.failed.retryAction': 'Run analysis again',
   'analysis.run.failed.retrying': 'Running analysis…',
-  'analysis.run.insufficient.title': 'Not enough verified evidence',
+  'analysis.run.insufficient.title': 'Not enough supporting evidence',
   'analysis.run.insufficient.description':
-    'The document did not provide enough verified evidence for this analysis. This is a valid outcome, not a system failure.',
+    'The document did not provide enough supporting evidence for this analysis. This is a valid outcome, not a system failure.',
   'analysis.run.insufficient.reasonTitle': 'Why evidence was insufficient',
   'analysis.run.unknownStatus.title': 'Unrecognized run state',
   'analysis.run.unknownStatus.description':
@@ -395,7 +408,7 @@ export const en = {
   'analysis.run.result.unavailable.description':
     'This run is completed, but its structured result could not be displayed.',
   'analysis.run.summary.title': 'Executive summary',
-  'analysis.run.summary.description': 'Generated from verified document evidence.',
+  'analysis.run.summary.description': 'Generated from evidence retrieved from this document.',
   'analysis.run.overview.reportingPeriod': 'Reporting period',
   'analysis.run.overview.notStated': 'Not stated in the document',
   'analysis.run.overview.topics': 'Detected topics',
@@ -411,15 +424,15 @@ export const en = {
   'analysis.run.metrics.period': 'Period: {period}',
   'analysis.run.metrics.empty': 'No metrics were reported in this analysis.',
   'analysis.run.findings.title': 'Key findings',
-  'analysis.run.findings.description': 'Each finding is linked to its verified sources.',
+  'analysis.run.findings.description': 'Each finding is linked to its cited sources.',
   'analysis.run.findings.label': 'Finding {number}',
   'analysis.run.findings.empty': 'No findings were produced by this analysis.',
   'analysis.run.recommendations.title': 'Recommendations',
   'analysis.run.recommendations.description': 'Suggested next steps grounded in the cited evidence.',
   'analysis.run.recommendations.empty': 'No recommendations were produced by this analysis.',
   'analysis.run.sources.label': 'Sources: {numbers}',
-  'analysis.run.citations.title': 'Verified citations',
-  'analysis.run.citations.description': 'Evidence excerpts verified and stored by the platform.',
+  'analysis.run.citations.title': 'Cited sources',
+  'analysis.run.citations.description': 'Excerpts retrieved from the document and stored with this run.',
   'analysis.run.citations.source': 'Source {number}',
   'analysis.run.citations.chunk': 'Chunk {index}',
   'analysis.run.citations.chars': 'Characters {start}–{end}',
@@ -442,16 +455,15 @@ export const en = {
   'placeholder.notify': 'Notify me when available',
   'placeholder.hubZero.description':
     'Insight Ledger, approval queue, and explainability for every extracted figure.',
-  'placeholder.hubZero.unlock':
-    'Activates when document analysis is enabled for your organization.',
+  'placeholder.hubZero.unlock': LATER_RELEASE_NOTICE,
   'placeholder.carbon.description': 'Scope 1, 2 and 3 ledgers with Saudi factor libraries.',
-  'placeholder.carbon.unlock': 'Activates with your first approved GHG inventory.',
+  'placeholder.carbon.unlock': LATER_RELEASE_NOTICE,
   'placeholder.telemetry.description': 'Live IIoT, meter, and drone sources, facility by facility.',
-  'placeholder.telemetry.unlock': 'Activates when a facility connects a live data source.',
+  'placeholder.telemetry.unlock': LATER_RELEASE_NOTICE,
   'placeholder.frameworks.description': 'Framework mappings across GRI, CSRD, and Saudi standards.',
-  'placeholder.frameworks.unlock': 'Activates with your first published report.',
+  'placeholder.frameworks.unlock': LATER_RELEASE_NOTICE,
   'placeholder.audit.description': 'A full audit trail of who touched what, and when.',
-  'placeholder.audit.unlock': 'Activates once your organization enables governance tracking.',
+  'placeholder.audit.unlock': LATER_RELEASE_NOTICE,
 
   'contextBar.search.placeholder': 'Search documents, organizations…',
   'contextBar.search.comingSoon': 'Search will be available once modules ship.',
@@ -462,7 +474,7 @@ export const en = {
   'contextBar.profile.signOut': 'Sign out',
 
   'coachmarks.orgSwitcher': 'Switch between the organizations you belong to here.',
-  'coachmarks.insightLedger': 'Hub Zero annotates your numbers here as it analyzes documents.',
+  'coachmarks.insightLedger': 'Hub Zero will annotate your numbers here once it is activated in a later release.',
   'coachmarks.uploadEntry': 'Upload sustainability documents to begin analysis.',
 } as const;
 

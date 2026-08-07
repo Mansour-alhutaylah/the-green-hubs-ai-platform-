@@ -294,7 +294,7 @@ describe('AnalysisRunPage — live mode', () => {
 
     renderRun('run-live-1');
 
-    expect(await screen.findByText('Not enough verified evidence', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Not enough supporting evidence', {}, { timeout: 5000 })).toBeVisible();
     expect(screen.getByText('No sufficiently relevant content was found for this request.')).toBeVisible();
     expect(screen.getAllByText('Insufficient evidence').length).toBeGreaterThan(0);
     expect(screen.queryByText('The analysis could not be completed')).not.toBeInTheDocument();
@@ -321,7 +321,7 @@ describe('AnalysisRunPage — live mode', () => {
 
     expect(await screen.findByText('The analysis could not be completed', {}, { timeout: 5000 })).toBeVisible();
     expect(screen.getByText('Analysis provider timed out')).toBeVisible();
-    expect(screen.queryByText('Not enough verified evidence')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not enough supporting evidence')).not.toBeInTheDocument();
     expect(screen.queryByText(/traceback/i)).not.toBeInTheDocument();
     // Retry never fires automatically.
     expect(analyzeDocument).not.toHaveBeenCalled();

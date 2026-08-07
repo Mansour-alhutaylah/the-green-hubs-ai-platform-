@@ -4,6 +4,7 @@ import { Avatar, Icon, StatusBadge } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { useAuth } from '@/features/auth/useAuth';
 import { markDashboardVisited } from '@/app/router/dashboardVisited';
+import { PreviewNotice } from '@/shell/PreviewNotice';
 import { ROUTES } from '@/app/navigation/routePaths';
 import type { StringKey } from '@/lib/i18n/strings/en';
 import { cn } from '@/lib/utils/cn';
@@ -50,6 +51,7 @@ export function DashboardPage() {
 
   return (
     <div>
+      <PreviewNotice />
       <DashboardHero user={user} />
 
       <section className="mt-4 sm:mt-5" aria-labelledby="workspace-overview-heading">

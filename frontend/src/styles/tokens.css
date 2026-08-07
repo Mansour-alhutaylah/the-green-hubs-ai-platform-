@@ -190,6 +190,9 @@
   --ease-out: ease-out;
   --ease-slow: cubic-bezier(0.2, 0, 0, 1);
 
+  /* Any surface rendered *above* a backdrop (Dialog, MobileDrawer) must sit
+     on --z-dialog, not --z-rail: --z-rail is below --z-overlay, so a
+     full-viewport backdrop would paint over it and swallow its clicks. */
   --z-rail: 40;
   --z-bar: 30;
   --z-overlay: 50;

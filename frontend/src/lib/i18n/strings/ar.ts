@@ -1,5 +1,10 @@
 import type { StringKey } from './en';
 
+/** Arabic mirror of en.ts's LATER_RELEASE_NOTICE — one line for every
+ * not-yet-available module. */
+const LATER_RELEASE_NOTICE =
+  'هذه الإمكانية غير مشمولة في نطاق النسخة الأولية الحالية وسيتم تفعيلها في إصدار لاحق.';
+
 /** Arabic string anchors (Appendix B gives the approved anchors for a
  * subset; the rest follow the same institutional, declarative voice — no
  * exclamation marks, "هَب زيرو" kept as a proper noun). */
@@ -7,6 +12,9 @@ export const ar: Record<StringKey, string> = {
   'brand.mission': 'نظام التشغيل للاستدامة.',
   'brand.name': 'ذا جرين هبز',
   'shell.skipToContent': 'تخطَّ إلى المحتوى الرئيسي',
+  'shell.nav.title': 'التنقل',
+  'shell.nav.open': 'فتح التنقل',
+  'shell.nav.close': 'إغلاق التنقل',
 
   'nav.dashboard': 'لوحة القيادة',
   'nav.reports': 'التقارير',
@@ -45,7 +53,7 @@ export const ar: Record<StringKey, string> = {
   'auth.signin.submit': 'تسجيل الدخول',
   'auth.welcome.title': 'ذكاء استدامة قائم على الأدلة',
   'auth.welcome.supporting':
-    'أدر المستندات والتحليلات والرؤى الموثّقة في مساحة عمل آمنة واحدة.',
+    'أدر المستندات والتحليلات والرؤى المستندة إلى الأدلة في مساحة عمل آمنة واحدة.',
   'auth.copyright': '© 2026 ذا جرين هبز. جميع الحقوق محفوظة.',
   'auth.signin.forgotPassword': 'نسيت كلمة المرور؟',
   'auth.demo.or': 'أو',
@@ -118,7 +126,11 @@ export const ar: Record<StringKey, string> = {
   'errors.routeCrash.title': 'واجهت هذه الصفحة خطأ',
   'errors.routeCrash.body': 'حاول إعادة التحميل. إذا استمرت المشكلة، تواصل مع أحد المسؤولين.',
 
-  'stub.laterPhase': 'تُفعَّل الوظائف الكاملة لهذه الوحدة في إصدار قادم.',
+  'stub.laterPhase': LATER_RELEASE_NOTICE,
+
+  'preview.label': 'معاينة داخلية للنسخة الأولية',
+  'preview.notice':
+    'بعض مؤشرات لوحة القيادة بيانات تجريبية. تركّز الوظائف الفعلية الحالية على رفع المستندات ومعالجتها وتحليلها على مستوى المستند.',
 
   'dashboard.sampleData': 'بيانات تجريبية · بيئة عرض',
   'dashboard.hero.eyebrow': 'ذكاء الاستدامة',
@@ -351,7 +363,7 @@ export const ar: Record<StringKey, string> = {
   'analysis.live.subtitle': 'شغّل التحليلات من مستند تمت معالجته وراجع نتائجها المستندة إلى الأدلة.',
   'analysis.live.noHistory.title': 'سجل التحليلات غير متاح بعد',
   'analysis.live.noHistory.description':
-    'لا توفر بيئة العمل هذه عرضاً لسجل التحليلات بعد. افتح مستنداً لتشغيل أحدث تحليل له أو مراجعته.',
+    'يُشغَّل التحليل حالياً انطلاقاً من مستند تمت معالجته. ستُضاف شاشة مخصصة لسجل التحليلات في نطاق لاحق من النسخة الأولية.',
   'analysis.live.noHistory.action': 'الانتقال إلى المستندات',
   'analysis.run.eyebrow': 'ذكاء التحليل',
   'analysis.run.live.title': 'ملخص الاستدامة',
@@ -372,9 +384,9 @@ export const ar: Record<StringKey, string> = {
   'analysis.run.failed.description': 'لم تُنتَج نتيجة لهذا التشغيل.',
   'analysis.run.failed.retryAction': 'تشغيل التحليل مجدداً',
   'analysis.run.failed.retrying': 'جارٍ تشغيل التحليل…',
-  'analysis.run.insufficient.title': 'لا توجد أدلة موثّقة كافية',
+  'analysis.run.insufficient.title': 'لا توجد أدلة داعمة كافية',
   'analysis.run.insufficient.description':
-    'لم يوفر المستند أدلة موثّقة كافية لهذا التحليل. هذه نتيجة صحيحة وليست عطلاً في النظام.',
+    'لم يوفر المستند أدلة داعمة كافية لهذا التحليل. هذه نتيجة صحيحة وليست عطلاً في النظام.',
   'analysis.run.insufficient.reasonTitle': 'سبب عدم كفاية الأدلة',
   'analysis.run.unknownStatus.title': 'حالة تشغيل غير معروفة',
   'analysis.run.unknownStatus.description':
@@ -382,7 +394,7 @@ export const ar: Record<StringKey, string> = {
   'analysis.run.result.unavailable.title': 'بيانات النتيجة غير متاحة',
   'analysis.run.result.unavailable.description': 'اكتمل هذا التشغيل، لكن تعذّر عرض نتيجته المنظمة.',
   'analysis.run.summary.title': 'الملخص التنفيذي',
-  'analysis.run.summary.description': 'مُنشأ من أدلة موثّقة في المستند.',
+  'analysis.run.summary.description': 'مُنشأ من أدلة مُسترجَعة من هذا المستند.',
   'analysis.run.overview.reportingPeriod': 'فترة التقرير',
   'analysis.run.overview.notStated': 'غير مذكورة في المستند',
   'analysis.run.overview.topics': 'الموضوعات المكتشفة',
@@ -398,15 +410,15 @@ export const ar: Record<StringKey, string> = {
   'analysis.run.metrics.period': 'الفترة: {period}',
   'analysis.run.metrics.empty': 'لم تُذكر مؤشرات في هذا التحليل.',
   'analysis.run.findings.title': 'أبرز النتائج',
-  'analysis.run.findings.description': 'كل نتيجة مرتبطة بمصادرها الموثّقة.',
+  'analysis.run.findings.description': 'كل نتيجة مرتبطة بمصادرها المُستشهد بها.',
   'analysis.run.findings.label': 'النتيجة {number}',
   'analysis.run.findings.empty': 'لم يُنتج هذا التحليل نتائج.',
   'analysis.run.recommendations.title': 'التوصيات',
   'analysis.run.recommendations.description': 'خطوات تالية مقترحة مستندة إلى الأدلة المستشهد بها.',
   'analysis.run.recommendations.empty': 'لم يُنتج هذا التحليل توصيات.',
   'analysis.run.sources.label': 'المصادر: {numbers}',
-  'analysis.run.citations.title': 'استشهادات موثّقة',
-  'analysis.run.citations.description': 'مقتطفات أدلة تحقق منها النظام وخزّنها.',
+  'analysis.run.citations.title': 'المصادر المُستشهد بها',
+  'analysis.run.citations.description': 'مقتطفات مُسترجَعة من المستند ومحفوظة مع هذا التشغيل.',
   'analysis.run.citations.source': 'المصدر {number}',
   'analysis.run.citations.chunk': 'المقطع {index}',
   'analysis.run.citations.chars': 'الأحرف {start}–{end}',
@@ -428,16 +440,16 @@ export const ar: Record<StringKey, string> = {
   'placeholder.eyebrow': 'قريباً',
   'placeholder.notify': 'أخطرني عند التوفر',
   'placeholder.hubZero.description': 'سجل الرؤى، قائمة الموافقات، وتفسير كل رقم مستخرج.',
-  'placeholder.hubZero.unlock': 'يُفعَّل عند تمكين تحليل المستندات لمؤسستك.',
+  'placeholder.hubZero.unlock': LATER_RELEASE_NOTICE,
   'placeholder.carbon.description': 'سجلات النطاق 1 و2 و3 مع مكتبات معاملات سعودية.',
-  'placeholder.carbon.unlock': 'يُفعَّل مع أول جرد معتمد لغازات الدفيئة.',
+  'placeholder.carbon.unlock': LATER_RELEASE_NOTICE,
   'placeholder.telemetry.description':
     'مصادر حية من إنترنت الأشياء الصناعي والعدادات والمسيّرات، لكل منشأة.',
-  'placeholder.telemetry.unlock': 'يُفعَّل عند ربط منشأة بمصدر بيانات حي.',
+  'placeholder.telemetry.unlock': LATER_RELEASE_NOTICE,
   'placeholder.frameworks.description': 'خرائط الأطر عبر GRI وCSRD والمعايير السعودية.',
-  'placeholder.frameworks.unlock': 'يُفعَّل مع أول تقرير منشور.',
+  'placeholder.frameworks.unlock': LATER_RELEASE_NOTICE,
   'placeholder.audit.description': 'سجل تدقيق كامل لمن قام بماذا ومتى.',
-  'placeholder.audit.unlock': 'يُفعَّل عند تمكين مؤسستك لتتبع الحوكمة.',
+  'placeholder.audit.unlock': LATER_RELEASE_NOTICE,
 
   'contextBar.search.placeholder': 'ابحث في المستندات، المؤسسات…',
   'contextBar.search.comingSoon': 'سيتوفر البحث بمجرد إطلاق الوحدات.',
@@ -448,6 +460,6 @@ export const ar: Record<StringKey, string> = {
   'contextBar.profile.signOut': 'تسجيل الخروج',
 
   'coachmarks.orgSwitcher': 'بدّل بين المؤسسات التي تنتمي إليها من هنا.',
-  'coachmarks.insightLedger': 'يوضح هَب زيرو أرقامك هنا أثناء تحليل المستندات.',
+  'coachmarks.insightLedger': 'سيوضح هَب زيرو أرقامك هنا بمجرد تفعيله في إصدار لاحق.',
   'coachmarks.uploadEntry': 'ارفع مستندات الاستدامة لبدء التحليل.',
 };

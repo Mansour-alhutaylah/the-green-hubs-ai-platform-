@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import type { AuthService, LoginResult } from '@/features/auth/services/AuthService';
@@ -34,6 +34,26 @@ function buildLiveOnlyService(overrides: Partial<AuthService> = {}): AuthService
 }
 
 describe('AuthProvider — live session bootstrap and expiry', () => {
+  /**
+   * These tests mount the real `AppRoutes` with a `kind: 'live'` session, so
+   * the live pages (WorkspaceProvider, documents/engagements hooks) issue
+   * genuine `apiRequest` calls. Vite loads `.env.local` in test mode too, so
+   * without this stub those calls go to whatever `VITE_API_BASE_URL` points
+   * at on the developer's machine — and a backend that happens to be running
+   * answers `401`, which fires `emitUnauthorizedResponse()` and redirects the
+   * app to /session-expired before these assertions can run. Failing the
+   * request at the transport layer is what CI already does implicitly (no
+   * server, no `.env.local`); stubbing it here makes that explicit instead of
+   * ambient. Nothing about what these tests assert changes.
+   */
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('restores a live session asynchronously via restoreSession (no synchronous demo session)', async () => {
     const service = buildLiveOnlyService({
       restoreSession: async () => buildLiveSession(),
