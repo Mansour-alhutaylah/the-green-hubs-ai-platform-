@@ -37,6 +37,16 @@ export const ar: Record<StringKey, string> = {
   'nav.domain.intelligence': 'الذكاء',
   'nav.domain.administration': 'الإدارة',
 
+  'title.signIn': 'تسجيل الدخول',
+  'title.forgotPassword': 'إعادة تعيين كلمة المرور',
+  'title.resetPassword': 'كلمة مرور جديدة',
+  'title.invite': 'قبول الدعوة',
+  'title.report': 'تقرير',
+  'title.document': 'مستند',
+  'title.analysisRun': 'تشغيل التحليل',
+  'title.organization': 'مؤسسة',
+  'title.notFound': 'الصفحة غير موجودة',
+
   'sovereignty.line1': 'مساحة عمل آمنة للاستدامة',
   'sovereignty.line2': 'معالجة محمية للمستندات',
 

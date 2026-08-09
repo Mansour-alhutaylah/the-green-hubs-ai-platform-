@@ -14,6 +14,7 @@ import { ProtectedRoute } from './guards/ProtectedRoute';
 import { PublicOnlyRoute } from './guards/PublicOnlyRoute';
 import { RoleGuard } from './guards/RoleGuard';
 import { RouteScrollReset } from './RouteScrollReset';
+import { DocumentTitle } from './DocumentTitle';
 
 /**
  * Every business-module page (everything behind auth) is code-split with
@@ -123,6 +124,7 @@ export function AppRoutes() {
   return (
     <>
       <RouteScrollReset />
+      <DocumentTitle />
       <Routes>
         <Route element={<PublicOnlyRoute />}>
           <Route path={ROUTES.login} element={<LoginPage />} />

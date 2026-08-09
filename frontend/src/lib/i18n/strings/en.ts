@@ -39,6 +39,20 @@ export const en = {
   'nav.domain.intelligence': 'Intelligence',
   'nav.domain.administration': 'Administration',
 
+  /* Browser-title segments for the routes that have no short name of their
+     own elsewhere in this dictionary (DocumentTitle.tsx reuses `nav.*` and
+     the auth page headings for the rest). Detail routes stay generic on
+     purpose — a document's own name must not reach the browser title. */
+  'title.signIn': 'Sign in',
+  'title.forgotPassword': 'Reset password',
+  'title.resetPassword': 'New password',
+  'title.invite': 'Accept invitation',
+  'title.report': 'Report',
+  'title.document': 'Document',
+  'title.analysisRun': 'Analysis run',
+  'title.organization': 'Organization',
+  'title.notFound': 'Page not found',
+
   'sovereignty.line1': 'Secure sustainability workspace',
   'sovereignty.line2': 'Protected document processing',
 
