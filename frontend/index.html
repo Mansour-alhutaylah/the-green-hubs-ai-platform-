@@ -2,12 +2,190 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Green Hubs</title>
+
+    <title>The Green Hubs — Sustainability Intelligence Platform</title>
+    <meta
+      name="description"
+      content="A controlled sustainability intelligence workspace for document processing, evidence-grounded analysis, and organizational workflows."
+    />
+    <meta name="application-name" content="The Green Hubs" />
+    <meta name="apple-mobile-web-app-title" content="Green Hubs" />
+    <!-- Forest-900, the Command Rail's own surface — the colour Android and
+         iOS tint browser chrome with. `color-scheme: light` matches the
+         pinned value in tokens.css: the product has no dark mode, so native
+         controls must not follow the OS preference. -->
+    <meta name="theme-color" content="#122618" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Controlled manager preview: keep it out of search indexes and out
+         of cached copies. Deliberately meta-only, with no robots.txt rule —
+         the Open Graph and Twitter scrapers below must still be able to
+         fetch this page for link previews to render. -->
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="googlebot" content="noindex, nofollow, noarchive" />
+
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Link previews (WhatsApp, LinkedIn, iMessage, Slack, X). Absolute
+         URLs are required: most scrapers do not resolve relative image
+         paths. Copy states only what the platform does today — no ESG,
+         carbon, tenant-isolation, agent, or audit-readiness claims. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="The Green Hubs" />
+    <meta property="og:title" content="The Green Hubs — Sustainability Intelligence Platform" />
+    <meta
+      property="og:description"
+      content="A controlled sustainability intelligence workspace for document processing, evidence-grounded analysis, and organizational workflows."
+    />
+    <meta property="og:url" content="https://the-green-hubs-ai-platform.vercel.app/" />
+    <meta
+      property="og:image"
+      content="https://the-green-hubs-ai-platform.vercel.app/og-image.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Green Hubs" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The Green Hubs — Sustainability Intelligence Platform" />
+    <meta
+      name="twitter:description"
+      content="A controlled sustainability intelligence workspace for document processing, evidence-grounded analysis, and organizational workflows."
+    />
+    <meta
+      name="twitter:image"
+      content="https://the-green-hubs-ai-platform.vercel.app/og-image.png"
+    />
+    <meta name="twitter:image:alt" content="The Green Hubs" />
+
+    <!--
+      Boot state, styled inline because the token stylesheet is part of the
+      JS bundle and so is not available at first paint. Every value below
+      mirrors tokens.css: paper-50, ink/forest-900, gray-600, gray-400, leaf-500.
+      Scoped entirely to `.app-boot` — no element the application itself
+      renders is styled here, so these unlayered rules can never outrank a
+      Tailwind utility once the bundle loads.
+    -->
+    <style>
+      .app-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px;
+        background-color: #f7f9f6;
+        text-align: center;
+        font-family:
+          'Manrope Variable',
+          Manrope,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      /* The official symbol, masked to its own diamond so it sits on the
+         light paper ground the application itself uses — no card, no tile.
+         The dark ground inside the diamond is the artwork's own, and is
+         what keeps the mark's white strokes readable here. */
+      .app-boot__symbol {
+        width: 72px;
+        height: 72px;
+      }
+      .app-boot__text {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .app-boot__name {
+        margin: 0;
+        color: #122618;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 26px;
+      }
+      .app-boot__tagline {
+        margin: 0;
+        color: #66706b;
+        font-size: 13px;
+        line-height: 18px;
+      }
+      .app-boot__indicator {
+        margin-top: 6px;
+      }
+      /* The §14.8 LoadingDiamond geometry, inlined: same path, same
+         9/28 dash pattern, same 1.1s linear loop, so the pre-mount and
+         post-mount loading states are the identical indicator. */
+      @keyframes app-boot-diamond {
+        to {
+          stroke-dashoffset: -37;
+        }
+      }
+      .app-boot__arc {
+        animation: app-boot-diamond 1.1s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-boot__arc {
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Replaced atomically by React's first commit (createRoot clears the
+        container it takes over), so there is no teardown script, no
+        artificial delay, and no window in which both this and the
+        application's own loading state are on screen.
+      -->
+      <div class="app-boot" role="status" aria-label="Loading The Green Hubs">
+        <img
+          class="app-boot__symbol"
+          src="/brand-symbol.png"
+          alt=""
+          width="72"
+          height="72"
+          fetchpriority="high"
+        />
+        <div class="app-boot__text">
+          <p class="app-boot__name">The Green Hubs</p>
+          <p class="app-boot__tagline">Sustainability Intelligence Platform</p>
+        </div>
+        <svg
+          class="app-boot__indicator"
+          width="24"
+          height="24"
+          viewBox="0 0 10 10"
+          aria-hidden="true"
+        >
+          <path
+            d="M5 0.9 L9.1 5 L5 9.1 L0.9 5 Z"
+            fill="none"
+            stroke="#758079"
+            stroke-width="1.25"
+          />
+          <path
+            class="app-boot__arc"
+            d="M5 0.9 L9.1 5 L5 9.1 L0.9 5 Z"
+            fill="none"
+            stroke="#4faf72"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-dasharray="9 28"
+          />
+        </svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
