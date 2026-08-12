@@ -102,7 +102,7 @@ MAX_REVIEW_REASON_CHARS = 1000
 
 _STATUS_LIST = ', '.join(f"'{status}'" for status in EVIDENCE_STATUSES)
 
-_REVIEW_CONSISTENCY = f"""
+_REVIEW_CONSISTENCY = """
 (
   evidence_status = 'PENDING_REVIEW'
   AND reviewed_by IS NULL AND reviewed_at IS NULL

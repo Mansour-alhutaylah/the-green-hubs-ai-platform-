@@ -360,19 +360,79 @@ async def test_the_evidence_status_index_exists() -> None:
 
 async def test_a_reviewed_by_value_must_reference_a_real_user() -> None:
     """The foreign key is what stops a decision naming a reviewer who
-    does not exist."""
+    does not exist.
 
-    async with AsyncSessionLocal() as session:
-        with pytest.raises(Exception) as excinfo:
-            await session.execute(
-                text(
-                    "UPDATE documents SET evidence_status = 'VERIFIED', "
-                    "reviewed_by = :ghost, reviewed_at = now() "
-                    "WHERE id = (SELECT id FROM documents LIMIT 1)"
-                ),
-                {"ghost": uuid.uuid4()},
+    The document under test is created here rather than borrowed from
+    whatever happens to be in the table: an ``UPDATE ... WHERE id =
+    (SELECT id FROM documents LIMIT 1)`` matches **zero rows** against a
+    freshly migrated database, violates nothing, and would make this
+    assertion pass for the wrong reason -- or, as CI found, fail with
+    ``DID NOT RAISE``. Every row is removed again in ``finally``."""
+
+    organization_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    document_id = uuid.uuid4()
+    parameters = {
+        "organization_id": organization_id,
+        "engagement_id": engagement_id,
+        "document_id": document_id,
+    }
+
+    async with AsyncSessionLocal() as setup_session:
+        await setup_session.execute(
+            text("INSERT INTO organizations (id, name) VALUES (:organization_id, :name)"),
+            {**parameters, "name": "Slice4 Reviewer FK Org"},
+        )
+        await setup_session.execute(
+            text(
+                "INSERT INTO engagements (id, organization_id, title) "
+                "VALUES (:engagement_id, :organization_id, :title)"
+            ),
+            {**parameters, "title": "Slice4 Reviewer FK Engagement"},
+        )
+        await setup_session.execute(
+            text(
+                "INSERT INTO documents (id, filename, storage_path, processing_status, "
+                "engagement_id) VALUES (:document_id, :filename, :path, 'PROCESSED', "
+                ":engagement_id)"
+            ),
+            {
+                **parameters,
+                "filename": "reviewer-fk.pdf",
+                "path": f"slice4-reviewer-fk/{document_id}.pdf",
+            },
+        )
+        await setup_session.commit()
+
+    try:
+        async with AsyncSessionLocal() as session:
+            with pytest.raises(Exception) as excinfo:
+                await session.execute(
+                    text(
+                        "UPDATE documents SET evidence_status = 'VERIFIED', "
+                        "reviewed_by = :ghost, reviewed_at = now() "
+                        "WHERE id = :document_id"
+                    ),
+                    {**parameters, "ghost": uuid.uuid4()},
+                )
+                await session.commit()
+            message = str(excinfo.value).lower()
+            assert "foreign key" in message or "violates" in message
+            await session.rollback()
+
+        # The refused write left the row exactly as it was.
+        async with AsyncSessionLocal() as verify_session:
+            status = await verify_session.scalar(
+                text("SELECT evidence_status FROM documents WHERE id = :document_id"),
+                parameters,
             )
-            await session.commit()
-        message = str(excinfo.value).lower()
-        assert "foreign key" in message or "violates" in message
-        await session.rollback()
+        assert status == "PENDING_REVIEW"
+    finally:
+        async with AsyncSessionLocal() as cleanup_session:
+            for statement in (
+                "DELETE FROM documents WHERE id = :document_id",
+                "DELETE FROM engagements WHERE id = :engagement_id",
+                "DELETE FROM organizations WHERE id = :organization_id",
+            ):
+                await cleanup_session.execute(text(statement), parameters)
+            await cleanup_session.commit()
