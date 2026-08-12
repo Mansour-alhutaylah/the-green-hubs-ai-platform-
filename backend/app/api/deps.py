@@ -64,6 +64,7 @@ from app.services.document_read import DocumentReadService
 from app.services.document_upload import DocumentUploadService
 from app.services.embedding_generation import EmbeddingGenerationService
 from app.services.engagement import EngagementService
+from app.services.evidence_review import EvidenceReviewService
 from app.services.organization import OrganizationService
 from app.services.vector_retrieval import VectorRetrievalService
 
@@ -260,6 +261,16 @@ def get_document_processing_service(
         storage,
         unit_of_work,
     )
+
+
+def get_evidence_review_service(
+    document_repository: IDocumentRepository = Depends(get_document_repository),
+) -> EvidenceReviewService:
+    # One dependency only. The evidence commands need no storage, no
+    # provider and no engagement repository: the document -> engagement
+    # -> organization ownership chain, the expected-state guard and the
+    # successor's tenancy all live inside the repository's own SQL.
+    return EvidenceReviewService(document_repository)
 
 
 def get_document_chunk_embedding_repository(

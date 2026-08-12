@@ -19,13 +19,33 @@ just the same conventional values every write path already produces
 and as the ``GET /api/v1/documents/{document_id}`` response body: the
 sprint's required field set is identical for both, so one schema
 serves both, rather than two structurally-identical models.
+
+MVP Slice 4 (Evidence Review Lifecycle) adds the evidence request/
+response models. Three things about them are deliberate:
+
+* there is **no** ``evidence_status`` field on any *request* model here.
+  The lifecycle is driven by four named commands, each its own route;
+  a client cannot name a target state, so it cannot ask for a
+  transition the state machine does not offer;
+* there is likewise no ``reviewed_by`` and no ``reviewed_at`` on any
+  request model. Both are derived server-side (authenticated profile,
+  database clock), and the absence of the fields is what makes
+  supplying them impossible rather than merely ignored;
+* ``reason`` is validated here *and* re-validated in
+  ``EvidenceReviewService``. This layer exists to return a clean 422
+  early; the service's copy is the authoritative one, because it is the
+  check a caller that never builds a Pydantic model still passes.
+  ``MAX_REVIEW_REASON_CHARS`` is imported from the lifecycle module so
+  the two bounds cannot drift apart.
 """
 
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+from app.domain.evidence.lifecycle import MAX_REVIEW_REASON_CHARS, EvidenceStatus
 
 
 class DocumentResponse(BaseModel):
@@ -72,6 +92,11 @@ class DocumentReadResponse(BaseModel):
     chunk_count: int
     embedding_summary: EmbeddingSummaryResponse
     latest_analysis_summary: AnalysisSummaryResponse | None
+    evidence_status: EvidenceStatus
+    reviewed_by: UUID | None
+    reviewed_at: datetime | None
+    review_reason: str | None
+    superseded_by_document_id: UUID | None
 
 
 class DocumentListResponse(BaseModel):
@@ -79,3 +104,71 @@ class DocumentListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+def _require_non_blank_reason(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("reason must not be blank")
+    return stripped
+
+
+class EvidenceVerifyRequest(BaseModel):
+    """Body for ``verify``. Wholly optional -- the route accepts none.
+
+    ``reason`` is a note, not a justification: an approval's meaning is
+    the approval. A blank or whitespace-only note is normalized away by
+    the service rather than rejected, since nothing depends on it."""
+
+    reason: str | None = Field(default=None, max_length=MAX_REVIEW_REASON_CHARS)
+
+
+class EvidenceReasonRequest(BaseModel):
+    """Body for ``reject`` and ``restrict``. The reason is mandatory.
+
+    ``min_length=1`` rejects ``""`` and the validator rejects
+    whitespace-only input, so neither form of "no reason" can reach the
+    stored decision. An omitted or explicitly null ``reason`` fails the
+    plain ``str`` type check with 422 -- the same distinction
+    ``EngagementUpdateRequest`` relies on."""
+
+    reason: str = Field(min_length=1, max_length=MAX_REVIEW_REASON_CHARS)
+
+    @field_validator("reason")
+    @classmethod
+    def _validate_reason(cls, value: str) -> str:
+        return _require_non_blank_reason(value)
+
+
+class EvidenceSupersedeRequest(EvidenceReasonRequest):
+    """Body for ``supersede``: the same mandatory reason, plus an
+    optional successor.
+
+    ``superseded_by_document_id`` is optional because a reviewer may
+    mark a document obsolete with no replacement to point at. When
+    supplied it must be a document in the caller's own organization and
+    not this document itself -- both enforced server-side, the second
+    within the transition's own SQL predicate."""
+
+    superseded_by_document_id: UUID | None = None
+
+
+class DocumentEvidenceResponse(BaseModel):
+    """The document's current evidence decision after the command.
+
+    Returned by all four review routes, including the idempotent-repeat
+    case -- where it carries the *original* reviewer and timestamp, not
+    the retrying caller's."""
+
+    id: UUID
+    engagement_id: UUID
+    evidence_status: EvidenceStatus
+    # `str | None` mirrors DocumentEvidence, whose type deliberately
+    # admits a missing processing state so the approval precondition
+    # fails closed rather than looking impossible.
+    processing_status: str | None
+    reviewed_by: UUID | None
+    reviewed_at: datetime | None
+    review_reason: str | None
+    superseded_by_document_id: UUID | None
+    updated_at: datetime

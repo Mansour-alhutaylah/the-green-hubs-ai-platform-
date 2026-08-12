@@ -33,6 +33,7 @@ real. Every row created is tracked and removed in dependency-safe order in
 import hashlib
 import json
 import uuid
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import AsyncIterator, Sequence
 
@@ -263,9 +264,16 @@ async def _create_tenant(
     label: str,
     role: str = "admin",
     with_organization: bool = True,
+    evidence_status: str = "PENDING_REVIEW",
 ) -> Tenant:
     """Create Organization + Engagement + User + a PROCESSED Document with
-    two chunks, and return every real id plus a signed token for the user."""
+    two chunks, and return every real id plus a signed token for the user.
+
+    ``evidence_status`` stays at the truthful initial state by default.
+    MVP Slice 4 made retrieval eligibility depend on it, so only the
+    retrieval test -- whose subject is the tenant predicate, not the
+    evidence one -- asks for VERIFIED, and asks for it on *both* tenants
+    so neither is excluded for the wrong reason."""
 
     async with AsyncSessionLocal() as session:
         organization = OrganizationModel(name=f"Slice3 Isolation {label}")
@@ -291,17 +299,27 @@ async def _create_tenant(
             )
         )
         ids.users.append(user_id)
+        # Flushed before the document below, which may reference this row
+        # through `reviewed_by` -- SQLAlchemy has no declared relationship
+        # between the two models to infer the insert order from.
+        await session.flush()
 
         storage_path = (
             f"organizations/{organization.id}/engagements/{engagement.id}"
             f"/documents/{uuid.uuid4()}.pdf"
         )
+        reviewed = evidence_status == "VERIFIED"
         document = DocumentModel(
             id=uuid.uuid4(),
             filename=f"{label.lower()}-confidential-report.pdf",
             storage_path=storage_path,
             processing_status="PROCESSED",
             engagement_id=engagement.id,
+            evidence_status=evidence_status,
+            # ck_documents_evidence_review_consistency requires a decided
+            # state to name its reviewer and the moment of the decision.
+            reviewed_by=user_id if reviewed else None,
+            reviewed_at=datetime.now(timezone.utc) if reviewed else None,
         )
         session.add(document)
         await session.flush()
@@ -354,6 +372,26 @@ async def tenants(
     private_key, _public_key = keypair
     a = await _create_tenant(ids, private_key, real_verifier, fake_storage, label="OrgA")
     b = await _create_tenant(ids, private_key, real_verifier, fake_storage, label="OrgB")
+    return a, b
+
+
+@pytest.fixture
+async def verified_tenants(
+    ids: Ids, keypair, real_verifier: SupabaseJWTVerifier, fake_storage: FakeDocumentStorage
+) -> tuple[Tenant, Tenant]:
+    """Two tenants whose documents a human has approved as evidence.
+
+    Only for the retrieval test: its subject is the tenant predicate, so
+    both documents must be retrieval-eligible or the assertion would
+    hold for the wrong reason."""
+
+    private_key, _public_key = keypair
+    a = await _create_tenant(
+        ids, private_key, real_verifier, fake_storage, label="OrgA", evidence_status="VERIFIED"
+    )
+    b = await _create_tenant(
+        ids, private_key, real_verifier, fake_storage, label="OrgB", evidence_status="VERIFIED"
+    )
     return a, b
 
 
@@ -680,13 +718,13 @@ async def test_embedding_generation_denies_a_real_foreign_document(
 
 
 async def test_retrieval_never_returns_the_other_tenants_chunks(
-    client: AsyncClient, ids: Ids, tenants: tuple[Tenant, Tenant]
+    client: AsyncClient, ids: Ids, verified_tenants: tuple[Tenant, Tenant]
 ) -> None:
-    """Both tenants hold near-identical text, so a shared query is a real
-    candidate for both. Only the in-query tenant predicate keeps B's
-    vectors out of A's ranking."""
+    """Both tenants hold near-identical text and both are approved
+    evidence, so a shared query is a real candidate for both. Only the
+    in-query tenant predicate keeps B's vectors out of A's ranking."""
 
-    a, b = tenants
+    a, b = verified_tenants
     await _embed_tenant_chunks(client, a)
     await _embed_tenant_chunks(client, b)
     await _track_embeddings(ids, a.document_id)

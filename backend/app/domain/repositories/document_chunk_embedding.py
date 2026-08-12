@@ -163,14 +163,25 @@ class IDocumentChunkEmbeddingRepository(ABC):
         engagement_id: UUID | None = None,
         document_id: UUID | None = None,
     ) -> Sequence[VectorSearchResult]:
-        """Tenant-, model-, and status-scoped cosine-similarity search.
-        The WHERE clause and the ORDER BY ... <=> ... vector distance
-        both apply to ``document_chunk_embeddings`` in the same query --
-        never a global fetch filtered afterward in Python. Only
+        """Tenant-, model-, status-, and evidence-scoped cosine-similarity
+        search. The WHERE clause and the ORDER BY ... <=> ... vector
+        distance both apply to ``document_chunk_embeddings`` in the same
+        query -- never a global fetch filtered afterward in Python. Only
         ``status = 'COMPLETED'`` rows matching the exact (provider,
         model, model_version) identity are eligible; a query embedding
         is never compared against a different model's vectors even if
-        the dimensions happen to match."""
+        the dimensions happen to match.
+
+        MVP Slice 4 adds the evidence predicate: a chunk is a candidate
+        only if its document is in a retrieval-eligible evidence state
+        (``RETRIEVAL_ELIGIBLE_STATUSES``). Implementations must apply it
+        *before* ranking and ``LIMIT``, in the same statement -- not to
+        the returned page. Filtering a ranked page afterwards would let
+        an unapproved document's stronger match consume a ``top_k`` slot
+        and silently shrink the approved evidence the caller receives,
+        which is the specific defect
+        ``test_a_stronger_unverified_match_never_displaces_a_verified_one``
+        exists to catch."""
         ...
 
     @abstractmethod

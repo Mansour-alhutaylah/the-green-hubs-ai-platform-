@@ -19,7 +19,7 @@ from sqlalchemy.pool import NullPool
 
 TEST_DATABASE_MARKER = "GH_SIP_DISPOSABLE_TEST_DB_DO_NOT_CREATE_ELSEWHERE"
 TEST_DATABASE_MARKER_TABLE = "gh_disposable_test_database"
-EXPECTED_ALEMBIC_HEAD = "a4f1c9d2e7b3"
+EXPECTED_ALEMBIC_HEAD = "b7d41e0c9a52"
 # Raised from 144 by MVP Slice 3 (Organization Data Isolation): 23 cases in
 # tests/api/test_organization_data_isolation_integration.py plus 7 added to
 # the existing repository suites, all cross-tenant negatives -- 174.
@@ -30,7 +30,17 @@ EXPECTED_ALEMBIC_HEAD = "a4f1c9d2e7b3"
 # Document and Engagement repositories expose no unscoped read, and -3 in
 # test_organization_repository.py, where four tests exercising the removed
 # global list()/count() are replaced by one asserting they no longer exist.
-EXPECTED_EXISTING_INTEGRATION_CASES = 177
+#
+# MVP Slice 4 (Evidence Review Lifecycle) adds 94 for 271: 81 in
+# tests/api/test_document_evidence_integration.py (the lifecycle matrix, the
+# processing precondition, two-reviewer concurrency, successor rules, the
+# retrieval state matrix, the pre-ranking closure test and the database
+# CHECK constraints) and 13 in tests/integration/test_evidence_migration.py
+# (the downgrade/upgrade chain, the pre-migration legacy row, and the
+# constraints/index the migration creates). The existing suites gained no
+# cases -- their retrieval fixtures were re-pointed at approved evidence
+# rather than multiplied.
+EXPECTED_EXISTING_INTEGRATION_CASES = 271
 REQUIRED_DATABASE_SUFFIX = "_test"
 
 LOCAL_TEST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "test-postgres"})

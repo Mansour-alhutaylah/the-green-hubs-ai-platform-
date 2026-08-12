@@ -48,6 +48,7 @@ class Permission(str, Enum):
     DOCUMENT_UPLOAD = "document.upload"
     DOCUMENT_PROCESS = "document.process"
     ANALYSIS_RUN = "analysis.run"
+    EVIDENCE_REVIEW = "evidence.review"
 
 
 class Role(str, Enum):
@@ -78,6 +79,23 @@ _ADMIN_PERMISSIONS: frozenset[Permission] = _WRITE_PERMISSIONS | {
     Permission.ORGANIZATION_MANAGE
 }
 
+#: MVP Slice 4 (Evidence Review Lifecycle). Held as its own set, not
+#: folded into ``_WRITE_PERMISSIONS``, precisely because *who may approve
+#: evidence* is the question **M-4** exists to answer and backlog risk
+#: R-1 forbids engineering from answering on its own.
+#:
+#: Until M-4 is recorded this grants exactly what the existing policy
+#: already grants every write-capable role, and no more: it closes the
+#: property that actually matters today -- a ``viewer`` cannot approve
+#: evidence, cannot withdraw an approval, and cannot make a document
+#: retrievable -- without inventing an approver/editor split that no
+#: approved source states. Narrowing it to approver-class roles when M-4
+#: lands is a single edit: remove this set from ``Role.EDITOR``'s value
+#: below. Nothing outside this module needs to change.
+_EVIDENCE_REVIEW_PERMISSIONS: frozenset[Permission] = frozenset(
+    {Permission.EVIDENCE_REVIEW}
+)
+
 #: The single authoritative role -> permission policy. Read-only at runtime:
 #: the mapping is a ``MappingProxyType`` and every value is a ``frozenset``,
 #: so neither the policy nor any individual permission set can be mutated
@@ -87,12 +105,15 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
         # Read-only. Holds no write permission at all -- this is the exact
         # bypass the audit recorded (a viewer calling POST /documents).
         Role.VIEWER: frozenset(),
-        Role.EDITOR: _WRITE_PERMISSIONS,
-        # Same as editor until M-4 defines approval authority. There is no
-        # approval route yet, so no permission distinguishes them today.
-        Role.APPROVER: _WRITE_PERMISSIONS,
-        Role.ADMIN: _ADMIN_PERMISSIONS,
-        Role.OWNER: _ADMIN_PERMISSIONS,
+        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
+        # Same as editor until M-4 defines approval authority. Slice 4
+        # added the first route an approver would plausibly own
+        # (evidence review), but the authority to *restrict* it to this
+        # role is still M-4's to grant -- see
+        # ``_EVIDENCE_REVIEW_PERMISSIONS``.
+        Role.APPROVER: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
+        Role.ADMIN: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
+        Role.OWNER: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
     }
 )
 

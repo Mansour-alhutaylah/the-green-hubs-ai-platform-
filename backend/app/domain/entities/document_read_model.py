@@ -18,11 +18,23 @@ partially-attempted embedding pass without this layer fabricating a
 ``structured_output`` actually contains it (only possible when
 ``status == "COMPLETED"``, per ``analysis_runs``' own status/column CHECK
 constraint) -- never guessed or defaulted.
+
+MVP Slice 4 (Evidence Review Lifecycle) adds the five evidence fields.
+Unlike everything else here they are *stored* columns rather than
+derived aggregates, and they duplicate what ``DocumentEvidence``
+carries -- deliberately, because a documents list has to be able to show
+"which of these are approved evidence, and who approved them" without
+issuing one extra query per row. ``DocumentEvidence`` remains the write
+path's return type; this is the read projection's copy of the same
+current-state facts, produced by the same single query as the rest of
+the row.
 """
 
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
+
+from app.domain.evidence.lifecycle import EvidenceStatus
 
 
 @dataclass(frozen=True)
@@ -56,3 +68,8 @@ class DocumentReadModel:
     chunk_count: int
     embedding_summary: EmbeddingSummary
     latest_analysis_summary: AnalysisSummary | None
+    evidence_status: EvidenceStatus
+    reviewed_by: UUID | None
+    reviewed_at: datetime | None
+    review_reason: str | None
+    superseded_by_document_id: UUID | None

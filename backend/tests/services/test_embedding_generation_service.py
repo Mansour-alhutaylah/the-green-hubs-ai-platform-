@@ -95,6 +95,12 @@ class FakeDocumentRepository(IDocumentRepository):
     async def count_for_organization(self, *, organization_id: uuid.UUID, engagement_id=None, processing_status=None) -> int:
         raise NotImplementedError
 
+    async def get_evidence_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
+        raise NotImplementedError
+
+    async def transition_evidence(self, document_id: uuid.UUID, **kwargs):
+        raise NotImplementedError
+
 
 class FakeEngagementRepository(IEngagementRepository):
     def __init__(self) -> None:

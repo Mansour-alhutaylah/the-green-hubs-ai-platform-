@@ -25,6 +25,7 @@ from app.domain.entities.document_read_model import (
     EmbeddingSummary,
 )
 from app.domain.entities.user import User
+from app.domain.evidence.lifecycle import EvidenceStatus
 from app.main import app
 
 from tests.api.test_auth import FakeUserRepository, FakeVerifier
@@ -47,6 +48,13 @@ def _document(**overrides: object) -> DocumentReadModel:
         "chunk_count": 3,
         "embedding_summary": _EMPTY_EMBEDDING_SUMMARY,
         "latest_analysis_summary": None,
+        # MVP Slice 4: the safe initial state, so a document built by
+        # this helper is never accidentally an approved one.
+        "evidence_status": EvidenceStatus.PENDING_REVIEW,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "review_reason": None,
+        "superseded_by_document_id": None,
     }
     defaults.update(overrides)
     return DocumentReadModel(**defaults)
@@ -66,6 +74,7 @@ class StubDocumentReadService:
         *,
         engagement_id: uuid.UUID | None,
         processing_status: str | None,
+        evidence_status: EvidenceStatus | None = None,
         limit: int,
         offset: int,
     ) -> tuple[list[DocumentReadModel], int]:
@@ -73,6 +82,7 @@ class StubDocumentReadService:
             {
                 "engagement_id": engagement_id,
                 "processing_status": processing_status,
+                "evidence_status": evidence_status,
                 "limit": limit,
                 "offset": offset,
             }
@@ -220,6 +230,14 @@ async def test_list_documents_response_contract(
         "chunk_count",
         "embedding_summary",
         "latest_analysis_summary",
+        # MVP Slice 4: the current evidence decision travels with every
+        # document read, so a list view can show what is approved
+        # evidence without a further request per row.
+        "evidence_status",
+        "reviewed_by",
+        "reviewed_at",
+        "review_reason",
+        "superseded_by_document_id",
     }
     assert item["id"] == str(document.id)
     assert "storage_path" not in item
@@ -367,6 +385,14 @@ async def test_get_document_response_contract(
         "chunk_count",
         "embedding_summary",
         "latest_analysis_summary",
+        # MVP Slice 4: the current evidence decision travels with every
+        # document read, so a list view can show what is approved
+        # evidence without a further request per row.
+        "evidence_status",
+        "reviewed_by",
+        "reviewed_at",
+        "review_reason",
+        "superseded_by_document_id",
     }
     assert body["id"] == str(document.id)
     assert body["latest_analysis_summary"]["overall_confidence"] == 0.9

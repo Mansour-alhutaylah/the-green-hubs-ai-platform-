@@ -21,6 +21,7 @@ from app.domain.entities.document_read_model import (
 )
 from app.domain.entities.engagement import Engagement
 from app.domain.entities.user import User
+from app.domain.evidence.lifecycle import EvidenceStatus
 from app.domain.repositories.document import IDocumentRepository
 from app.domain.repositories.engagement import IEngagementRepository
 from app.services.document_read import DocumentReadService
@@ -35,6 +36,7 @@ def _read_model(
     engagement_id: uuid.UUID,
     created_at: datetime | None = None,
     processing_status: str = "PROCESSED",
+    evidence_status: EvidenceStatus = EvidenceStatus.PENDING_REVIEW,
 ) -> DocumentReadModel:
     return DocumentReadModel(
         id=uuid.uuid4(),
@@ -47,6 +49,11 @@ def _read_model(
         chunk_count=3,
         embedding_summary=_EMPTY_EMBEDDING_SUMMARY,
         latest_analysis_summary=None,
+        evidence_status=evidence_status,
+        reviewed_by=None,
+        reviewed_at=None,
+        review_reason=None,
+        superseded_by_document_id=None,
     )
 
 
@@ -98,6 +105,7 @@ class FakeDocumentRepository(IDocumentRepository):
         organization_id: uuid.UUID,
         engagement_id: uuid.UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
         limit: int,
         offset: int,
         embedding_provider: str,
@@ -109,6 +117,7 @@ class FakeDocumentRepository(IDocumentRepository):
                 "organization_id": organization_id,
                 "engagement_id": engagement_id,
                 "processing_status": processing_status,
+                "evidence_status": evidence_status,
                 "limit": limit,
                 "offset": offset,
                 "embedding_provider": embedding_provider,
@@ -122,6 +131,7 @@ class FakeDocumentRepository(IDocumentRepository):
             if owner_organization_id == organization_id
             and (engagement_id is None or document.engagement_id == engagement_id)
             and (processing_status is None or document.processing_status == processing_status)
+            and (evidence_status is None or document.evidence_status == evidence_status)
         ]
         matches.sort(key=lambda d: (d.created_at, str(d.id)), reverse=True)
         return matches[offset : offset + limit]
@@ -132,12 +142,14 @@ class FakeDocumentRepository(IDocumentRepository):
         organization_id: uuid.UUID,
         engagement_id: uuid.UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
     ) -> int:
         self.count_calls.append(
             {
                 "organization_id": organization_id,
                 "engagement_id": engagement_id,
                 "processing_status": processing_status,
+                "evidence_status": evidence_status,
             }
         )
         return len(
@@ -147,10 +159,17 @@ class FakeDocumentRepository(IDocumentRepository):
                 if owner_organization_id == organization_id
                 and (engagement_id is None or document.engagement_id == engagement_id)
                 and (processing_status is None or document.processing_status == processing_status)
+                and (evidence_status is None or document.evidence_status == evidence_status)
             ]
         )
 
     # -- Unused by DocumentReadService; kept only to satisfy the ABC. --
+    async def get_evidence_for_organization(self, document_id, *, organization_id):
+        raise NotImplementedError
+
+    async def transition_evidence(self, document_id, **kwargs):
+        raise NotImplementedError
+
     async def get(self, entity_id):  # type: ignore[override]
         raise NotImplementedError
 
@@ -523,6 +542,11 @@ async def test_get_maps_embedding_and_analysis_summaries_through_untouched(
         chunk_count=4,
         embedding_summary=embedding_summary,
         latest_analysis_summary=analysis_summary,
+        evidence_status=EvidenceStatus.VERIFIED,
+        reviewed_by=uuid.uuid4(),
+        reviewed_at=datetime.now(timezone.utc),
+        review_reason=None,
+        superseded_by_document_id=None,
     )
     document_repository.seed(document, organization_id=organization_a_id)
 

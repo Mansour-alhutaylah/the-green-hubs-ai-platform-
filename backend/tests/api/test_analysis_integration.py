@@ -209,12 +209,21 @@ async def cleanup_ids() -> AsyncIterator[dict[str, list[uuid.UUID]]]:
 
 
 async def _make_org_engagement_document_with_embedded_chunks(
-    cleanup_ids: dict[str, list[uuid.UUID]], *, chunk_contents: list[str]
+    cleanup_ids: dict[str, list[uuid.UUID]],
+    *,
+    chunk_contents: list[str],
+    evidence_status: str = "VERIFIED",
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID]:
     """Returns (organization_id, engagement_id, profile_id, document_id).
     Every chunk is given a real, COMPLETED DocumentChunkEmbeddingModel row
     with a deterministic vector, so RagAnalysisService's retrieval step
-    finds real, tenant-scoped matches without any network call."""
+    finds real, tenant-scoped matches without any network call.
+
+    ``evidence_status`` defaults to VERIFIED here, unlike the other
+    integration fixtures: every test in this module analyses a document
+    it intends to be usable evidence, and MVP Slice 4 makes retrieval --
+    and therefore grounded analysis -- conditional on that approval. A
+    test wanting the unapproved case passes it explicitly."""
     settings = get_settings()
     async with AsyncSessionLocal() as session:
         organization = OrganizationModel(name="Analysis Integration Test Org")
@@ -225,9 +234,25 @@ async def _make_org_engagement_document_with_embedded_chunks(
         )
         session.add(engagement)
         await session.flush()
+        reviewer_id = uuid.uuid4()
+        session.add(
+            UserModel(
+                id=reviewer_id, organization_id=organization.id,
+                full_name="Analysis Integration Test Reviewer",
+                email=f"analysis-reviewer-{reviewer_id}@example.com", role="approver",
+            )
+        )
+        await session.flush()
+        cleanup_ids["users"].append(reviewer_id)
+        reviewed = evidence_status == "VERIFIED"
         document = DocumentModel(
             filename="report.pdf", storage_path=f"test/{uuid.uuid4()}.pdf",
             processing_status="PROCESSED", engagement_id=engagement.id,
+            evidence_status=evidence_status,
+            # ck_documents_evidence_review_consistency requires a decided
+            # state to name its reviewer and the moment of the decision.
+            reviewed_by=reviewer_id if reviewed else None,
+            reviewed_at=datetime.now(timezone.utc) if reviewed else None,
         )
         session.add(document)
         await session.flush()

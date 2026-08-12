@@ -123,6 +123,40 @@ def test_write_capable_roles_can_upload_a_document() -> None:
         assert has_permission(role, Permission.DOCUMENT_UPLOAD) is True
 
 
+def test_evidence_review_is_granted_to_exactly_the_documented_roles() -> None:
+    """The authoritative pin for MVP Slice 4's authorization policy.
+
+    This assertion -- not any API test -- is where the evidence-review
+    role mapping is decided; ``test_document_evidence.py`` derives its
+    allowed/denied parametrization from ``ROLE_PERMISSIONS`` so that the
+    tests follow the policy rather than establish it.
+
+    The mapping grants ``evidence.review`` to every role that already
+    holds write permissions, and to no other. That is deliberately the
+    coarsest split that closes the property Slice 4 needs -- a
+    ``viewer`` cannot approve evidence, withdraw an approval, or make a
+    document retrievable -- without inventing the approver/editor
+    distinction that management decision **M-4** owns and that backlog
+    risk R-1 forbids engineering from inventing.
+
+    **This assertion is expected to change when M-4 lands**, and the
+    change is one line in ``ROLE_PERMISSIONS`` plus one line here."""
+
+    granted = {role for role in Role if Permission.EVIDENCE_REVIEW in permissions_for_role(role)}
+
+    assert granted == {Role.EDITOR, Role.APPROVER, Role.ADMIN, Role.OWNER}
+    assert Role.VIEWER not in granted
+
+
+def test_evidence_review_is_not_administrative() -> None:
+    """Reviewing evidence is not an organization-management action; it
+    must not have been folded into the admin-class set."""
+
+    assert Permission.EVIDENCE_REVIEW not in _ADMIN_CLASS_PERMISSIONS
+    assert has_permission(Role.APPROVER, Permission.EVIDENCE_REVIEW) is True
+    assert has_permission(Role.APPROVER, Permission.ORGANIZATION_MANAGE) is False
+
+
 def test_role_resolution_normalizes_case_and_surrounding_whitespace() -> None:
     assert resolve_trusted_role(_user("  Admin ")) is Role.ADMIN
 

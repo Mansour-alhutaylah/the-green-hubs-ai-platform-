@@ -25,6 +25,7 @@ from app.infrastructure.db.models.document_chunk import DocumentChunkModel
 from app.infrastructure.db.models.document_chunk_embedding import DocumentChunkEmbeddingModel
 from app.infrastructure.db.models.engagement import Engagement as EngagementModel
 from app.infrastructure.db.models.organization import Organization as OrganizationModel
+from app.infrastructure.db.models.user import User as UserModel
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.repositories.document_chunk_embedding import (
     SQLAlchemyDocumentChunkEmbeddingRepository,
@@ -61,7 +62,8 @@ async def session() -> AsyncIterator[AsyncSession]:
 @pytest.fixture
 async def cleanup_ids() -> AsyncIterator[dict[str, list[uuid.UUID]]]:
     ids: dict[str, list[uuid.UUID]] = {
-        "embeddings": [], "chunks": [], "documents": [], "engagements": [], "organizations": [],
+        "embeddings": [], "chunks": [], "documents": [], "users": [], "engagements": [],
+        "organizations": [],
     }
     yield ids
     async with AsyncSessionLocal() as cleanup_session:
@@ -77,6 +79,11 @@ async def cleanup_ids() -> AsyncIterator[dict[str, list[uuid.UUID]]]:
         await cleanup_session.commit()
         for document_id in ids["documents"]:
             model = await cleanup_session.get(DocumentModel, document_id)
+            if model is not None:
+                await cleanup_session.delete(model)
+        await cleanup_session.commit()
+        for user_id in ids["users"]:
+            model = await cleanup_session.get(UserModel, user_id)
             if model is not None:
                 await cleanup_session.delete(model)
         await cleanup_session.commit()
@@ -98,9 +105,19 @@ def make_chunk(
 ) -> Callable[..., Awaitable[tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, str]]]:
     """Factory: creates a real Organization + Engagement + Document
     (PROCESSED) + DocumentChunk row. Returns
-    (chunk_id, document_id, engagement_id, organization_id, content)."""
+    (chunk_id, document_id, engagement_id, organization_id, content).
 
-    async def _make(content: str = "Emissions decreased year over year.") -> tuple:
+    ``evidence_status`` defaults to the truthful initial state
+    (PENDING_REVIEW). MVP Slice 4 made retrieval eligibility depend on
+    it, so a test that expects ``search()`` to *return* a row must ask
+    for VERIFIED explicitly and say why -- the fixture never grants
+    approval implicitly."""
+
+    async def _make(
+        content: str = "Emissions decreased year over year.",
+        *,
+        evidence_status: str = "PENDING_REVIEW",
+    ) -> tuple:
         async with AsyncSessionLocal() as session:
             organization = OrganizationModel(name="Embedding Repo Test Org")
             session.add(organization)
@@ -110,9 +127,26 @@ def make_chunk(
             )
             session.add(engagement)
             await session.flush()
+            reviewer_id: uuid.UUID | None = None
+            if evidence_status == "VERIFIED":
+                # A VERIFIED row must carry a real reviewer and timestamp:
+                # ck_documents_evidence_review_consistency enforces it.
+                reviewer_id = uuid.uuid4()
+                session.add(
+                    UserModel(
+                        id=reviewer_id, organization_id=organization.id,
+                        full_name="Embedding Repo Test Reviewer",
+                        email=f"embedding-repo-{reviewer_id}@example.com", role="approver",
+                    )
+                )
+                await session.flush()
+                cleanup_ids["users"].append(reviewer_id)
             document = DocumentModel(
                 filename="report.pdf", storage_path=f"test/{uuid.uuid4()}.pdf",
                 processing_status="PROCESSED", engagement_id=engagement.id,
+                evidence_status=evidence_status,
+                reviewed_by=reviewer_id,
+                reviewed_at=datetime.now(timezone.utc) if reviewer_id is not None else None,
             )
             session.add(document)
             await session.flush()
@@ -135,6 +169,17 @@ def make_chunk(
 @pytest.fixture
 async def chunk(make_chunk) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, str]:
     return await make_chunk()
+
+
+@pytest.fixture
+async def verified_chunk(make_chunk) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, str]:
+    """A chunk whose document a human has approved as evidence.
+
+    Used by every ``search()`` test: without approval the row is not a
+    retrieval candidate at all, so an assertion about ordering, tenancy
+    or model identity would pass for the wrong reason."""
+
+    return await make_chunk(evidence_status="VERIFIED")
 
 
 def _track(cleanup_ids: dict[str, list[uuid.UUID]], rows) -> None:
@@ -444,7 +489,7 @@ async def test_search_returns_only_same_tenant_results_ordered_by_similarity(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], make_chunk
 ) -> None:
     chunk_a_id, document_id, engagement_a, organization_a, content_a = await make_chunk(
-        "Close match content."
+        "Close match content.", evidence_status="VERIFIED"
     )
     # A second chunk under the *same* document/tenant -- not a second
     # make_chunk() call, which would create an unrelated organization.
@@ -499,10 +544,13 @@ async def test_cross_tenant_nearest_neighbor_is_never_returned(
     to an Organization A search, even though it would rank first by raw
     distance alone."""
     chunk_a_id, _da, _ea, organization_a, content_a = await make_chunk(
-        "Scope 1 emissions data for fiscal year."
+        "Scope 1 emissions data for fiscal year.", evidence_status="VERIFIED"
     )
     chunk_b_id, _db, _eb, organization_b, content_b = await make_chunk(
-        "Scope 1 emissions data for fiscal year."  # intentionally identical content
+        # Intentionally identical content, and equally approved -- so the
+        # only thing keeping B out of A's results is the tenant predicate.
+        "Scope 1 emissions data for fiscal year.",
+        evidence_status="VERIFIED",
     )
 
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
@@ -565,9 +613,11 @@ async def test_cross_tenant_nearest_neighbor_is_never_returned(
 
 
 async def test_search_excludes_non_completed_rows(
-    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
+    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], verified_chunk
 ) -> None:
-    chunk_id, _d, _e, organization_id, content = chunk
+    # Verified, so the only reason this row can be excluded is its
+    # PROCESSING embedding status -- which is what this test asserts.
+    chunk_id, _d, _e, organization_id, content = verified_chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
         [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
@@ -584,9 +634,9 @@ async def test_search_excludes_non_completed_rows(
 
 
 async def test_search_filters_by_engagement_id(
-    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
+    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], verified_chunk
 ) -> None:
-    chunk_id, _d, engagement_id, organization_id, content = chunk
+    chunk_id, _d, engagement_id, organization_id, content = verified_chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
         [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
@@ -614,8 +664,12 @@ async def test_search_filters_by_engagement_id(
 async def test_search_filters_by_document_id(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], make_chunk
 ) -> None:
-    chunk_a_id, document_a, _ea, organization_id, content_a = await make_chunk("Document A content.")
-    chunk_b_id, document_b, _eb, _ob, content_b = await make_chunk("Document B content.")
+    chunk_a_id, document_a, _ea, organization_id, content_a = await make_chunk(
+        "Document A content.", evidence_status="VERIFIED"
+    )
+    chunk_b_id, document_b, _eb, _ob, content_b = await make_chunk(
+        "Document B content.", evidence_status="VERIFIED"
+    )
 
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed_a = await repository.claim_new(
@@ -641,9 +695,9 @@ async def test_search_filters_by_document_id(
 
 
 async def test_search_filters_by_provider_model_version_identity(
-    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
+    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], verified_chunk
 ) -> None:
-    chunk_id, _d, _e, organization_id, content = chunk
+    chunk_id, _d, _e, organization_id, content = verified_chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
         [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,

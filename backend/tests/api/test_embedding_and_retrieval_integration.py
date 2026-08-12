@@ -14,6 +14,7 @@ session in teardown, regardless of test outcome.
 
 import hashlib
 import uuid
+from datetime import datetime, timezone
 from typing import AsyncIterator, Sequence
 
 import pytest
@@ -140,9 +141,18 @@ async def cleanup_ids() -> AsyncIterator[dict[str, list[uuid.UUID]]]:
 
 
 async def _make_org_engagement_document_with_chunks(
-    cleanup_ids: dict[str, list[uuid.UUID]], *, chunk_contents: list[str]
+    cleanup_ids: dict[str, list[uuid.UUID]],
+    *,
+    chunk_contents: list[str],
+    evidence_status: str = "PENDING_REVIEW",
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID]:
-    """Returns (organization_id, engagement_id, profile_id, document_id)."""
+    """Returns (organization_id, engagement_id, profile_id, document_id).
+
+    ``evidence_status`` defaults to the truthful initial state. MVP
+    Slice 4 made retrieval eligibility depend on it, so a test that
+    expects a search to *return* this document must ask for VERIFIED --
+    the fixture never approves evidence on a test's behalf."""
+
     async with AsyncSessionLocal() as session:
         organization = OrganizationModel(name="Embedding Integration Test Org")
         session.add(organization)
@@ -152,9 +162,26 @@ async def _make_org_engagement_document_with_chunks(
         )
         session.add(engagement)
         await session.flush()
+        profile_id = uuid.uuid4()
+        session.add(
+            UserModel(
+                id=profile_id, organization_id=organization.id,
+                full_name="Embedding Integration Test User",
+                # Write-capable so this test still reaches the behaviour it
+                # asserts; role denial is covered in tests/api/test_authorization.py.
+                email=f"embedding-integration-{profile_id}@example.com", role="admin",
+            )
+        )
+        await session.flush()
+        reviewed = evidence_status == "VERIFIED"
         document = DocumentModel(
             filename="report.pdf", storage_path=f"test/{uuid.uuid4()}.pdf",
             processing_status="PROCESSED", engagement_id=engagement.id,
+            evidence_status=evidence_status,
+            # A decided state must carry its reviewer and timestamp --
+            # ck_documents_evidence_review_consistency enforces it.
+            reviewed_by=profile_id if reviewed else None,
+            reviewed_at=datetime.now(timezone.utc) if reviewed else None,
         )
         session.add(document)
         await session.flush()
@@ -167,16 +194,6 @@ async def _make_org_engagement_document_with_chunks(
         ]
         session.add_all(chunk_models)
         await session.flush()
-        profile_id = uuid.uuid4()
-        session.add(
-            UserModel(
-                id=profile_id, organization_id=organization.id,
-                full_name="Embedding Integration Test User",
-                # Write-capable so this test still reaches the behaviour it
-                # asserts; role denial is covered in tests/api/test_authorization.py.
-                email=f"embedding-integration-{profile_id}@example.com", role="admin",
-            )
-        )
         await session.commit()
 
     cleanup_ids["organizations"].append(organization.id)
@@ -201,8 +218,12 @@ async def test_generate_then_retrieve_end_to_end(
     cleanup_ids: dict[str, list[uuid.UUID]],
 ) -> None:
     private_key, _public_key = keypair
+    # VERIFIED: this test asserts the chunks are *retrievable*, which
+    # MVP Slice 4 makes conditional on an explicit human approval.
     _org, _eng, profile_id, document_id = await _make_org_engagement_document_with_chunks(
-        cleanup_ids, chunk_contents=["Scope 1 emissions decreased.", "Scope 2 emissions increased."]
+        cleanup_ids,
+        chunk_contents=["Scope 1 emissions decreased.", "Scope 2 emissions increased."],
+        evidence_status="VERIFIED",
     )
     token = _token_for(private_key, real_verifier, profile_id)
     headers = {"Authorization": f"Bearer {token}"}
@@ -338,11 +359,13 @@ async def test_cross_tenant_search_never_returns_the_other_organizations_nearest
 ) -> None:
     private_key, _public_key = keypair
     identical_content = "Deliberately identical disclosure text for both tenants."
+    # Both approved, so the only thing keeping B out of A's results is
+    # the tenant predicate -- not an accidental evidence exclusion.
     _org_a, _eng_a, profile_a, document_a = await _make_org_engagement_document_with_chunks(
-        cleanup_ids, chunk_contents=[identical_content]
+        cleanup_ids, chunk_contents=[identical_content], evidence_status="VERIFIED"
     )
     _org_b, _eng_b, profile_b, document_b = await _make_org_engagement_document_with_chunks(
-        cleanup_ids, chunk_contents=[identical_content]
+        cleanup_ids, chunk_contents=[identical_content], evidence_status="VERIFIED"
     )
     token_a = _token_for(private_key, real_verifier, profile_a)
     token_b = _token_for(private_key, real_verifier, profile_b)
