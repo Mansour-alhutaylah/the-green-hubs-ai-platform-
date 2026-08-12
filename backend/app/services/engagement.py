@@ -55,7 +55,12 @@ class EngagementService:
         self._organization_repository = organization_repository
 
     async def _require_organization_exists(self, organization_id: UUID) -> None:
-        organization = await self._organization_repository.get(organization_id)
+        # `organization_id` has already been proven equal to the caller's own
+        # trusted organization by every caller of this helper, so reading it
+        # back is a scoped read of the caller's own tenant root.
+        organization = await self._organization_repository.get_for_organization(
+            organization_id=organization_id
+        )
         if organization is None:
             raise NotFoundError(f"Organization {organization_id} not found")
 
@@ -103,7 +108,7 @@ class EngagementService:
             raise AuthorizationError("Cannot list Engagements for another organization")
         offset = (page - 1) * page_size
         items = await self._repository.list(
-            limit=page_size, offset=offset, organization_id=own_organization_id
+            organization_id=own_organization_id, limit=page_size, offset=offset
         )
         total = await self._repository.count(organization_id=own_organization_id)
         return items, total

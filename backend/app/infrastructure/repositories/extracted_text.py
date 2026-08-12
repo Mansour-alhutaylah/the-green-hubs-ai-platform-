@@ -8,6 +8,10 @@ transaction, committed once by ``DocumentProcessingService`` via
 (more than one extracted-text row per Document) is mapped to
 ``PersistenceError`` rather than a raw DB exception, mirroring
 ``SQLAlchemyDocumentRepository.create()``'s integrity-error handling.
+
+MVP Slice 3 (Organization Data Isolation): ``get_by_document`` joins
+``extracted_text -> documents -> engagements`` so the caller's
+``organization_id`` constrains the selecting query itself.
 """
 
 from uuid import UUID
@@ -19,6 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import PersistenceError
 from app.domain.entities.extracted_text import ExtractedText
 from app.domain.repositories.extracted_text import IExtractedTextRepository
+from app.infrastructure.db.models.document import DocumentModel
+from app.infrastructure.db.models.engagement import Engagement as EngagementModel
 from app.infrastructure.db.models.extracted_text import ExtractedText as ExtractedTextModel
 
 
@@ -48,8 +54,18 @@ class SQLAlchemyExtractedTextRepository(IExtractedTextRepository):
             raise PersistenceError("Unable to persist extracted text for this document") from exc
         return _to_domain(model)
 
-    async def get_by_document(self, document_id: UUID) -> ExtractedText | None:
-        stmt = select(ExtractedTextModel).where(ExtractedTextModel.document_id == document_id)
+    async def get_by_document(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> ExtractedText | None:
+        stmt = (
+            select(ExtractedTextModel)
+            .join(DocumentModel, DocumentModel.id == ExtractedTextModel.document_id)
+            .join(EngagementModel, EngagementModel.id == DocumentModel.engagement_id)
+            .where(
+                ExtractedTextModel.document_id == document_id,
+                EngagementModel.organization_id == organization_id,
+            )
+        )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         return _to_domain(model) if model is not None else None

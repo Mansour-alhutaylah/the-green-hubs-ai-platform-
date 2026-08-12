@@ -240,7 +240,9 @@ async def test_non_administrative_roles_cannot_update_an_organization(
         f"/api/v1/organizations/{organization.id}", headers=headers, json={"name": "Renamed"}
     )
     assert response.status_code == 403
-    assert (await fake_organization_repository.get(organization.id)).name == organization.name
+    unchanged = await fake_organization_repository.get_for_organization(organization.id)
+    assert unchanged is not None
+    assert unchanged.name == organization.name
 
 
 @pytest.mark.parametrize("role", ["admin", "owner"])

@@ -24,6 +24,23 @@ scope through ``engagement_id -> engagements.organization_id`` inside
 the query itself (never an unscoped fetch followed by an
 in-application comparison), mirroring ``IEngagementRepository``'s
 ``get_for_organization`` convention.
+
+MVP Slice 3 (Organization Data Isolation) extends that convention to
+*every* Document access path. ``get_for_organization`` is added, and
+``get_by_engagement``/``update_status``/``begin_processing``/
+``complete_processing`` each gain a mandatory keyword-only
+``organization_id``. These four are bespoke to this interface -- none of
+them is declared by ``IRepository[Document]`` -- so unlike ``list``/
+``get``/``update`` (see ``IEngagementRepository``'s docstring for the
+Liskov constraint that forces those to stay unscoped) the tenant scope
+can be made outright mandatory here without breaking substitutability.
+
+The invariant every implementation must satisfy: the caller's trusted
+``organization_id`` is part of the same SQL predicate that locates the
+row. A cross-tenant ``document_id`` must therefore behave exactly like a
+nonexistent one -- no row returned, no row mutated, and no distinguishable
+error -- rather than being fetched first and rejected afterward by an
+in-application comparison a later refactor could drop.
 """
 
 from abc import ABC, abstractmethod
@@ -39,26 +56,61 @@ class IDocumentRepository(IRepository[Document], ABC):
     """Repository contract for retrieving and updating ``Document`` entities."""
 
     @abstractmethod
-    async def get_by_engagement(self, engagement_id: UUID) -> Sequence[Document]: ...
+    async def get_for_organization(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> Document | None:
+        """Tenant-scoped lookup of the Document aggregate itself.
 
-    @abstractmethod
-    async def update_status(self, document_id: UUID, status: str) -> Document: ...
+        Ownership is resolved inside the query, through
+        ``documents.engagement_id -> engagements.organization_id``.
+        Returns ``None`` for a nonexistent document, for a document owned
+        by another organization, and for a document whose engagement has
+        no organization at all -- all three indistinguishable by design,
+        so a valid foreign ``document_id`` is not an existence oracle.
 
-    @abstractmethod
-    async def begin_processing(self, document_id: UUID) -> Document:
-        """Atomically transitions PENDING -> PROCESSING via a single
-        conditional ``UPDATE ... WHERE processing_status = 'PENDING'``,
-        committed immediately. Raises ``NotFoundError`` if the document
-        does not exist, or ``InvalidStateTransitionError`` if it exists
-        but is not currently PENDING."""
+        This is the only Document read a tenant-facing use case may
+        perform; the inherited, unscoped ``get(entity_id)`` exists solely
+        to satisfy ``IRepository``'s contract and for test cleanup."""
         ...
 
     @abstractmethod
-    async def complete_processing(self, document_id: UUID) -> Document:
+    async def get_by_engagement(
+        self, engagement_id: UUID, *, organization_id: UUID
+    ) -> Sequence[Document]:
+        """Tenant-scoped listing of one engagement's Documents. An
+        engagement belonging to another organization yields an empty
+        sequence rather than its rows."""
+        ...
+
+    @abstractmethod
+    async def update_status(
+        self, document_id: UUID, status: str, *, organization_id: UUID
+    ) -> Document:
+        """Tenant-scoped status write. The ``organization_id`` predicate
+        is part of the statement that selects the row to mutate, so this
+        can never update another organization's Document even if called
+        with a foreign ``document_id``. Raises ``NotFoundError`` when no
+        row matches both."""
+        ...
+
+    @abstractmethod
+    async def begin_processing(self, document_id: UUID, *, organization_id: UUID) -> Document:
+        """Atomically transitions PENDING -> PROCESSING via a single
+        conditional, tenant-scoped ``UPDATE ... WHERE processing_status =
+        'PENDING' AND <owned by organization_id>``, committed immediately.
+        Raises ``NotFoundError`` if no Document matches both the id and
+        the organization -- the cross-tenant case is deliberately
+        indistinguishable from the nonexistent one -- or
+        ``InvalidStateTransitionError`` if the caller's own Document
+        exists but is not currently PENDING."""
+        ...
+
+    @abstractmethod
+    async def complete_processing(self, document_id: UUID, *, organization_id: UUID) -> Document:
         """Sets processing_status to PROCESSED via flush only -- part of
         the caller's own transaction (see ``IProcessingUnitOfWork``), not
-        committed here. Raises ``NotFoundError`` if the document no
-        longer exists."""
+        committed here. Tenant-scoped exactly as ``update_status``.
+        Raises ``NotFoundError`` if no matching row exists."""
         ...
 
     @abstractmethod

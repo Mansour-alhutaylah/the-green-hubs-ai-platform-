@@ -134,6 +134,30 @@ async def document_id(make_document: Callable[..., Awaitable[uuid.UUID]]) -> uui
     return await make_document()
 
 
+async def _organization_of(document_id: uuid.UUID) -> uuid.UUID:
+    """Resolve a document's owning organization through the real
+    ``documents -> engagements`` join.
+
+    MVP Slice 3 made ``organization_id`` mandatory on every tenant-owned
+    repository method. Tests resolve it the same way production does --
+    from the row's actual lineage -- rather than inventing a value, so a
+    scope that stopped matching would fail here too.
+    """
+
+    async with AsyncSessionLocal() as session:
+        document = await session.get(DocumentModel, document_id)
+        assert document is not None
+        engagement = await session.get(Engagement, document.engagement_id)
+        assert engagement is not None
+        assert engagement.organization_id is not None
+        return engagement.organization_id
+
+
+@pytest.fixture
+async def organization_id(document_id: uuid.UUID) -> uuid.UUID:
+    return await _organization_of(document_id)
+
+
 # ---------------------------------------------------------------------------
 # SQLAlchemyExtractedTextRepository
 # ---------------------------------------------------------------------------
@@ -143,6 +167,7 @@ async def test_extracted_text_create_flushes_but_does_not_commit(
     session: AsyncSession,
     cleanup_ids: dict[str, list[uuid.UUID]],
     document_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     repository = SQLAlchemyExtractedTextRepository(session)
 
@@ -152,7 +177,7 @@ async def test_extracted_text_create_flushes_but_does_not_commit(
     cleanup_ids["extracted_text"].append(created.id)
 
     # Visible within the same, still-open transaction (flush, not commit)...
-    fetched = await repository.get_by_document(document_id)
+    fetched = await repository.get_by_document(document_id, organization_id=organization_id)
     assert fetched is not None
     assert fetched.extracted_content == "hello world"
 
@@ -170,10 +195,35 @@ async def test_extracted_text_create_flushes_but_does_not_commit(
 
 
 async def test_extracted_text_get_by_document_returns_none_when_absent(
-    session: AsyncSession, document_id: uuid.UUID
+    session: AsyncSession, document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     repository = SQLAlchemyExtractedTextRepository(session)
-    assert await repository.get_by_document(document_id) is None
+    assert await repository.get_by_document(document_id, organization_id=organization_id) is None
+
+
+async def test_extracted_text_is_not_readable_from_another_organization(
+    session: AsyncSession,
+    cleanup_ids: dict[str, list[uuid.UUID]],
+    document_id: uuid.UUID,
+    organization_id: uuid.UUID,
+) -> None:
+    """The row holds the document's full normalized text -- the largest
+    single disclosure on this table. A real document id paired with a
+    foreign organization must resolve to nothing."""
+
+    repository = SQLAlchemyExtractedTextRepository(session)
+    created = await repository.create(
+        ExtractedText(id=None, document_id=document_id, extracted_content="secret", created_at=None)
+    )
+    await session.commit()
+    cleanup_ids["extracted_text"].append(created.id)
+
+    assert await repository.get_by_document(
+        document_id, organization_id=organization_id
+    ) is not None
+    assert await repository.get_by_document(
+        document_id, organization_id=uuid.uuid4()
+    ) is None
 
 
 async def test_extracted_text_unique_constraint_violation_maps_to_persistence_error(
@@ -232,6 +282,7 @@ async def test_document_chunk_get_by_document_orders_by_chunk_index(
     session: AsyncSession,
     cleanup_ids: dict[str, list[uuid.UUID]],
     document_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     repository = SQLAlchemyDocumentChunkRepository(session)
     created = await repository.create_many(
@@ -244,17 +295,20 @@ async def test_document_chunk_get_by_document_orders_by_chunk_index(
     await session.commit()
     cleanup_ids["chunks"].extend(c.id for c in created)
 
-    results = await repository.get_by_document(document_id)
+    results = await repository.get_by_document(document_id, organization_id=organization_id)
 
     assert [c.chunk_index for c in results] == [0, 1, 2]
     assert [c.content for c in results] == ["a", "b", "c"]
 
+    # Same real document id, foreign organization: no chunk text at all.
+    assert await repository.get_by_document(document_id, organization_id=uuid.uuid4()) == []
+
 
 async def test_document_chunk_get_by_document_returns_empty_when_none_exist(
-    session: AsyncSession, document_id: uuid.UUID
+    session: AsyncSession, document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     repository = SQLAlchemyDocumentChunkRepository(session)
-    assert await repository.get_by_document(document_id) == []
+    assert await repository.get_by_document(document_id, organization_id=organization_id) == []
 
 
 async def test_document_chunk_unique_constraint_violation_maps_to_persistence_error(
@@ -282,11 +336,11 @@ async def test_document_chunk_unique_constraint_violation_maps_to_persistence_er
 
 
 async def test_begin_processing_claims_a_pending_document(
-    session: AsyncSession, document_id: uuid.UUID
+    session: AsyncSession, document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     repository = SQLAlchemyDocumentRepository(session)
 
-    claimed = await repository.begin_processing(document_id)
+    claimed = await repository.begin_processing(document_id, organization_id=organization_id)
 
     assert claimed.processing_status == "PROCESSING"
     async with AsyncSessionLocal() as verify_session:
@@ -300,7 +354,29 @@ async def test_begin_processing_raises_not_found_for_missing_document(
 ) -> None:
     repository = SQLAlchemyDocumentRepository(session)
     with pytest.raises(NotFoundError):
-        await repository.begin_processing(uuid.uuid4())
+        await repository.begin_processing(uuid.uuid4(), organization_id=uuid.uuid4())
+
+
+async def test_begin_processing_never_claims_another_organizations_document(
+    session: AsyncSession, document_id: uuid.UUID
+) -> None:
+    """The tenant predicate is inside the conditional UPDATE itself.
+
+    A *real* PENDING document id with a foreign organization must raise the
+    same ``NotFoundError`` an unknown id raises -- not
+    ``InvalidStateTransitionError``, which would confirm the row exists --
+    and must leave the row PENDING rather than claiming it.
+    """
+
+    repository = SQLAlchemyDocumentRepository(session)
+
+    with pytest.raises(NotFoundError):
+        await repository.begin_processing(document_id, organization_id=uuid.uuid4())
+
+    async with AsyncSessionLocal() as verify_session:
+        model = await verify_session.get(DocumentModel, document_id)
+        assert model is not None
+        assert model.processing_status == "PENDING"  # never claimed
 
 
 @pytest.mark.parametrize(
@@ -317,16 +393,17 @@ async def test_begin_processing_rejects_non_pending_states_with_exact_message(
     expected_message: str,
 ) -> None:
     doc_id = await make_document(status=status)
+    owner_id = await _organization_of(doc_id)
     async with AsyncSessionLocal() as session:
         repository = SQLAlchemyDocumentRepository(session)
         with pytest.raises(InvalidStateTransitionError) as exc_info:
-            await repository.begin_processing(doc_id)
+            await repository.begin_processing(doc_id, organization_id=owner_id)
         assert exc_info.value.message == expected_message
         assert exc_info.value.status_code == 409
 
 
 async def test_begin_processing_two_concurrent_calls_only_one_wins(
-    document_id: uuid.UUID,
+    document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     """The core concurrency guarantee: two callers racing to claim the same
     PENDING document must not both succeed. Uses two independent sessions
@@ -337,13 +414,17 @@ async def test_begin_processing_two_concurrent_calls_only_one_wins(
     application-level ordering."""
     async with AsyncSessionLocal() as session_a:
         repository_a = SQLAlchemyDocumentRepository(session_a)
-        first = await repository_a.begin_processing(document_id)
+        first = await repository_a.begin_processing(
+            document_id, organization_id=organization_id
+        )
     assert first.processing_status == "PROCESSING"
 
     async with AsyncSessionLocal() as session_b:
         repository_b = SQLAlchemyDocumentRepository(session_b)
         with pytest.raises(InvalidStateTransitionError) as exc_info:
-            await repository_b.begin_processing(document_id)
+            await repository_b.begin_processing(
+                document_id, organization_id=organization_id
+            )
     assert exc_info.value.message == "Document is already being processed."
 
     async with AsyncSessionLocal() as verify_session:
@@ -353,7 +434,7 @@ async def test_begin_processing_two_concurrent_calls_only_one_wins(
 
 
 async def test_begin_processing_truly_concurrent_tasks_only_one_wins(
-    document_id: uuid.UUID,
+    document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     """Same guarantee, exercised via genuinely concurrent asyncio tasks
     (not just sequential calls) against two independent sessions/connections."""
@@ -362,7 +443,9 @@ async def test_begin_processing_truly_concurrent_tasks_only_one_wins(
         async with AsyncSessionLocal() as session:
             repository = SQLAlchemyDocumentRepository(session)
             try:
-                await repository.begin_processing(document_id)
+                await repository.begin_processing(
+                    document_id, organization_id=organization_id
+                )
                 return "won"
             except InvalidStateTransitionError:
                 return "lost"
@@ -378,12 +461,14 @@ async def test_begin_processing_truly_concurrent_tasks_only_one_wins(
 
 
 async def test_complete_processing_flushes_but_does_not_commit(
-    session: AsyncSession, document_id: uuid.UUID
+    session: AsyncSession, document_id: uuid.UUID, organization_id: uuid.UUID
 ) -> None:
     repository = SQLAlchemyDocumentRepository(session)
-    await repository.begin_processing(document_id)
+    await repository.begin_processing(document_id, organization_id=organization_id)
 
-    completed = await repository.complete_processing(document_id)
+    completed = await repository.complete_processing(
+        document_id, organization_id=organization_id
+    )
     assert completed.processing_status == "PROCESSED"
 
     # Not yet visible to an independent session -- only flushed, not committed.
@@ -405,7 +490,23 @@ async def test_complete_processing_raises_not_found_for_missing_document(
 ) -> None:
     repository = SQLAlchemyDocumentRepository(session)
     with pytest.raises(NotFoundError):
-        await repository.complete_processing(uuid.uuid4())
+        await repository.complete_processing(uuid.uuid4(), organization_id=uuid.uuid4())
+
+
+async def test_complete_processing_never_writes_another_organizations_document(
+    session: AsyncSession, document_id: uuid.UUID, organization_id: uuid.UUID
+) -> None:
+    repository = SQLAlchemyDocumentRepository(session)
+    await repository.begin_processing(document_id, organization_id=organization_id)
+    await session.commit()
+
+    with pytest.raises(NotFoundError):
+        await repository.complete_processing(document_id, organization_id=uuid.uuid4())
+
+    async with AsyncSessionLocal() as verify_session:
+        model = await verify_session.get(DocumentModel, document_id)
+        assert model is not None
+        assert model.processing_status == "PROCESSING"  # not advanced by a foreign caller
 
 
 # ---------------------------------------------------------------------------
@@ -417,20 +518,21 @@ async def test_unit_of_work_commit_persists_extracted_text_chunks_and_processed_
     session: AsyncSession,
     cleanup_ids: dict[str, list[uuid.UUID]],
     document_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     document_repository = SQLAlchemyDocumentRepository(session)
     extracted_text_repository = SQLAlchemyExtractedTextRepository(session)
     chunk_repository = SQLAlchemyDocumentChunkRepository(session)
     unit_of_work = SQLAlchemyProcessingUnitOfWork(session)
 
-    await document_repository.begin_processing(document_id)
+    await document_repository.begin_processing(document_id, organization_id=organization_id)
     created_text = await extracted_text_repository.create(
         ExtractedText(id=None, document_id=document_id, extracted_content="full text", created_at=None)
     )
     created_chunks = await chunk_repository.create_many(
         [DocumentChunk(id=None, document_id=document_id, chunk_index=0, content="full text", char_start=0, char_end=9, created_at=None)]
     )
-    await document_repository.complete_processing(document_id)
+    await document_repository.complete_processing(document_id, organization_id=organization_id)
     await unit_of_work.commit()
 
     cleanup_ids["extracted_text"].append(created_text.id)
@@ -452,13 +554,14 @@ async def test_unit_of_work_commit_persists_extracted_text_chunks_and_processed_
 async def test_unit_of_work_rollback_leaves_no_extracted_text_or_chunk_rows(
     session: AsyncSession,
     document_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     document_repository = SQLAlchemyDocumentRepository(session)
     extracted_text_repository = SQLAlchemyExtractedTextRepository(session)
     chunk_repository = SQLAlchemyDocumentChunkRepository(session)
     unit_of_work = SQLAlchemyProcessingUnitOfWork(session)
 
-    await document_repository.begin_processing(document_id)
+    await document_repository.begin_processing(document_id, organization_id=organization_id)
     created_text = await extracted_text_repository.create(
         ExtractedText(id=None, document_id=document_id, extracted_content="doomed text", created_at=None)
     )

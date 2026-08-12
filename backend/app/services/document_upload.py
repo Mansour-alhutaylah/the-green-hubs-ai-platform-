@@ -16,9 +16,25 @@ precedent exactly: engagement/organization existence is checked here via
 neither ``EngagementService`` nor ``OrganizationService`` needs any
 redesign.
 
+MVP Slice 3 (Organization Data Isolation): the Engagement is now loaded
+through ``IEngagementRepository.get_for_organization``, so the caller's
+organization is part of the SQL predicate that finds the row rather than
+a Python comparison afterwards. The user-visible consequence is that an
+Engagement belonging to another organization now returns
+``NotFoundError`` (404), exactly like an Engagement that does not exist
+-- previously it returned ``AuthorizationError`` (403), which let a
+caller holding a valid Engagement UUID confirm it existed under some
+other tenant. This aligns upload with the indistinguishable-not-found
+convention already used by Organization/Engagement reads (Sprint 3.5.1),
+embeddings (Sprint 3.6A) and analysis (Sprint 3.6B).
+
+An Engagement whose ``organization_id`` is NULL likewise cannot match the
+predicate, so the previous explicit "Engagement has no organization"
+branch is now covered by the same fail-closed 404.
+
 Ordering (see the Sprint 3.4 plan's "Upload order and compensation"
-section): validate -> load Engagement -> verify organization
-authorization -> generate id/object key -> store -> persist -> return.
+section): validate -> load Engagement tenant-scoped -> generate
+id/object key -> store -> persist -> return.
 There is no cross-system transaction between Postgres and Supabase
 Storage -- if the database insert fails after the storage write already
 succeeded, this service compensates by deleting the exact object it just
@@ -91,24 +107,29 @@ class DocumentUploadService:
         sanitized_filename = _sanitize_filename(request.original_filename)
         self._validate_pdf(request)
 
-        engagement = await self._engagement_repository.get(request.engagement_id)
+        # Fail closed before any lookup: a profile with no organization
+        # has no tenant scope, so there is no engagement it may upload to.
+        organization_id = current_user.organization_id
+        if organization_id is None:
+            raise AuthorizationError("User has no organization")
+
+        engagement = await self._engagement_repository.get_for_organization(
+            request.engagement_id, organization_id=organization_id
+        )
         if engagement is None:
             raise NotFoundError(f"Engagement {request.engagement_id} not found")
 
-        if current_user.organization_id is None:
-            raise AuthorizationError("User has no organization")
-        if engagement.organization_id is None:
-            raise AuthorizationError("Engagement has no organization")
-        if current_user.organization_id != engagement.organization_id:
-            raise AuthorizationError("User is not authorized for this engagement")
-
         # engagement.id is always populated here: it came from
-        # engagement_repository.get(), which only ever returns persisted
-        # rows. The domain type is Optional only to also cover the
+        # get_for_organization(), which only ever returns persisted rows.
+        # The domain type is Optional only to also cover the
         # pre-persistence state EngagementService.create() constructs.
         assert engagement.id is not None
         document_id = uuid4()
-        object_key = _build_object_key(engagement.organization_id, engagement.id, document_id)
+        # The object key is built from the *trusted* organization id, not
+        # from the row we just read: the storage path is server-derived
+        # tenant metadata and must not depend on a value that travelled
+        # through the database on the way here.
+        object_key = _build_object_key(organization_id, engagement.id, document_id)
 
         try:
             await self._storage.put(object_key, request.content, _PDF_CONTENT_TYPE)

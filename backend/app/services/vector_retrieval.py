@@ -8,6 +8,19 @@ a caller could search another tenant's embeddings. Optional
 the caller's organization before ever reaching the repository, using the
 same indistinguishable-404 convention as Organization/Engagement
 (Sprint 3.5.1) and Document Processing.
+
+MVP Slice 3 (Organization Data Isolation): those two filter checks now
+use the tenant-scoped ``get_for_organization`` on each repository
+instead of an unscoped fetch followed by an in-memory comparison. The
+document check in particular collapses from three statements (load
+document, load its engagement, compare organizations) to one, because
+the ownership chain is resolved by the repository's SQL join -- the
+foreign row is never loaded into the process at all.
+
+Retrieval itself was already tenant-safe and is unchanged: the
+``organization_id`` predicate sits in the same ``WHERE`` clause as the
+pgvector ``ORDER BY ... <=> ...``, so cross-tenant rows are never
+candidates for ranking rather than being filtered out afterwards.
 """
 
 from typing import Sequence
@@ -63,19 +76,17 @@ class VectorRetrievalService:
             raise ValidationError(f"top_k must be between 1 and {_MAX_TOP_K}")
 
         if engagement_id is not None:
-            engagement = await self._engagement_repository.get(engagement_id)
-            if engagement is None or engagement.organization_id != organization_id:
+            engagement = await self._engagement_repository.get_for_organization(
+                engagement_id, organization_id=organization_id
+            )
+            if engagement is None:
                 raise NotFoundError(f"Engagement {engagement_id} not found")
 
         if document_id is not None:
-            document = await self._document_repository.get(document_id)
+            document = await self._document_repository.get_for_organization(
+                document_id, organization_id=organization_id
+            )
             if document is None:
-                raise NotFoundError(f"Document {document_id} not found")
-            document_engagement = await self._engagement_repository.get(document.engagement_id)
-            if (
-                document_engagement is None
-                or document_engagement.organization_id != organization_id
-            ):
                 raise NotFoundError(f"Document {document_id} not found")
             if engagement_id is not None and document.engagement_id != engagement_id:
                 raise ValidationError("document does not belong to the specified engagement")

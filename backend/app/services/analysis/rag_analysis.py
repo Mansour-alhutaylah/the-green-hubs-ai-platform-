@@ -24,6 +24,17 @@ No queue or worker exists yet (out of scope this sprint): every request
 processes synchronously within the API call. Stale-reclaim exists for
 the case where a *previous* request's process died mid-flight, leaving
 a PROCESSING row a later, identically-hashed request can safely resume.
+
+MVP Slice 3 (Organization Data Isolation): the caller's trusted
+``organization_id`` is threaded into every repository call this service
+makes, including the ones that previously addressed a run by bare id
+(``retry_failed``, ``reclaim_stale``, the three ``mark_*`` transitions,
+and ``get_citations``). ``analyze_document`` no longer walks the
+document -> engagement -> organization chain by hand either; it reads
+the Document through ``get_for_organization`` and takes
+``engagement_id`` from the row that lookup already proved is the
+caller's, which removes ``IEngagementRepository`` from that path
+entirely (``analyze_engagement`` still needs it, tenant-scoped).
 """
 
 from dataclasses import dataclass, field
@@ -170,18 +181,16 @@ class RagAnalysisService:
             raise AuthorizationError("User has no organization")
         organization_id = current_user.organization_id
 
-        document = await self._document_repository.get(document_id)
+        document = await self._document_repository.get_for_organization(
+            document_id, organization_id=organization_id
+        )
         if document is None:
             raise NotFoundError(f"Document {document_id} not found")
-        engagement = await self._engagement_repository.get(document.engagement_id)
-        if engagement is None or engagement.organization_id != organization_id:
-            raise NotFoundError(f"Document {document_id} not found")
-        assert engagement.id is not None
 
         return await self._run(
             current_user,
             organization_id=organization_id,
-            engagement_id=engagement.id,
+            engagement_id=document.engagement_id,
             document_id=document_id,
             analysis_type=analysis_type,
             query_text=query_text,
@@ -194,8 +203,10 @@ class RagAnalysisService:
             raise AuthorizationError("User has no organization")
         organization_id = current_user.organization_id
 
-        engagement = await self._engagement_repository.get(engagement_id)
-        if engagement is None or engagement.organization_id != organization_id:
+        engagement = await self._engagement_repository.get_for_organization(
+            engagement_id, organization_id=organization_id
+        )
+        if engagement is None:
             raise NotFoundError(f"Engagement {engagement_id} not found")
 
         return await self._run(
@@ -208,14 +219,15 @@ class RagAnalysisService:
         )
 
     async def get_run(self, current_user: User, analysis_run_id: UUID) -> AnalysisResultView:
-        if current_user.organization_id is None:
+        organization_id = current_user.organization_id
+        if organization_id is None:
             raise AuthorizationError("User has no organization")
         run = await self._analysis_run_repository.get_by_id(
-            analysis_run_id, organization_id=current_user.organization_id
+            analysis_run_id, organization_id=organization_id
         )
         if run is None:
             raise NotFoundError(f"Analysis run {analysis_run_id} not found")
-        return await self._to_view(run)
+        return await self._to_view(run, organization_id=organization_id)
 
     async def _run(
         self,
@@ -279,18 +291,25 @@ class RagAnalysisService:
             assert run.id is not None
             claimed_id: UUID = run.id
             if run.status in ("COMPLETED", "INSUFFICIENT_EVIDENCE"):
-                return await self._to_view(run)
+                return await self._to_view(run, organization_id=organization_id)
             if run.status == "FAILED":
-                retried = await self._analysis_run_repository.retry_failed(claimed_id)
+                retried = await self._analysis_run_repository.retry_failed(
+                    claimed_id, organization_id=organization_id
+                )
                 if retried is None:
-                    return await self._to_view(await self._refetch(claimed_id, organization_id))
+                    return await self._to_view(
+                        await self._refetch(claimed_id, organization_id),
+                        organization_id=organization_id,
+                    )
                 run = retried
             elif run.status == "PROCESSING":
                 reclaimed = await self._analysis_run_repository.reclaim_stale(
-                    claimed_id, stale_after_seconds=self._stale_after_seconds
+                    claimed_id,
+                    organization_id=organization_id,
+                    stale_after_seconds=self._stale_after_seconds,
                 )
                 if reclaimed is None:
-                    return await self._to_view(run)
+                    return await self._to_view(run, organization_id=organization_id)
                 run = reclaimed
 
         return await self._process(
@@ -322,9 +341,13 @@ class RagAnalysisService:
 
         if not relevant:
             await self._analysis_run_repository.mark_insufficient_evidence(
-                run.id, reason="No sufficiently relevant content was found for this request."
+                run.id,
+                organization_id=organization_id,
+                reason="No sufficiently relevant content was found for this request.",
             )
-            return await self._to_view(await self._refetch(run.id, organization_id))
+            return await self._to_view(
+                await self._refetch(run.id, organization_id), organization_id=organization_id
+            )
 
         source_map: dict[str, VectorSearchResult] = {
             f"SOURCE_{i}": result for i, result in enumerate(relevant, start=1)
@@ -347,33 +370,48 @@ class RagAnalysisService:
             )
         except LLMGatewayError as exc:
             await self._analysis_run_repository.mark_failed(
-                run.id, error_message=_safe_llm_error_message(exc)
+                run.id,
+                organization_id=organization_id,
+                error_message=_safe_llm_error_message(exc),
             )
-            return await self._to_view(await self._refetch(run.id, organization_id))
+            return await self._to_view(
+                await self._refetch(run.id, organization_id), organization_id=organization_id
+            )
 
         try:
             structured = StructuredAnalysisResult.model_validate(result.parsed)
         except PydanticValidationError:
             await self._analysis_run_repository.mark_failed(
-                run.id, error_message="Analysis provider returned a structurally invalid response"
+                run.id,
+                organization_id=organization_id,
+                error_message="Analysis provider returned a structurally invalid response",
             )
-            return await self._to_view(await self._refetch(run.id, organization_id))
+            return await self._to_view(
+                await self._refetch(run.id, organization_id), organization_id=organization_id
+            )
 
         referenced_keys = structured.all_source_keys()
         unknown_keys = referenced_keys - source_map.keys()
         if unknown_keys:
             await self._analysis_run_repository.mark_failed(
-                run.id, error_message="Analysis provider cited sources outside the assembled context"
+                run.id,
+                organization_id=organization_id,
+                error_message="Analysis provider cited sources outside the assembled context",
             )
-            return await self._to_view(await self._refetch(run.id, organization_id))
+            return await self._to_view(
+                await self._refetch(run.id, organization_id), organization_id=organization_id
+            )
 
         if structured.evidence_status == "insufficient":
             await self._analysis_run_repository.mark_insufficient_evidence(
                 run.id,
+                organization_id=organization_id,
                 reason=structured.insufficient_evidence_reason
                 or "The model determined available evidence was insufficient.",
             )
-            return await self._to_view(await self._refetch(run.id, organization_id))
+            return await self._to_view(
+                await self._refetch(run.id, organization_id), organization_id=organization_id
+            )
 
         new_citations = [
             NewCitation(
@@ -391,19 +429,29 @@ class RagAnalysisService:
         )
         await self._analysis_run_repository.mark_completed(
             run.id,
+            organization_id=organization_id,
             structured_output=structured.model_dump(),
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
             total_tokens=result.total_tokens,
             estimated_cost=None,
         )
-        return await self._to_view(await self._refetch(run.id, organization_id))
+        return await self._to_view(
+            await self._refetch(run.id, organization_id), organization_id=organization_id
+        )
 
-    async def _to_view(self, run: AnalysisRun) -> AnalysisResultView:
+    async def _to_view(self, run: AnalysisRun, *, organization_id: UUID) -> AnalysisResultView:
+        # `organization_id` is the caller's trusted scope, deliberately
+        # passed in rather than read off `run.organization_id`: the view
+        # assembly must not derive its own authority from the row it is
+        # rendering, or a run that reached here by some future unscoped
+        # path would authorize its own citation read.
         assert run.id is not None
         citations: Sequence[AnalysisSourceReference] = []
         if run.status == "COMPLETED":
-            citations = await self._analysis_run_repository.get_citations(run.id)
+            citations = await self._analysis_run_repository.get_citations(
+                run.id, organization_id=organization_id
+            )
 
         citation_by_order = {c.citation_order: c for c in citations}
         safe_structured = (

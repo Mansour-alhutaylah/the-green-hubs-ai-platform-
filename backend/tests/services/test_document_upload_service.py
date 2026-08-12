@@ -32,11 +32,7 @@ class FakeDocumentRepository(IDocumentRepository):
         self.rows: dict[uuid.UUID, Document] = {}
         self.create_error: Exception | None = None
 
-    async def get(self, entity_id: uuid.UUID) -> Document | None:
-        return self.rows.get(entity_id)
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        return list(self.rows.values())[offset : offset + limit]
 
     async def create(self, entity: Document) -> Document:
         if self.create_error is not None:
@@ -50,16 +46,29 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity: Document) -> None:
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id: uuid.UUID) -> Sequence[Document]:
+    async def get_for_organization(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document | None:
+        raise NotImplementedError
+
+    async def get_by_engagement(
+        self, engagement_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[Document]:
         return [d for d in self.rows.values() if d.engagement_id == engagement_id]
 
-    async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
+    async def update_status(
+        self, document_id: uuid.UUID, status: str, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+    async def begin_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+    async def complete_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
     async def get_read_model_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
@@ -80,8 +89,6 @@ class FakeEngagementRepository(IEngagementRepository):
         assert engagement.id is not None
         self._rows[engagement.id] = engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self._rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -239,26 +246,44 @@ async def test_user_without_organization_raises_authorization_error(
         await service.upload(_upload_input(engagement.id), current_user=user)  # type: ignore[arg-type]
 
 
-async def test_engagement_without_organization_raises_authorization_error(
+async def test_engagement_without_organization_raises_not_found(
     service: DocumentUploadService, engagement_repository: FakeEngagementRepository
 ) -> None:
+    """Fail closed: an Engagement owned by nobody matches no tenant scope,
+    so it reads as not found rather than as a distinct 403."""
+
     engagement = _engagement(None)
     engagement_repository.seed(engagement)
     user = _user(uuid.uuid4())
 
-    with pytest.raises(AuthorizationError):
+    with pytest.raises(NotFoundError):
         await service.upload(_upload_input(engagement.id), current_user=user)  # type: ignore[arg-type]
 
 
-async def test_organization_mismatch_raises_authorization_error(
-    service: DocumentUploadService, engagement_repository: FakeEngagementRepository
+async def test_organization_mismatch_raises_not_found_not_authorization_error(
+    service: DocumentUploadService,
+    engagement_repository: FakeEngagementRepository,
+    storage: FakeDocumentStorage,
+    document_repository: FakeDocumentRepository,
 ) -> None:
+    """MVP Slice 3: a real Engagement UUID from another organization must
+    be indistinguishable from one that does not exist.
+
+    Previously this raised ``AuthorizationError`` (403) while
+    ``test_missing_engagement_raises_not_found`` above raised 404, so the
+    pair of responses told a caller which foreign Engagement UUIDs were
+    real. Both are 404 now, and nothing is written on the way out.
+    """
+
     engagement = _engagement(uuid.uuid4())
     engagement_repository.seed(engagement)
-    user = _user(uuid.uuid4())  # a different organization
+    attacker = _user(uuid.uuid4())  # a different organization
 
-    with pytest.raises(AuthorizationError):
-        await service.upload(_upload_input(engagement.id), current_user=user)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await service.upload(_upload_input(engagement.id), current_user=attacker)  # type: ignore[arg-type]
+
+    assert storage.put_calls == []
+    assert document_repository.rows == {}
 
 
 async def test_invalid_filename_raises_validation_error(

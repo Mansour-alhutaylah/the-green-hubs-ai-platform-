@@ -9,7 +9,6 @@ dependency chain and endpoint contract.
 
 import datetime
 import uuid
-from typing import Sequence
 
 import pytest
 from httpx import AsyncClient
@@ -31,11 +30,9 @@ class FakeUserRepository(IUserRepository):
     def remove(self, user_id: uuid.UUID) -> None:
         self._rows.pop(user_id, None)
 
-    async def get(self, entity_id: uuid.UUID) -> User | None:
-        return self._rows.get(entity_id)
+    async def get_by_authenticated_id(self, user_id: uuid.UUID) -> User | None:
+        return self._rows.get(user_id)
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[User]:
-        return list(self._rows.values())[offset : offset + limit]
 
     async def create(self, entity: User) -> User:
         raise NotImplementedError

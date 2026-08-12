@@ -19,8 +19,18 @@ from sqlalchemy.pool import NullPool
 
 TEST_DATABASE_MARKER = "GH_SIP_DISPOSABLE_TEST_DB_DO_NOT_CREATE_ELSEWHERE"
 TEST_DATABASE_MARKER_TABLE = "gh_disposable_test_database"
-EXPECTED_ALEMBIC_HEAD = "da0298a9c722"
-EXPECTED_EXISTING_INTEGRATION_CASES = 144
+EXPECTED_ALEMBIC_HEAD = "a4f1c9d2e7b3"
+# Raised from 144 by MVP Slice 3 (Organization Data Isolation): 23 cases in
+# tests/api/test_organization_data_isolation_integration.py plus 7 added to
+# the existing repository suites, all cross-tenant negatives -- 174.
+#
+# The Slice 3 closure then netted +3 for 177: +4 in the isolation module
+# (organization enumeration, user enumeration, the authentication bootstrap,
+# and its fail-closed unprovisioned case), +2 structural checks proving the
+# Document and Engagement repositories expose no unscoped read, and -3 in
+# test_organization_repository.py, where four tests exercising the removed
+# global list()/count() are replaced by one asserting they no longer exist.
+EXPECTED_EXISTING_INTEGRATION_CASES = 177
 REQUIRED_DATABASE_SUFFIX = "_test"
 
 LOCAL_TEST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "test-postgres"})

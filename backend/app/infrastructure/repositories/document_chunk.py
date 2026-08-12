@@ -6,6 +6,12 @@ transaction-ownership rationale. Bulk-inserts via ``session.add_all``,
 a single round-trip rather than one commit per chunk. A
 unique-constraint violation (duplicate ``(document_id, chunk_index)``)
 is mapped to ``PersistenceError`` rather than a raw DB exception.
+
+MVP Slice 3 (Organization Data Isolation): ``get_by_document`` joins the
+full ``document_chunks -> documents -> engagements`` chain so the
+caller's ``organization_id`` constrains the same query that selects the
+rows. Chunk ``content`` is verbatim document text, so this read is a
+direct-disclosure path, not merely a metadata one.
 """
 
 from typing import Sequence
@@ -18,7 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import PersistenceError
 from app.domain.entities.document_chunk import DocumentChunk
 from app.domain.repositories.document_chunk import IDocumentChunkRepository
+from app.infrastructure.db.models.document import DocumentModel
 from app.infrastructure.db.models.document_chunk import DocumentChunkModel
+from app.infrastructure.db.models.engagement import Engagement as EngagementModel
 
 
 def _to_domain(model: DocumentChunkModel) -> DocumentChunk:
@@ -57,10 +65,17 @@ class SQLAlchemyDocumentChunkRepository(IDocumentChunkRepository):
             raise PersistenceError("Unable to persist document chunks") from exc
         return [_to_domain(model) for model in models]
 
-    async def get_by_document(self, document_id: UUID) -> Sequence[DocumentChunk]:
+    async def get_by_document(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> Sequence[DocumentChunk]:
         stmt = (
             select(DocumentChunkModel)
-            .where(DocumentChunkModel.document_id == document_id)
+            .join(DocumentModel, DocumentModel.id == DocumentChunkModel.document_id)
+            .join(EngagementModel, EngagementModel.id == DocumentModel.engagement_id)
+            .where(
+                DocumentChunkModel.document_id == document_id,
+                EngagementModel.organization_id == organization_id,
+            )
             .order_by(DocumentChunkModel.chunk_index.asc())
         )
         result = await self._session.execute(stmt)

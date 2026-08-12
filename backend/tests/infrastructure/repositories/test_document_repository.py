@@ -131,6 +131,26 @@ async def engagement_id(make_engagement: Callable[[], Awaitable[uuid.UUID]]) -> 
     return await make_engagement()
 
 
+async def _organization_of_engagement(engagement_id: uuid.UUID) -> uuid.UUID:
+    """The organization that owns ``engagement_id``.
+
+    MVP Slice 3 made ``organization_id`` mandatory on the tenant-scoped
+    Document methods; ``documents`` has no such column of its own, so the
+    scope is resolved from the engagement, exactly as the repository's SQL
+    join does."""
+
+    async with AsyncSessionLocal() as session:
+        engagement = await session.get(Engagement, engagement_id)
+        assert engagement is not None
+        assert engagement.organization_id is not None
+        return engagement.organization_id
+
+
+@pytest.fixture
+async def organization_id(engagement_id: uuid.UUID) -> uuid.UUID:
+    return await _organization_of_engagement(engagement_id)
+
+
 @pytest.fixture
 async def cleanup_ids(
     make_engagement: Callable[[], Awaitable[uuid.UUID]],
@@ -208,15 +228,18 @@ async def test_new_row_defaults_processing_status_at_schema_level(
 # ---------------------------------------------------------------------------
 
 
-async def test_get_retrieves_by_id(
+async def test_get_for_organization_retrieves_by_id(
     repository: SQLAlchemyDocumentRepository,
     cleanup_ids: list[uuid.UUID],
     engagement_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     created = await repository.create(_make_document(engagement_id=engagement_id))
     cleanup_ids.append(created.id)
 
-    fetched = await repository.get(created.id)
+    fetched = await repository.get_for_organization(
+        created.id, organization_id=organization_id
+    )
 
     assert fetched is not None
     assert isinstance(fetched, Document)
@@ -224,10 +247,27 @@ async def test_get_retrieves_by_id(
     assert fetched.filename == created.filename
 
 
-async def test_get_returns_none_for_missing_id(
+async def test_get_for_organization_returns_none_for_missing_id(
     repository: SQLAlchemyDocumentRepository,
 ) -> None:
-    assert await repository.get(uuid.uuid4()) is None
+    assert (
+        await repository.get_for_organization(
+            uuid.uuid4(), organization_id=uuid.uuid4()
+        )
+        is None
+    )
+
+
+async def test_the_repository_offers_no_unscoped_read(
+    repository: SQLAlchemyDocumentRepository,
+) -> None:
+    """MVP Slice 3 closure: the inherited unscoped ``get``/``list`` are
+    gone, so a cross-tenant Document id cannot be resolved and the table
+    cannot be enumerated by any method here."""
+
+    assert not hasattr(repository, "get")
+    assert not hasattr(repository, "list")
+    assert hasattr(repository, "get_for_organization")
 
 
 async def test_get_by_engagement_returns_only_matching_documents(
@@ -237,17 +277,27 @@ async def test_get_by_engagement_returns_only_matching_documents(
 ) -> None:
     engagement_id = await make_engagement()
     other_engagement_id = await make_engagement()
+    organization_id = await _organization_of_engagement(engagement_id)
 
     first = await repository.create(_make_document(engagement_id=engagement_id))
     second = await repository.create(_make_document(engagement_id=engagement_id))
     unrelated = await repository.create(_make_document(engagement_id=other_engagement_id))
     cleanup_ids.extend([first.id, second.id, unrelated.id])
 
-    results = await repository.get_by_engagement(engagement_id)
+    results = await repository.get_by_engagement(
+        engagement_id, organization_id=organization_id
+    )
 
     assert {d.id for d in results} == {first.id, second.id}
     assert all(isinstance(d, Document) for d in results)
     assert all(d.engagement_id == engagement_id for d in results)
+
+    # `make_engagement` gives each engagement its own organization, so
+    # `other_engagement_id` is genuinely a different tenant's -- asking for
+    # it under this organization's scope must yield nothing.
+    assert await repository.get_by_engagement(
+        other_engagement_id, organization_id=organization_id
+    ) == []
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +310,7 @@ async def test_update_status_changes_status_and_bumps_updated_at(
     session: AsyncSession,
     cleanup_ids: list[uuid.UUID],
     engagement_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     created = await repository.create(
         _make_document(processing_status="PENDING", engagement_id=engagement_id)
@@ -273,7 +324,9 @@ async def test_update_status_changes_status_and_bumps_updated_at(
     # Guarantee the next transaction's `now()` differs from the first's.
     await asyncio.sleep(0.05)
 
-    updated = await repository.update_status(created.id, "PROCESSED")
+    updated = await repository.update_status(
+        created.id, "PROCESSED", organization_id=organization_id
+    )
 
     assert isinstance(updated, Document)
     assert not isinstance(updated, DocumentModel)
@@ -290,7 +343,62 @@ async def test_update_status_raises_not_found_for_missing_document(
     repository: SQLAlchemyDocumentRepository,
 ) -> None:
     with pytest.raises(NotFoundError):
-        await repository.update_status(uuid.uuid4(), "PROCESSED")
+        await repository.update_status(
+            uuid.uuid4(), "PROCESSED", organization_id=uuid.uuid4()
+        )
+
+
+async def test_update_status_never_writes_another_organizations_document(
+    repository: SQLAlchemyDocumentRepository,
+    cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
+) -> None:
+    """A real document id under a foreign organization raises the same
+    ``NotFoundError`` an unknown id does, and writes nothing."""
+
+    created = await repository.create(
+        _make_document(processing_status="PENDING", engagement_id=engagement_id)
+    )
+    cleanup_ids.append(created.id)
+
+    with pytest.raises(NotFoundError):
+        await repository.update_status(
+            created.id, "PROCESSED", organization_id=uuid.uuid4()
+        )
+
+    async with AsyncSessionLocal() as verify_session:
+        after = await verify_session.get(DocumentModel, created.id)
+        assert after is not None
+        assert after.processing_status == "PENDING"  # untouched
+
+
+async def test_get_for_organization_scopes_by_the_engagements_owner(
+    repository: SQLAlchemyDocumentRepository,
+    cleanup_ids: list[uuid.UUID],
+    engagement_id: uuid.UUID,
+    organization_id: uuid.UUID,
+) -> None:
+    """The core Slice 3 read: same real id, two different scopes."""
+
+    created = await repository.create(_make_document(engagement_id=engagement_id))
+    cleanup_ids.append(created.id)
+
+    owned = await repository.get_for_organization(
+        created.id, organization_id=organization_id
+    )
+    foreign = await repository.get_for_organization(
+        created.id, organization_id=uuid.uuid4()
+    )
+
+    assert owned is not None
+    assert owned.id == created.id
+    assert isinstance(owned, Document)
+    assert not isinstance(owned, DocumentModel)
+    # Indistinguishable from an id that does not exist at all.
+    assert foreign is None
+    assert await repository.get_for_organization(
+        uuid.uuid4(), organization_id=organization_id
+    ) is None
 
 
 # ---------------------------------------------------------------------------
@@ -301,12 +409,18 @@ async def test_update_status_raises_not_found_for_missing_document(
 async def test_delete_removes_the_record(
     repository: SQLAlchemyDocumentRepository,
     engagement_id: uuid.UUID,
+    organization_id: uuid.UUID,
 ) -> None:
     created = await repository.create(_make_document(engagement_id=engagement_id))
 
     await repository.delete(created)
 
-    assert await repository.get(created.id) is None
+    assert (
+        await repository.get_for_organization(
+            created.id, organization_id=organization_id
+        )
+        is None
+    )
     async with AsyncSessionLocal() as verify_session:
         assert await verify_session.get(DocumentModel, created.id) is None
 

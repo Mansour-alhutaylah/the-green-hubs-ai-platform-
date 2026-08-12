@@ -224,13 +224,22 @@ async def test_authenticated_upload_for_matching_organization_persists_document(
         assert fake_storage.objects[model.storage_path] == PDF_BYTES
 
 
-async def test_forbidden_upload_for_different_organization_creates_no_document(
+async def test_upload_for_different_organization_returns_404_and_creates_no_document(
     client: AsyncClient,
     keypair,
     real_verifier: SupabaseJWTVerifier,
     fake_storage: FakeDocumentStorage,
     cleanup_ids: dict[str, list[uuid.UUID]],
 ) -> None:
+    """MVP Slice 3: a real Engagement UUID from another organization is
+    rejected as 404, not 403.
+
+    Compare ``test_upload_for_missing_engagement_returns_404`` directly
+    below: the two responses are now identical, so a caller cannot use the
+    status code to learn that a foreign Engagement UUID is real. Before
+    this slice this case returned 403 and that one returned 404.
+    """
+
     private_key, _public_key = keypair
     _organization_id, engagement_id, _profile_id = await _make_organization_engagement_and_profile(
         cleanup_ids
@@ -273,7 +282,7 @@ async def test_forbidden_upload_for_different_organization_creates_no_document(
         files={"file": ("sustainability-report.pdf", PDF_BYTES, "application/pdf")},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
     assert fake_storage.objects == {}  # nothing was ever stored
 
     async with AsyncSessionLocal() as verify_session:

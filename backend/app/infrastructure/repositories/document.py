@@ -1,13 +1,16 @@
 """Concrete async repository for the ``Document`` aggregate.
 
-Implements ``IDocumentRepository`` directly rather than subclassing the
-generic ``SQLAlchemyRepository`` in this package: that generic class hands
-back whatever ``ModelType`` it is parameterized with straight from the
-session, which is only correct when the ORM model itself is what callers
-expect. Here, callers expect the pure ``Document`` domain entity, so every
-method maps explicitly between ``DocumentModel`` (ORM) and ``Document``
-(domain) via ``_to_domain`` -- the ORM type never crosses the repository
-boundary.
+Implements ``IDocumentRepository`` directly: callers expect the pure
+``Document`` domain entity, so every method maps explicitly between
+``DocumentModel`` (ORM) and ``Document`` (domain) via ``_to_domain`` --
+the ORM type never crosses the repository boundary.
+
+MVP Slice 3 closure: this class has **no unscoped ``get`` or ``list``**.
+Both were inherited from the old generic ``IRepository`` contract and both
+returned rows regardless of owner; ``get_for_organization`` and the
+tenant-scoped read-model queries are now the only ways to read a Document,
+so a cross-tenant id cannot be resolved to a row by any method this class
+offers.
 
 ``create()`` distinguishes two real constraint-violation causes (Sprint
 3.4, Document Upload Foundation): a foreign-key violation on
@@ -20,6 +23,15 @@ had it observed the deletion in time. A unique-constraint violation on
 mapping is done here, in the SQL-aware repository layer, specifically so
 the service layer never needs to import SQLAlchemy or asyncpg to
 distinguish these cases.
+
+MVP Slice 3 (Organization Data Isolation): ``documents`` has no
+``organization_id`` column, so ownership is the join
+``documents.engagement_id -> engagements.organization_id``. That join is
+written once, in ``_tenant_scoped_select``, and reused by every read;
+the write paths use ``_is_owned_by`` to carry the same predicate inside
+the mutating statement itself (an ``UPDATE`` cannot portably join).
+Nothing in this class compares organizations in Python after the fact --
+if a row is not the caller's, the SQL simply does not return or touch it.
 
 ``begin_processing()`` (Sprint 3.5) is the sole mechanism preventing two
 concurrent requests from both claiming the same Document: a single
@@ -77,6 +89,7 @@ from app.domain.entities.document import Document
 from app.domain.entities.document_read_model import AnalysisSummary, DocumentReadModel, EmbeddingSummary
 from app.domain.repositories.document import IDocumentRepository
 from app.infrastructure.db.models.document import DocumentModel
+from app.infrastructure.db.models.engagement import Engagement as EngagementModel
 
 _READ_MODEL_COLUMNS = """
     d.id AS id,
@@ -227,15 +240,6 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get(self, entity_id: UUID) -> Document | None:
-        model = await self._session.get(DocumentModel, entity_id)
-        return _to_domain(model) if model is not None else None
-
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        stmt = select(DocumentModel).limit(limit).offset(offset)
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars().all()]
-
     async def create(self, entity: Document) -> Document:
         model = DocumentModel(
             id=entity.id,
@@ -271,24 +275,101 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
             await self._session.delete(model)
             await self._session.commit()
 
-    async def get_by_engagement(self, engagement_id: UUID) -> Sequence[Document]:
-        stmt = select(DocumentModel).where(DocumentModel.engagement_id == engagement_id)
+    async def _get_owned_model(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> DocumentModel:
+        """Load a Document ORM row that this organization actually owns.
+
+        Returns the ORM instance (not the domain entity) because the two
+        callers mutate it and let the session flush the change -- and
+        raises the same ``NotFoundError`` for a cross-tenant id as for an
+        unknown one, so neither write path is an existence oracle."""
+
+        result = await self._session.execute(
+            self._tenant_scoped_select(organization_id=organization_id).where(
+                DocumentModel.id == document_id
+            )
+        )
+        model = result.scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Document {document_id} not found")
+        return model
+
+    def _tenant_scoped_select(self, *, organization_id: UUID):
+        """A ``SELECT ... FROM documents JOIN engagements`` already
+        narrowed to one organization.
+
+        ``documents`` has no ``organization_id`` column, so this join is
+        the ownership chain -- expressed once here and reused by every
+        tenant-scoped method below, rather than restated (and eventually
+        forgotten) at each call site."""
+
+        return select(DocumentModel).join(
+            EngagementModel,
+            EngagementModel.id == DocumentModel.engagement_id,
+        ).where(EngagementModel.organization_id == organization_id)
+
+    def _is_owned_by(self, *, organization_id: UUID):
+        """Correlated ``EXISTS`` proving the row under UPDATE belongs to
+        ``organization_id``.
+
+        Written as ``EXISTS (... WHERE e.id = documents.engagement_id AND
+        e.organization_id = :org)`` rather than ``engagement_id IN (SELECT
+        id FROM engagements WHERE organization_id = :org)``: correlating on
+        ``e.id`` lets Postgres satisfy the subquery with a primary-key
+        lookup of the single relevant engagement, whereas the ``IN`` form
+        makes it materialize every engagement the organization owns first.
+        Both are equally safe; this one does not degrade as the
+        ``engagements`` table grows across tenants.
+
+        An UPDATE cannot portably carry a JOIN, which is why the write
+        paths use this instead of ``_tenant_scoped_select``."""
+
+        return (
+            select(EngagementModel.id)
+            .where(
+                EngagementModel.id == DocumentModel.engagement_id,
+                EngagementModel.organization_id == organization_id,
+            )
+            .exists()
+        )
+
+    async def get_for_organization(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> Document | None:
+        stmt = self._tenant_scoped_select(organization_id=organization_id).where(
+            DocumentModel.id == document_id
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return _to_domain(model) if model is not None else None
+
+    async def get_by_engagement(
+        self, engagement_id: UUID, *, organization_id: UUID
+    ) -> Sequence[Document]:
+        stmt = self._tenant_scoped_select(organization_id=organization_id).where(
+            DocumentModel.engagement_id == engagement_id
+        )
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars().all()]
 
-    async def update_status(self, document_id: UUID, status: str) -> Document:
-        model = await self._session.get(DocumentModel, document_id)
-        if model is None:
-            raise NotFoundError(f"Document {document_id} not found")
+    async def update_status(
+        self, document_id: UUID, status: str, *, organization_id: UUID
+    ) -> Document:
+        model = await self._get_owned_model(document_id, organization_id=organization_id)
         model.processing_status = status
         await self._session.commit()
         await self._session.refresh(model)
         return _to_domain(model)
 
-    async def begin_processing(self, document_id: UUID) -> Document:
+    async def begin_processing(self, document_id: UUID, *, organization_id: UUID) -> Document:
         stmt = (
             update(DocumentModel)
-            .where(DocumentModel.id == document_id, DocumentModel.processing_status == "PENDING")
+            .where(
+                DocumentModel.id == document_id,
+                DocumentModel.processing_status == "PENDING",
+                self._is_owned_by(organization_id=organization_id),
+            )
             .values(processing_status="PROCESSING")
             .returning(DocumentModel)
         )
@@ -298,19 +379,28 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         if model is not None:
             return _to_domain(model)
 
-        existing = await self._session.get(DocumentModel, document_id)
-        if existing is None:
+        # Zero rows matched for one of three reasons: no such document,
+        # a document owned by another organization, or the caller's own
+        # document in a non-PENDING state. Only the third may be
+        # disclosed, so the disambiguating re-read is itself
+        # tenant-scoped -- the first two therefore collapse into the
+        # same NotFoundError a wholly unknown UUID produces.
+        existing = await self._session.execute(
+            self._tenant_scoped_select(organization_id=organization_id).where(
+                DocumentModel.id == document_id
+            )
+        )
+        owned = existing.scalar_one_or_none()
+        if owned is None:
             raise NotFoundError(f"Document {document_id} not found")
         message = _STATE_TRANSITION_MESSAGES.get(
-            existing.processing_status,
-            f"Document is not in a PENDING state (current state: {existing.processing_status}).",
+            owned.processing_status,
+            f"Document is not in a PENDING state (current state: {owned.processing_status}).",
         )
         raise InvalidStateTransitionError(message)
 
-    async def complete_processing(self, document_id: UUID) -> Document:
-        model = await self._session.get(DocumentModel, document_id)
-        if model is None:
-            raise NotFoundError(f"Document {document_id} not found")
+    async def complete_processing(self, document_id: UUID, *, organization_id: UUID) -> Document:
+        model = await self._get_owned_model(document_id, organization_id=organization_id)
         model.processing_status = "PROCESSED"
         await self._session.flush()
         # `updated_at`'s `onupdate=func.now()` is a server-evaluated SQL

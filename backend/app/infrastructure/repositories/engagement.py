@@ -13,13 +13,17 @@ beyond the plain foreign-key column already present on ``EngagementModel``
 exposed through ``EngagementService`` or any route this sprint -- it
 exists solely so integration tests can remove the exact rows they create.
 
-Sprint 3.5.1 (Tenant Isolation & API Security): ``get``/``update`` (both
-inherited from ``IRepository``) remain unscoped and are kept only to
-satisfy that contract and for test cleanup -- ``EngagementService`` must
-never call them. ``get_for_organization``/``update_for_organization``
-are the tenant-scoped methods the service actually uses; both enforce
+Sprint 3.5.1 (Tenant Isolation & API Security) introduced
+``get_for_organization``/``update_for_organization``, which enforce
 ``organization_id`` as part of the same SQL predicate used to locate the
-row, not a separate check performed after an unscoped fetch.
+row rather than as a check performed after an unscoped fetch.
+
+MVP Slice 3 closure removed the unscoped counterparts entirely: there is
+no ``get`` here any more, and ``list``'s ``organization_id`` is mandatory
+rather than optional (the Liskov constraint that forced it optional
+disappeared when ``IRepository`` dropped ``get``/``list`` -- see that
+module). ``update``/``delete`` remain for contract completeness and test
+cleanup; they operate on an Engagement the caller must already hold.
 """
 
 from typing import Sequence
@@ -50,21 +54,16 @@ class SQLAlchemyEngagementRepository(IEngagementRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get(self, entity_id: UUID) -> Engagement | None:
-        model = await self._session.get(EngagementModel, entity_id)
-        return _to_domain(model) if model is not None else None
-
     async def list(
-        self, *, limit: int = 100, offset: int = 0, organization_id: UUID | None = None
+        self, *, organization_id: UUID, limit: int = 100, offset: int = 0
     ) -> Sequence[Engagement]:
         stmt = (
             select(EngagementModel)
+            .where(EngagementModel.organization_id == organization_id)
             .order_by(EngagementModel.created_at.asc(), EngagementModel.id.asc())
             .limit(limit)
             .offset(offset)
         )
-        if organization_id is not None:
-            stmt = stmt.where(EngagementModel.organization_id == organization_id)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars().all()]
 

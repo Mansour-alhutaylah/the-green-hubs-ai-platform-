@@ -67,17 +67,17 @@ VALID_STRUCTURED_OUTPUT = {
 
 
 class FakeDocumentRepository(IDocumentRepository):
-    def __init__(self) -> None:
+    """Models the real ``documents -> engagements`` ownership join, so a
+    foreign ``document_id`` genuinely resolves to nothing here too."""
+
+    def __init__(self, engagements: "FakeEngagementRepository") -> None:
         self.rows: dict[uuid.UUID, Document] = {}
+        self._engagements = engagements
 
     def seed(self, document: Document) -> None:
         self.rows[document.id] = document
 
-    async def get(self, entity_id: uuid.UUID) -> Document | None:
-        return self.rows.get(entity_id)
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        return list(self.rows.values())
 
     async def create(self, entity: Document) -> Document:
         raise NotImplementedError
@@ -88,16 +88,35 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity: Document) -> None:
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id: uuid.UUID) -> Sequence[Document]:
+    async def get_for_organization(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document | None:
+        document = self.rows.get(document_id)
+        if document is None:
+            return None
+        engagement = self._engagements.rows.get(document.engagement_id)
+        if engagement is None or engagement.organization_id != organization_id:
+            return None
+        return document
+
+    async def get_by_engagement(
+        self, engagement_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[Document]:
         return [d for d in self.rows.values() if d.engagement_id == engagement_id]
 
-    async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
+    async def update_status(
+        self, document_id: uuid.UUID, status: str, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+    async def begin_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+    async def complete_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
     async def get_read_model_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
@@ -118,8 +137,6 @@ class FakeEngagementRepository(IEngagementRepository):
         assert engagement.id is not None
         self.rows[engagement.id] = engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self.rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -286,9 +303,11 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
             return None
         return run
 
-    async def retry_failed(self, analysis_run_id: uuid.UUID) -> AnalysisRun | None:
+    async def retry_failed(
+        self, analysis_run_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> AnalysisRun | None:
         run = self.runs.get(analysis_run_id)
-        if run is None or run.status != "FAILED":
+        if run is None or run.organization_id != organization_id or run.status != "FAILED":
             return None
         run.status = "PROCESSING"
         run.processing_started_at = datetime.now(timezone.utc)
@@ -299,10 +318,10 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
         return run
 
     async def reclaim_stale(
-        self, analysis_run_id: uuid.UUID, *, stale_after_seconds: int
+        self, analysis_run_id: uuid.UUID, *, organization_id: uuid.UUID, stale_after_seconds: int
     ) -> AnalysisRun | None:
         run = self.runs.get(analysis_run_id)
-        if run is None or run.status != "PROCESSING":
+        if run is None or run.organization_id != organization_id or run.status != "PROCESSING":
             return None
         assert run.processing_started_at is not None
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=stale_after_seconds)
@@ -317,6 +336,7 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
         self,
         analysis_run_id: uuid.UUID,
         *,
+        organization_id: uuid.UUID,
         structured_output: dict,
         prompt_tokens: int | None,
         completion_tokens: int | None,
@@ -324,7 +344,7 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
         estimated_cost: Decimal | None,
     ) -> None:
         run = self.runs[analysis_run_id]
-        if run.status != "PROCESSING":
+        if run.organization_id != organization_id or run.status != "PROCESSING":
             return
         run.status = "COMPLETED"
         run.structured_output = structured_output
@@ -336,18 +356,22 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
         run.completed_at = datetime.now(timezone.utc)
         run.updated_at = datetime.now(timezone.utc)
 
-    async def mark_failed(self, analysis_run_id: uuid.UUID, *, error_message: str) -> None:
+    async def mark_failed(
+        self, analysis_run_id: uuid.UUID, *, organization_id: uuid.UUID, error_message: str
+    ) -> None:
         run = self.runs[analysis_run_id]
-        if run.status != "PROCESSING":
+        if run.organization_id != organization_id or run.status != "PROCESSING":
             return
         run.status = "FAILED"
         run.error_message = error_message
         run.structured_output = None
         run.updated_at = datetime.now(timezone.utc)
 
-    async def mark_insufficient_evidence(self, analysis_run_id: uuid.UUID, *, reason: str) -> None:
+    async def mark_insufficient_evidence(
+        self, analysis_run_id: uuid.UUID, *, organization_id: uuid.UUID, reason: str
+    ) -> None:
         run = self.runs[analysis_run_id]
-        if run.status != "PROCESSING":
+        if run.organization_id != organization_id or run.status != "PROCESSING":
             return
         run.status = "INSUFFICIENT_EVIDENCE"
         run.insufficient_evidence_reason = reason
@@ -388,10 +412,15 @@ class FakeAnalysisRunRepository(IAnalysisRunRepository):
         return inserted
 
     async def get_citations(
-        self, analysis_run_id: uuid.UUID
+        self, analysis_run_id: uuid.UUID, *, organization_id: uuid.UUID
     ) -> Sequence[AnalysisSourceReference]:
         return sorted(
-            self.citations.get(analysis_run_id, []), key=lambda c: c.citation_order
+            [
+                c
+                for c in self.citations.get(analysis_run_id, [])
+                if c.organization_id == organization_id
+            ],
+            key=lambda c: c.citation_order,
         )
 
     async def delete(self, entity: AnalysisRun) -> None:
@@ -454,8 +483,8 @@ def _search_result(
 
 class Harness:
     def __init__(self) -> None:
-        self.document_repository = FakeDocumentRepository()
         self.engagement_repository = FakeEngagementRepository()
+        self.document_repository = FakeDocumentRepository(self.engagement_repository)
         self.embedding_repository = FakeDocumentChunkEmbeddingRepository()
         self.embedding_provider = FakeEmbeddingProvider()
         self.vector_retrieval_service = VectorRetrievalService(

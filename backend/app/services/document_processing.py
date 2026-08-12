@@ -2,18 +2,37 @@
 persisted extracted text and chunks, ready for future AI processing.
 
 Deliberately framework-independent: no FastAPI import anywhere in this
-module. Depends only on repository/storage/unit-of-work interfaces,
-mirroring ``DocumentUploadService``'s exact shape -- Engagement
-existence and organization-match authorization is checked here via
-``IEngagementRepository`` directly (never ``EngagementService``), so
-neither it nor ``OrganizationService`` needs any redesign.
+module. Depends only on repository/storage/unit-of-work interfaces.
 
-Pipeline: load Document -> load Engagement -> authorize -> atomically
-claim PENDING (``begin_processing``, its own immediately-committed
-transaction) -> retrieve PDF bytes from storage -> write a secure OS
-temp file -> extract text (existing, unmodified extractor) ->
-conservatively normalize -> chunk (existing, unmodified chunker) ->
-persist extracted_text + chunks + PROCESSED status in one transaction
+MVP Slice 3 (Organization Data Isolation) changed how the tenant
+boundary is enforced here. Previously this service loaded the Document
+unscoped, loaded its Engagement unscoped, and compared
+``engagement.organization_id`` to ``current_user.organization_id`` in
+Python -- then performed three further writes (``begin_processing``,
+``update_status``, ``complete_processing``) addressed by document id
+alone. Two consequences were fixed:
+
+* the mismatch raised ``AuthorizationError`` (403) while a nonexistent
+  document raised ``NotFoundError`` (404), so an attacker holding a
+  valid Document UUID could tell another organization's document apart
+  from a made-up one. Both now return 404, matching the
+  indistinguishable-not-found convention Sprint 3.5.1 established for
+  Organization/Engagement and Sprint 3.6A adopted for embeddings;
+* the tenant predicate now lives in each statement (see
+  ``IDocumentRepository``), so no write can address a row outside the
+  caller's organization even if reached by a future code path that
+  forgets to check first.
+
+``IEngagementRepository`` is no longer a dependency of this service: the
+ownership chain it was used to walk by hand is now resolved by the
+repository's own SQL join.
+
+Pipeline: load Document tenant-scoped -> atomically claim PENDING
+(``begin_processing``, its own immediately-committed transaction) ->
+retrieve PDF bytes from storage -> write a secure OS temp file ->
+extract text (existing, unmodified extractor) -> conservatively
+normalize -> chunk (existing, unmodified chunker) -> persist
+extracted_text + chunks + PROCESSED status in one transaction
 (``IProcessingUnitOfWork``) -> return the persisted Document.
 
 On any failure after the claim: the processing transaction is rolled
@@ -47,7 +66,6 @@ from app.domain.entities.user import User
 from app.domain.processing_unit_of_work import IProcessingUnitOfWork
 from app.domain.repositories.document import IDocumentRepository
 from app.domain.repositories.document_chunk import IDocumentChunkRepository
-from app.domain.repositories.engagement import IEngagementRepository
 from app.domain.repositories.extracted_text import IExtractedTextRepository
 from app.domain.storage.document_storage import (
     IDocumentStorage,
@@ -112,46 +130,49 @@ class DocumentProcessingService:
     def __init__(
         self,
         document_repository: IDocumentRepository,
-        engagement_repository: IEngagementRepository,
         extracted_text_repository: IExtractedTextRepository,
         chunk_repository: IDocumentChunkRepository,
         storage: IDocumentStorage,
         unit_of_work: IProcessingUnitOfWork,
     ) -> None:
         self._document_repository = document_repository
-        self._engagement_repository = engagement_repository
         self._extracted_text_repository = extracted_text_repository
         self._chunk_repository = chunk_repository
         self._storage = storage
         self._unit_of_work = unit_of_work
 
     async def process(self, document_id: UUID, current_user: User) -> Document:
-        document = await self._document_repository.get(document_id)
+        # Fail closed: a profile with no organization has no tenant scope
+        # at all, so there is no document it may process. Never a default
+        # or first-organization fallback.
+        organization_id = current_user.organization_id
+        if organization_id is None:
+            raise AuthorizationError("User has no organization")
+
+        document = await self._document_repository.get_for_organization(
+            document_id, organization_id=organization_id
+        )
         if document is None:
             raise NotFoundError(f"Document {document_id} not found")
 
-        engagement = await self._engagement_repository.get(document.engagement_id)
-        if engagement is None:
-            raise NotFoundError(f"Engagement {document.engagement_id} not found")
-
-        if current_user.organization_id is None:
-            raise AuthorizationError("User has no organization")
-        if engagement.organization_id is None:
-            raise AuthorizationError("Engagement has no organization")
-        if current_user.organization_id != engagement.organization_id:
-            raise AuthorizationError("User is not authorized for this engagement")
-
-        # Atomic claim -- its own, immediately-committed transaction. From
+        # Atomic claim -- its own, immediately-committed transaction, and
+        # itself tenant-scoped rather than trusting the read above. From
         # this point on the Document is PROCESSING and must end in either
         # PROCESSED or FAILED; it must never be left stuck in PROCESSING.
-        claimed_document = await self._document_repository.begin_processing(document_id)
+        claimed_document = await self._document_repository.begin_processing(
+            document_id, organization_id=organization_id
+        )
 
         try:
-            return await self._process_claimed_document(claimed_document)
+            return await self._process_claimed_document(
+                claimed_document, organization_id=organization_id
+            )
         except Exception as exc:
             await self._unit_of_work.rollback()
             try:
-                await self._document_repository.update_status(document_id, "FAILED")
+                await self._document_repository.update_status(
+                    document_id, "FAILED", organization_id=organization_id
+                )
             except Exception as status_exc:
                 logger.error(
                     "Failed to persist FAILED status for document %s after "
@@ -162,7 +183,9 @@ class DocumentProcessingService:
                 )
             raise _map_to_app_error(exc) from exc
 
-    async def _process_claimed_document(self, document: Document) -> Document:
+    async def _process_claimed_document(
+        self, document: Document, *, organization_id: UUID
+    ) -> Document:
         pdf_bytes = await self._storage.get(document.storage_path)
         extracted = await _extract_text_from_bytes(pdf_bytes)
         normalized = normalize_text(extracted)
@@ -196,6 +219,8 @@ class DocumentProcessingService:
                 for chunk in text_chunks
             ]
         )
-        processed_document = await self._document_repository.complete_processing(document.id)
+        processed_document = await self._document_repository.complete_processing(
+            document.id, organization_id=organization_id
+        )
         await self._unit_of_work.commit()
         return processed_document

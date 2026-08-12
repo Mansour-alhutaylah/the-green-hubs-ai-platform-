@@ -58,8 +58,21 @@ def _make_pdf_bytes(text: str = "Test document content") -> bytes:
 
 
 class FakeDocumentRepository(IDocumentRepository):
+    """In-memory ``IDocumentRepository`` that models the real tenant join.
+
+    ``documents`` has no ``organization_id`` column, so the real
+    repository resolves ownership through
+    ``documents.engagement_id -> engagements.organization_id``.
+    ``engagement_organizations`` below is that join: every tenant-scoped
+    method resolves the caller's scope through it and returns nothing for
+    a foreign document, exactly as the SQL does. A fake that ignored
+    ``organization_id`` would let these tests pass while the service was
+    wide open.
+    """
+
     def __init__(self) -> None:
         self.rows: dict[uuid.UUID, Document] = {}
+        self.engagement_organizations: dict[uuid.UUID, uuid.UUID | None] = {}
         self.begin_processing_error: Exception | None = None
         self.complete_processing_error: Exception | None = None
         self.status_history: list[tuple[uuid.UUID, str]] = []
@@ -67,11 +80,21 @@ class FakeDocumentRepository(IDocumentRepository):
     def seed(self, document: Document) -> None:
         self.rows[document.id] = document
 
-    async def get(self, entity_id: uuid.UUID) -> Document | None:
-        return self.rows.get(entity_id)
+    def seed_ownership(
+        self, engagement_id: uuid.UUID, organization_id: uuid.UUID | None
+    ) -> None:
+        self.engagement_organizations[engagement_id] = organization_id
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        return list(self.rows.values())[offset : offset + limit]
+    def _owned(self, document_id: uuid.UUID, organization_id: uuid.UUID) -> Document | None:
+        document = self.rows.get(document_id)
+        if document is None:
+            return None
+        owner = self.engagement_organizations.get(document.engagement_id)
+        if owner is None or owner != organization_id:
+            return None
+        return document
+
+
 
     async def create(self, entity: Document) -> Document:
         raise NotImplementedError
@@ -82,22 +105,35 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity: Document) -> None:
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id: uuid.UUID) -> Sequence[Document]:
+    async def get_for_organization(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document | None:
+        return self._owned(document_id, organization_id)
+
+    async def get_by_engagement(
+        self, engagement_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[Document]:
+        if self.engagement_organizations.get(engagement_id) != organization_id:
+            return []
         return [d for d in self.rows.values() if d.engagement_id == engagement_id]
 
-    async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
+    async def update_status(
+        self, document_id: uuid.UUID, status: str, *, organization_id: uuid.UUID
+    ) -> Document:
         self.status_history.append((document_id, status))
-        existing = self.rows.get(document_id)
+        existing = self._owned(document_id, organization_id)
         if existing is None:
             raise NotFoundError(f"Document {document_id} not found")
         updated = replace(existing, processing_status=status)
         self.rows[document_id] = updated
         return updated
 
-    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+    async def begin_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         if self.begin_processing_error is not None:
             raise self.begin_processing_error
-        existing = self.rows.get(document_id)
+        existing = self._owned(document_id, organization_id)
         if existing is None:
             raise NotFoundError(f"Document {document_id} not found")
         messages = {
@@ -116,10 +152,12 @@ class FakeDocumentRepository(IDocumentRepository):
         self.rows[document_id] = updated
         return updated
 
-    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+    async def complete_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         if self.complete_processing_error is not None:
             raise self.complete_processing_error
-        existing = self.rows.get(document_id)
+        existing = self._owned(document_id, organization_id)
         if existing is None:
             raise NotFoundError(f"Document {document_id} not found")
         updated = replace(existing, processing_status="PROCESSED")
@@ -144,8 +182,6 @@ class FakeEngagementRepository(IEngagementRepository):
         assert engagement.id is not None
         self._rows[engagement.id] = engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self._rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -193,7 +229,9 @@ class FakeExtractedTextRepository(IExtractedTextRepository):
         self.rows.append(created)
         return created
 
-    async def get_by_document(self, document_id: uuid.UUID) -> ExtractedText | None:
+    async def get_by_document(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> ExtractedText | None:
         for row in self.rows:
             if row.document_id == document_id:
                 return row
@@ -215,7 +253,9 @@ class FakeDocumentChunkRepository(IDocumentChunkRepository):
         self.rows.extend(created)
         return created
 
-    async def get_by_document(self, document_id: uuid.UUID) -> Sequence[DocumentChunk]:
+    async def get_by_document(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[DocumentChunk]:
         return [r for r in self.rows if r.document_id == document_id]
 
     async def delete(self, entity: DocumentChunk) -> None:
@@ -296,15 +336,15 @@ def unit_of_work() -> FakeUnitOfWork:
 @pytest.fixture
 def service(
     document_repository: FakeDocumentRepository,
-    engagement_repository: FakeEngagementRepository,
     extracted_text_repository: FakeExtractedTextRepository,
     chunk_repository: FakeDocumentChunkRepository,
     storage: FakeDocumentStorage,
     unit_of_work: FakeUnitOfWork,
 ) -> DocumentProcessingService:
+    # No engagement repository: MVP Slice 3 moved the ownership chain
+    # into IDocumentRepository's own tenant-scoped queries.
     return DocumentProcessingService(
         document_repository,
-        engagement_repository,
         extracted_text_repository,
         chunk_repository,
         storage,
@@ -360,6 +400,7 @@ def _setup_ready_document(
     assert engagement.id is not None
     document = _document(engagement.id, f"organizations/{organization_id}/doc.pdf", status=status)
     document_repository.seed(document)
+    document_repository.seed_ownership(engagement.id, organization_id)
     storage.seed(document.storage_path, _make_pdf_bytes(pdf_text))
     user = _user(organization_id)
     return document, engagement, user
@@ -462,11 +503,15 @@ async def test_missing_document_raises_not_found(
         await service.process(uuid.uuid4(), user)
 
 
-async def test_missing_engagement_raises_not_found(
+async def test_document_whose_engagement_has_no_owner_raises_not_found(
     service: DocumentProcessingService, document_repository: FakeDocumentRepository
 ) -> None:
+    """Fail closed: an engagement with no organization is owned by nobody,
+    so it can never match a caller's scope."""
+
     document = _document(uuid.uuid4(), "organizations/x/doc.pdf")
     document_repository.seed(document)
+    document_repository.seed_ownership(document.engagement_id, None)
     user = _user(uuid.uuid4())
 
     with pytest.raises(NotFoundError):
@@ -476,49 +521,67 @@ async def test_missing_engagement_raises_not_found(
 async def test_user_without_organization_raises_authorization_error(
     service: DocumentProcessingService,
     document_repository: FakeDocumentRepository,
-    engagement_repository: FakeEngagementRepository,
 ) -> None:
-    engagement = _engagement(uuid.uuid4())
-    engagement_repository.seed(engagement)
+    """No organization means no tenant scope at all -- 403, and the
+    rejection happens before any document is looked up."""
+
+    organization_id = uuid.uuid4()
+    engagement = _engagement(organization_id)
     assert engagement.id is not None
     document = _document(engagement.id, "organizations/x/doc.pdf")
     document_repository.seed(document)
+    document_repository.seed_ownership(engagement.id, organization_id)
     user = _user(None)
 
     with pytest.raises(AuthorizationError):
         await service.process(document.id, user)
 
 
-async def test_engagement_without_organization_raises_authorization_error(
+async def test_organization_mismatch_raises_not_found_not_authorization_error(
     service: DocumentProcessingService,
     document_repository: FakeDocumentRepository,
-    engagement_repository: FakeEngagementRepository,
 ) -> None:
-    engagement = _engagement(None)
-    engagement_repository.seed(engagement)
+    """MVP Slice 3: a valid Document UUID owned by another organization is
+    indistinguishable from one that does not exist.
+
+    Before this slice the mismatch raised ``AuthorizationError`` (403)
+    while an unknown id raised ``NotFoundError`` (404), so an attacker
+    holding a real UUID could tell the two apart -- a cross-tenant
+    existence oracle. Both are 404 now.
+    """
+
+    owner_organization_id = uuid.uuid4()
+    engagement = _engagement(owner_organization_id)
     assert engagement.id is not None
     document = _document(engagement.id, "organizations/x/doc.pdf")
     document_repository.seed(document)
-    user = _user(uuid.uuid4())
+    document_repository.seed_ownership(engagement.id, owner_organization_id)
+    attacker = _user(uuid.uuid4())  # a different organization
 
-    with pytest.raises(AuthorizationError):
-        await service.process(document.id, user)
+    with pytest.raises(NotFoundError):
+        await service.process(document.id, attacker)
 
 
-async def test_organization_mismatch_raises_authorization_error(
+async def test_cross_tenant_process_never_mutates_the_foreign_document(
     service: DocumentProcessingService,
     document_repository: FakeDocumentRepository,
-    engagement_repository: FakeEngagementRepository,
 ) -> None:
-    engagement = _engagement(uuid.uuid4())
-    engagement_repository.seed(engagement)
+    """The rejected request must leave no trace on the victim's row --
+    not even the FAILED status the error path would otherwise write."""
+
+    owner_organization_id = uuid.uuid4()
+    engagement = _engagement(owner_organization_id)
     assert engagement.id is not None
     document = _document(engagement.id, "organizations/x/doc.pdf")
     document_repository.seed(document)
-    user = _user(uuid.uuid4())  # a different organization
+    document_repository.seed_ownership(engagement.id, owner_organization_id)
+    attacker = _user(uuid.uuid4())
 
-    with pytest.raises(AuthorizationError):
-        await service.process(document.id, user)
+    with pytest.raises(NotFoundError):
+        await service.process(document.id, attacker)
+
+    assert document_repository.rows[document.id].processing_status == "PENDING"
+    assert document_repository.status_history == []
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +633,7 @@ async def test_storage_object_missing_maps_to_not_found_and_marks_failed(
     assert engagement.id is not None
     document = _document(engagement.id, "organizations/x/never-stored.pdf")
     document_repository.seed(document)
+    document_repository.seed_ownership(engagement.id, organization_id)
     user = _user(organization_id)
     # Deliberately never seed storage.objects -- the object doesn't exist.
 
@@ -630,6 +694,7 @@ async def test_extraction_failure_maps_to_validation_error_and_marks_failed(
     assert engagement.id is not None
     document = _document(engagement.id, "organizations/x/corrupt.pdf")
     document_repository.seed(document)
+    document_repository.seed_ownership(engagement.id, organization_id)
     storage.seed(document.storage_path, b"this is not a real pdf file")
     user = _user(organization_id)
 

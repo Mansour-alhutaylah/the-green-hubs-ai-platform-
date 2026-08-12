@@ -45,11 +45,8 @@ class FakeUserRepository(IUserRepository):
     def __init__(self, users: Sequence[User]) -> None:
         self._users = {user.id: user for user in users}
 
-    async def get(self, entity_id: uuid.UUID) -> User | None:
-        return self._users.get(entity_id)
-
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[User]:
-        return list(self._users.values())[offset : offset + limit]
+    async def get_by_authenticated_id(self, user_id: uuid.UUID) -> User | None:
+        return self._users.get(user_id)
 
     async def create(self, entity: User) -> User:
         raise NotImplementedError

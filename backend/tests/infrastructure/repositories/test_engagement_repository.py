@@ -136,16 +136,33 @@ async def test_get_retrieves_by_id(
     assert created.id is not None
     cleanup_ids["engagements"].append(created.id)
 
-    fetched = await repository.get(created.id)
+    fetched = await repository.get_for_organization(
+        created.id, organization_id=organization_id
+    )
 
     assert fetched is not None
     assert fetched.id == created.id
 
 
-async def test_get_returns_none_for_missing_id(
+async def test_get_for_organization_returns_none_for_missing_id(
     repository: SQLAlchemyEngagementRepository,
 ) -> None:
-    assert await repository.get(uuid.uuid4()) is None
+    assert (
+        await repository.get_for_organization(
+            uuid.uuid4(), organization_id=uuid.uuid4()
+        )
+        is None
+    )
+
+
+async def test_the_repository_offers_no_unscoped_read(
+    repository: SQLAlchemyEngagementRepository,
+) -> None:
+    """MVP Slice 3 closure: the inherited unscoped ``get`` is gone, so a
+    cross-tenant Engagement id cannot be resolved by any method here."""
+
+    assert not hasattr(repository, "get")
+    assert hasattr(repository, "get_for_organization")
 
 
 async def test_list_returns_created_rows_in_deterministic_order(
@@ -174,7 +191,7 @@ async def test_list_returns_created_rows_in_deterministic_order(
     assert first.id is not None and second.id is not None
     cleanup_ids["engagements"].extend([first.id, second.id])
 
-    results = await repository.list(limit=1000, offset=0)
+    results = await repository.list(organization_id=organization_id, limit=1000, offset=0)
 
     ids_in_order = [r.id for r in results]
     assert ids_in_order.index(first.id) < ids_in_order.index(second.id)
@@ -200,7 +217,7 @@ async def test_list_filters_by_organization_id(
     assert engagement_a.id is not None and engagement_b.id is not None
     cleanup_ids["engagements"].extend([engagement_a.id, engagement_b.id])
 
-    results = await repository.list(limit=1000, offset=0, organization_id=org_a)
+    results = await repository.list(organization_id=org_a, limit=1000, offset=0)
 
     ids = [r.id for r in results]
     assert engagement_a.id in ids
@@ -227,7 +244,7 @@ async def test_list_pagination_respects_limit_and_offset(
         created_ids.append(created.id)
     cleanup_ids["engagements"].extend(created_ids)
 
-    page = await repository.list(limit=1, offset=1, organization_id=organization_id)
+    page = await repository.list(organization_id=organization_id, limit=1, offset=1)
 
     assert len(page) == 1
 
@@ -378,4 +395,9 @@ async def test_delete_removes_the_record(
 
     await repository.delete(created)
 
-    assert await repository.get(created.id) is None
+    assert (
+        await repository.get_for_organization(
+            created.id, organization_id=organization_id
+        )
+        is None
+    )
