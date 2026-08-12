@@ -12,36 +12,33 @@ This repository must never query ``organizations`` -- Organization
 existence is checked in ``EngagementService`` via
 ``IOrganizationRepository``, not here.
 
-Sprint 3.5.1 (Tenant Isolation & API Security): two different inheritance
-situations get two different fixes, both chosen as the smallest
-architecture-compatible adjustment rather than a redesign of
-``IRepository``:
+Sprint 3.5.1 (Tenant Isolation & API Security) added
+``get_for_organization``/``update_for_organization``/``count`` as
+tenant-scoped methods alongside the inherited, unscoped
+``get``/``list``. At the time ``list``'s ``organization_id`` had to stay
+*optional*: it overrode ``IRepository[Engagement].list(*, limit, offset)``,
+and narrowing an inherited signature breaks Liskov substitutability
+(mypy confirmed it), so the guarantee rested on ``EngagementService``
+never calling it unscoped.
 
-- ``count()`` is bespoke to this interface (not part of
-  ``IRepository[Engagement]``'s contract at all), so its
-  ``organization_id`` filter is made outright mandatory here -- no LSP
-  concern, since there is no inherited signature to stay compatible
-  with.
-- ``list()`` *is* inherited from ``IRepository[Engagement]`` with the
-  signature ``list(*, limit=100, offset=0)`` -- no scope parameter at
-  all. This override already widened it with an *optional*
-  ``organization_id`` before this sprint; making it outright mandatory
-  breaks Liskov substitutability (confirmed by mypy: a caller honoring
-  the base ``IRepository[Engagement]`` contract could call
-  ``list(limit=x, offset=y)`` and get an unscoped, cross-tenant result).
-  So ``organization_id`` stays optional in the signature, and the
-  "mandatory in practice" guarantee instead comes from
-  ``EngagementService`` never calling it with anything but its own,
-  non-``None`` organization id.
-- ``get_for_organization``/``update_for_organization`` are new,
-  additive tenant-scoped methods rather than overrides of the inherited
-  ``get(entity_id)``/``update(entity)`` (also declared by
-  ``IRepository[Engagement]`` with no scope parameter, for the same LSP
-  reason as ``list``). The inherited, unscoped ``get``/``update`` remain
-  implemented only to satisfy ``IRepository``'s contract and for test
-  cleanup -- ``EngagementService`` must never call them;
-  ``get_for_organization``/``update_for_organization`` are the only
-  tenant-safe path.
+MVP Slice 3 closure removed ``get`` and ``list`` from ``IRepository``
+itself (see that module for why a generic contract cannot express tenant
+scope). That dissolves the LSP constraint entirely, and both loose ends
+are now closed properly:
+
+- ``list()`` is bespoke to this interface, so ``organization_id`` is
+  **mandatory** -- there is no longer a signature through which an
+  unscoped, cross-tenant engagement listing can be requested at all;
+- ``count()`` likewise takes a mandatory ``organization_id``;
+- there is **no unscoped ``get``**. ``get_for_organization`` is the only
+  read, so a cross-tenant Engagement id cannot be resolved to a row by
+  any call this interface offers.
+
+``update``/``delete`` remain inherited from ``IRepository``. They take an
+Engagement the caller must already hold -- obtainable only through
+``get_for_organization`` -- and ``EngagementService`` writes exclusively
+through ``update_for_organization``; the plain ``update``/``delete`` exist
+for contract completeness and integration-test cleanup.
 """
 
 from abc import ABC, abstractmethod
@@ -55,8 +52,12 @@ from app.domain.repositories.base import IRepository
 class IEngagementRepository(IRepository[Engagement], ABC):
     @abstractmethod
     async def list(
-        self, *, limit: int = 100, offset: int = 0, organization_id: UUID | None = None
-    ) -> Sequence[Engagement]: ...
+        self, *, organization_id: UUID, limit: int = 100, offset: int = 0
+    ) -> Sequence[Engagement]:
+        """Tenant-scoped, paginated listing. ``organization_id`` is
+        mandatory: there is no signature here that yields a cross-tenant
+        page."""
+        ...
 
     @abstractmethod
     async def count(self, *, organization_id: UUID) -> int: ...

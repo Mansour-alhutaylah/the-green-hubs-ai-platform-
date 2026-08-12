@@ -26,17 +26,23 @@ DIMENSION = 1536
 
 
 class FakeDocumentRepository(IDocumentRepository):
-    def __init__(self) -> None:
+    """Models the real ``documents -> engagements`` ownership join.
+
+    ``documents`` has no ``organization_id``, so the real
+    ``get_for_organization`` resolves the tenant through the engagement.
+    This fake is constructed with the engagement repository and does the
+    same, rather than accepting ``organization_id`` and ignoring it --
+    which would make every isolation assertion below vacuous.
+    """
+
+    def __init__(self, engagements: "FakeEngagementRepository") -> None:
         self.rows: dict[uuid.UUID, Document] = {}
+        self._engagements = engagements
 
     def seed(self, document: Document) -> None:
         self.rows[document.id] = document
 
-    async def get(self, entity_id: uuid.UUID) -> Document | None:
-        return self.rows.get(entity_id)
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        return list(self.rows.values())
 
     async def create(self, entity: Document) -> Document:
         raise NotImplementedError
@@ -47,16 +53,35 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity: Document) -> None:
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id: uuid.UUID) -> Sequence[Document]:
+    async def get_for_organization(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document | None:
+        document = self.rows.get(document_id)
+        if document is None:
+            return None
+        engagement = self._engagements.rows.get(document.engagement_id)
+        if engagement is None or engagement.organization_id != organization_id:
+            return None
+        return document
+
+    async def get_by_engagement(
+        self, engagement_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[Document]:
         return [d for d in self.rows.values() if d.engagement_id == engagement_id]
 
-    async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
+    async def update_status(
+        self, document_id: uuid.UUID, status: str, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+    async def begin_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+    async def complete_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
     async def get_read_model_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
@@ -77,8 +102,6 @@ class FakeEngagementRepository(IEngagementRepository):
         assert engagement.id is not None
         self.rows[engagement.id] = engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self.rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -181,13 +204,15 @@ def _user(organization_id: uuid.UUID | None) -> User:
 
 
 @pytest.fixture
-def document_repository() -> FakeDocumentRepository:
-    return FakeDocumentRepository()
+def engagement_repository() -> FakeEngagementRepository:
+    return FakeEngagementRepository()
 
 
 @pytest.fixture
-def engagement_repository() -> FakeEngagementRepository:
-    return FakeEngagementRepository()
+def document_repository(
+    engagement_repository: FakeEngagementRepository,
+) -> FakeDocumentRepository:
+    return FakeDocumentRepository(engagement_repository)
 
 
 @pytest.fixture

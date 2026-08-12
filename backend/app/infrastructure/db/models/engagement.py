@@ -24,7 +24,10 @@ class Engagement(Base):
         PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True
+        # Indexed by migration ``a4f1c9d2e7b3`` (MVP Slice 3): this column
+        # is the root of the tenant-ownership chain that every
+        # document-side query joins through.
+        PG_UUID(as_uuid=True), ForeignKey("organizations.id"), index=True, nullable=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[Optional[str]] = mapped_column(

@@ -1,4 +1,4 @@
-"""Integration tests for the embedding-identity scoping in
+﻿"""Integration tests for the embedding-identity scoping in
 ``SQLAlchemyDocumentRepository.get_read_model_for_organization`` /
 ``list_read_models_for_organization`` against a real database.
 
@@ -159,10 +159,12 @@ async def _fail_under_identity(
     chunk_ids: list[uuid.UUID],
     contents: list[str],
     *,
+    organization_id: uuid.UUID,
     model: str,
 ) -> None:
     claimed = await repository.claim_new(
         chunk_ids,
+        organization_id=organization_id,
         provider=PROVIDER,
         model=model,
         model_version=MODEL_VERSION,
@@ -171,7 +173,9 @@ async def _fail_under_identity(
     )
     _track(cleanup_ids, claimed)
     await repository.mark_failed(
-        [row.id for row in claimed if row.id is not None], error_message="Embedding provider rejected the request"
+        [row.id for row in claimed if row.id is not None],
+        organization_id=organization_id,
+        error_message="Embedding provider rejected the request",
     )
 
 
@@ -181,10 +185,12 @@ async def _complete_under_identity(
     chunk_ids: list[uuid.UUID],
     contents: list[str],
     *,
+    organization_id: uuid.UUID,
     model: str,
 ) -> None:
     claimed = await repository.claim_new(
         chunk_ids,
+        organization_id=organization_id,
         provider=PROVIDER,
         model=model,
         model_version=MODEL_VERSION,
@@ -192,7 +198,10 @@ async def _complete_under_identity(
         content_hashes={cid: _content_hash(c) for cid, c in zip(chunk_ids, contents)},
     )
     _track(cleanup_ids, claimed)
-    await repository.mark_completed([(row.id, _vector()) for row in claimed if row.id is not None])
+    await repository.mark_completed(
+        [(row.id, _vector()) for row in claimed if row.id is not None],
+        organization_id=organization_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -211,10 +220,12 @@ async def test_stale_failed_attempt_under_old_identity_is_excluded_from_current_
     embedding_repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
 
     await _fail_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=OLD_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=OLD_MODEL
     )
     await _complete_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=CURRENT_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=CURRENT_MODEL
     )
 
     document_repository = SQLAlchemyDocumentRepository(session)
@@ -248,10 +259,12 @@ async def test_old_identity_still_shows_its_own_failed_history_when_queried_dire
     embedding_repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
 
     await _fail_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=OLD_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=OLD_MODEL
     )
     await _complete_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=CURRENT_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=CURRENT_MODEL
     )
 
     document_repository = SQLAlchemyDocumentRepository(session)
@@ -286,12 +299,14 @@ async def test_multi_chunk_document_is_not_double_counted_across_identities(
 
     # Every chunk has a stale FAILED row under the old identity...
     await _fail_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=OLD_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=OLD_MODEL
     )
     # ...and a real, current-identity COMPLETED row -- 8 rows total for 4
     # chunks, exactly the shape that produced "4/8" in the UI bug report.
     await _complete_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=CURRENT_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=CURRENT_MODEL
     )
 
     document_repository = SQLAlchemyDocumentRepository(session)
@@ -330,10 +345,12 @@ async def test_partial_current_identity_completion_is_reported_per_unique_chunk(
     embedding_repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
 
     await _fail_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=OLD_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=OLD_MODEL
     )
     await _complete_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids[:3], contents[:3], model=CURRENT_MODEL
+        embedding_repository, cleanup_ids, chunk_ids[:3], contents[:3],
+        organization_id=organization_id, model=CURRENT_MODEL
     )
 
     document_repository = SQLAlchemyDocumentRepository(session)
@@ -370,10 +387,12 @@ async def test_list_read_models_also_scopes_embedding_summary_to_current_identit
     embedding_repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
 
     await _fail_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=OLD_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=OLD_MODEL
     )
     await _complete_under_identity(
-        embedding_repository, cleanup_ids, chunk_ids, contents, model=CURRENT_MODEL
+        embedding_repository, cleanup_ids, chunk_ids, contents,
+        organization_id=organization_id, model=CURRENT_MODEL
     )
 
     document_repository = SQLAlchemyDocumentRepository(session)

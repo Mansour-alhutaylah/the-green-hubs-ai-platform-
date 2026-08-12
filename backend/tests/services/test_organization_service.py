@@ -9,7 +9,6 @@ denial for every route.
 
 import uuid
 from datetime import datetime, timezone
-from typing import Sequence
 
 import pytest
 
@@ -32,15 +31,17 @@ class FakeOrganizationRepository(IOrganizationRepository):
         self._rows[organization_id] = organization
         return organization
 
-    async def get(self, entity_id: uuid.UUID) -> Organization | None:
-        return self._rows.get(entity_id)
+    def row_count(self) -> int:
+        """Test-only accessor. Not part of ``IOrganizationRepository`` --
+        the global ``count()`` was removed in the MVP Slice 3 closure
+        because it disclosed how many tenants exist."""
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Organization]:
-        rows = sorted(self._rows.values(), key=lambda o: (o.created_at, str(o.id)))
-        return rows[offset : offset + limit]
-
-    async def count(self) -> int:
         return len(self._rows)
+
+    async def get_for_organization(
+        self, organization_id: uuid.UUID
+    ) -> Organization | None:
+        return self._rows.get(organization_id)
 
     async def create(self, entity: Organization) -> Organization:
         raise NotImplementedError
@@ -115,12 +116,16 @@ async def test_create_rejected_with_403_for_any_authenticated_user(
 async def test_create_does_not_persist_a_row(
     service: OrganizationService, repository: FakeOrganizationRepository, user_a: User
 ) -> None:
-    before = await repository.count()
+    # Counted through the fake's own test-only accessor: the repository
+    # interface has no global count() any more (MVP Slice 3 closure), and
+    # reintroducing one just to assert this would restore the surface the
+    # closure removed.
+    before = repository.row_count()
 
     with pytest.raises(AuthorizationError):
         await service.create("New Org", user_a)
 
-    assert await repository.count() == before
+    assert repository.row_count() == before
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +280,7 @@ async def test_update_other_organization_does_not_change_its_name(
     with pytest.raises(NotFoundError):
         await service.update(organization_b.id, "Hijacked Name", user_a)
 
-    untouched = await repository.get(organization_b.id)
+    untouched = await repository.get_for_organization(organization_b.id)
     assert untouched is not None
     assert untouched.name == organization_b.name
 

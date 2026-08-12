@@ -11,7 +11,6 @@ what this router previously lacked.
 
 import uuid
 from datetime import datetime, timezone
-from typing import Sequence
 
 import pytest
 from httpx import AsyncClient
@@ -39,15 +38,10 @@ class FakeOrganizationRepository(IOrganizationRepository):
         self._rows[organization_id] = organization
         return organization
 
-    async def get(self, entity_id: uuid.UUID) -> Organization | None:
-        return self._rows.get(entity_id)
-
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Organization]:
-        rows = sorted(self._rows.values(), key=lambda o: (o.created_at, str(o.id)))
-        return rows[offset : offset + limit]
-
-    async def count(self) -> int:
-        return len(self._rows)
+    async def get_for_organization(
+        self, organization_id: uuid.UUID
+    ) -> Organization | None:
+        return self._rows.get(organization_id)
 
     async def create(self, entity: Organization) -> Organization:
         raise NotImplementedError

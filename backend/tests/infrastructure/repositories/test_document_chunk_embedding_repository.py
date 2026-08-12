@@ -1,4 +1,4 @@
-"""Integration tests for ``SQLAlchemyDocumentChunkEmbeddingRepository``
+﻿"""Integration tests for ``SQLAlchemyDocumentChunkEmbeddingRepository``
 against a real database (pgvector, migration ``3f3acc7fc556``).
 
 Every row a test creates is tracked and deleted, via an independent
@@ -153,7 +153,7 @@ async def test_claim_new_derives_lineage_from_real_chunk_ownership(
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
 
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
@@ -208,17 +208,17 @@ async def test_composite_foreign_key_rejects_mismatched_organization(
 async def test_claim_new_is_idempotent_via_on_conflict_do_nothing(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     hashes = {chunk_id: _content_hash(content)}
 
     first = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes=hashes,
     )
     _track(cleanup_ids, first)
     second = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes=hashes,
     )
 
@@ -229,14 +229,14 @@ async def test_claim_new_is_idempotent_via_on_conflict_do_nothing(
 async def test_two_concurrent_first_claims_only_one_wins(
     cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     hashes = {chunk_id: _content_hash(content)}
 
     async def _attempt() -> int:
         async with AsyncSessionLocal() as session:
             repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
             claimed = await repository.claim_new(
-                [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+                [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
                 embedding_dimension=DIMENSION, content_hashes=hashes,
             )
             return len(claimed)
@@ -266,17 +266,17 @@ async def test_two_concurrent_first_claims_only_one_wins(
 async def test_retry_failed_transitions_and_increments_attempt_count(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
     row = claimed[0]
-    await repository.mark_failed([row.id], error_message="Embedding provider unavailable")
+    await repository.mark_failed([row.id], organization_id=organization_id, error_message="Embedding provider unavailable")
 
-    retried = await repository.retry_failed([row.id])
+    retried = await repository.retry_failed([row.id], organization_id=organization_id)
 
     assert len(retried) == 1
     assert retried[0].status == "PROCESSING"
@@ -288,16 +288,16 @@ async def test_retry_failed_transitions_and_increments_attempt_count(
 async def test_retry_failed_does_not_touch_non_failed_rows(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
     row = claimed[0]  # still PROCESSING, not FAILED
 
-    retried = await repository.retry_failed([row.id])
+    retried = await repository.retry_failed([row.id], organization_id=organization_id)
 
     assert retried == []
 
@@ -310,16 +310,16 @@ async def test_retry_failed_does_not_touch_non_failed_rows(
 async def test_non_stale_processing_row_cannot_be_reclaimed(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
     row = claimed[0]  # processing_started_at = now(), not stale
 
-    reclaimed = await repository.reclaim_stale([row.id], stale_after_seconds=300)
+    reclaimed = await repository.reclaim_stale([row.id], organization_id=organization_id, stale_after_seconds=300)
 
     assert reclaimed == []
 
@@ -327,10 +327,10 @@ async def test_non_stale_processing_row_cannot_be_reclaimed(
 async def test_stale_processing_row_can_be_reclaimed_exactly_once(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
@@ -345,8 +345,8 @@ async def test_stale_processing_row_can_be_reclaimed_exactly_once(
     )
     await session.commit()
 
-    first_reclaim = await repository.reclaim_stale([row.id], stale_after_seconds=300)
-    second_reclaim = await repository.reclaim_stale([row.id], stale_after_seconds=300)
+    first_reclaim = await repository.reclaim_stale([row.id], organization_id=organization_id, stale_after_seconds=300)
+    second_reclaim = await repository.reclaim_stale([row.id], organization_id=organization_id, stale_after_seconds=300)
 
     assert len(first_reclaim) == 1
     assert first_reclaim[0].attempt_count == 2
@@ -356,10 +356,10 @@ async def test_stale_processing_row_can_be_reclaimed_exactly_once(
 async def test_two_concurrent_stale_reclaim_attempts_only_one_wins(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
@@ -377,7 +377,7 @@ async def test_two_concurrent_stale_reclaim_attempts_only_one_wins(
     async def _attempt() -> int:
         async with AsyncSessionLocal() as reclaim_session:
             reclaim_repository = SQLAlchemyDocumentChunkEmbeddingRepository(reclaim_session)
-            reclaimed = await reclaim_repository.reclaim_stale([row.id], stale_after_seconds=300)
+            reclaimed = await reclaim_repository.reclaim_stale([row.id], organization_id=organization_id, stale_after_seconds=300)
             return len(reclaimed)
 
     results = await asyncio.gather(_attempt(), _attempt())
@@ -393,16 +393,16 @@ async def test_two_concurrent_stale_reclaim_attempts_only_one_wins(
 async def test_mark_completed_persists_vector_and_updates_timestamp(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
     row = claimed[0]
 
-    await repository.mark_completed([(row.id, _vector(0.5))])
+    await repository.mark_completed([(row.id, _vector(0.5))], organization_id=organization_id)
 
     async with AsyncSessionLocal() as verify_session:
         model = await verify_session.get(DocumentChunkEmbeddingModel, row.id)
@@ -416,16 +416,16 @@ async def test_mark_completed_persists_vector_and_updates_timestamp(
 async def test_mark_failed_persists_sanitized_message(
     session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], chunk
 ) -> None:
-    chunk_id, _d, _e, _o, content = chunk
+    chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
     row = claimed[0]
 
-    await repository.mark_failed([row.id], error_message="Embedding provider unavailable")
+    await repository.mark_failed([row.id], organization_id=organization_id, error_message="Embedding provider unavailable")
 
     async with AsyncSessionLocal() as verify_session:
         model = await verify_session.get(DocumentChunkEmbeddingModel, row.id)
@@ -462,17 +462,23 @@ async def test_search_returns_only_same_tenant_results_ordered_by_similarity(
 
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed_a = await repository.claim_new(
-        [chunk_a_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_a_id], organization_id=organization_a, provider=PROVIDER, model=MODEL,
+        model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_a_id: _content_hash(content_a)},
     )
     claimed_far = await repository.claim_new(
-        [chunk_far_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_far_id], organization_id=organization_a, provider=PROVIDER, model=MODEL,
+        model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_far_id: _content_hash(content_far)},
     )
     _track(cleanup_ids, claimed_a)
     _track(cleanup_ids, claimed_far)
-    await repository.mark_completed([(claimed_a[0].id, _vector(0.9))])
-    await repository.mark_completed([(claimed_far[0].id, _vector(-0.1))])
+    await repository.mark_completed(
+        [(claimed_a[0].id, _vector(0.9))], organization_id=organization_a
+    )
+    await repository.mark_completed(
+        [(claimed_far[0].id, _vector(-0.1))], organization_id=organization_a
+    )
 
     results = await repository.search(
         organization_id=organization_a, provider=PROVIDER, model=MODEL,
@@ -500,21 +506,44 @@ async def test_cross_tenant_nearest_neighbor_is_never_returned(
     )
 
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
+    # Each chunk is claimed under its *own* organization -- the derived
+    # lineage and the supplied scope agree, which is the only way a claim
+    # succeeds now.
     claimed_a = await repository.claim_new(
-        [chunk_a_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_a_id], organization_id=organization_a, provider=PROVIDER, model=MODEL,
+        model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_a_id: _content_hash(content_a)},
     )
     claimed_b = await repository.claim_new(
-        [chunk_b_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_b_id], organization_id=organization_b, provider=PROVIDER, model=MODEL,
+        model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_b_id: _content_hash(content_b)},
     )
     _track(cleanup_ids, claimed_a)
     _track(cleanup_ids, claimed_b)
+
+    # MVP Slice 3: claiming B's chunk under A's scope inserts nothing at
+    # all -- the derived-lineage join now also constrains on organization.
+    assert await repository.claim_new(
+        [chunk_b_id], organization_id=organization_a, provider=PROVIDER, model=MODEL,
+        model_version="cross-tenant-probe",
+        embedding_dimension=DIMENSION, content_hashes={chunk_b_id: _content_hash(content_b)},
+    ) == []
+
     query_vector = _vector(0.777)
     # Both get the *exact same* vector -- B would be an equally-perfect
     # match for an A-scoped query if tenant scope were not enforced.
-    await repository.mark_completed([(claimed_a[0].id, query_vector)])
-    await repository.mark_completed([(claimed_b[0].id, query_vector)])
+    await repository.mark_completed(
+        [(claimed_a[0].id, query_vector)], organization_id=organization_a
+    )
+    await repository.mark_completed(
+        [(claimed_b[0].id, query_vector)], organization_id=organization_b
+    )
+
+    # A cross-tenant write is equally inert: A cannot resolve B's row.
+    await repository.mark_failed(
+        [claimed_b[0].id], organization_id=organization_a, error_message="cross-tenant write"
+    )
 
     results = await repository.search(
         organization_id=organization_a, provider=PROVIDER, model=MODEL,
@@ -530,6 +559,8 @@ async def test_cross_tenant_nearest_neighbor_is_never_returned(
         organization_id=organization_b, provider=PROVIDER, model=MODEL,
         model_version=MODEL_VERSION, query_vector=query_vector, top_k=10,
     )
+    # B still sees its own row COMPLETED -- A's cross-tenant mark_failed
+    # above changed nothing.
     assert {r.chunk_id for r in other_results} == {chunk_b_id}
 
 
@@ -539,7 +570,7 @@ async def test_search_excludes_non_completed_rows(
     chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)  # left PROCESSING -- never resolved
@@ -558,11 +589,13 @@ async def test_search_filters_by_engagement_id(
     chunk_id, _d, engagement_id, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
-    await repository.mark_completed([(claimed[0].id, _vector())])
+    await repository.mark_completed(
+        [(claimed[0].id, _vector())], organization_id=organization_id
+    )
 
     matching_results = await repository.search(
         organization_id=organization_id, provider=PROVIDER, model=MODEL,
@@ -586,11 +619,13 @@ async def test_search_filters_by_document_id(
 
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed_a = await repository.claim_new(
-        [chunk_a_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_a_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_a_id: _content_hash(content_a)},
     )
     _track(cleanup_ids, claimed_a)
-    await repository.mark_completed([(claimed_a[0].id, _vector())])
+    await repository.mark_completed(
+        [(claimed_a[0].id, _vector())], organization_id=organization_id
+    )
 
     results = await repository.search(
         organization_id=organization_id, provider=PROVIDER, model=MODEL,
@@ -611,11 +646,13 @@ async def test_search_filters_by_provider_model_version_identity(
     chunk_id, _d, _e, organization_id, content = chunk
     repository = SQLAlchemyDocumentChunkEmbeddingRepository(session)
     claimed = await repository.claim_new(
-        [chunk_id], provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
+        [chunk_id], organization_id=organization_id, provider=PROVIDER, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, content_hashes={chunk_id: _content_hash(content)},
     )
     _track(cleanup_ids, claimed)
-    await repository.mark_completed([(claimed[0].id, _vector())])
+    await repository.mark_completed(
+        [(claimed[0].id, _vector())], organization_id=organization_id
+    )
 
     wrong_model_results = await repository.search(
         organization_id=organization_id, provider=PROVIDER, model="a-different-model",

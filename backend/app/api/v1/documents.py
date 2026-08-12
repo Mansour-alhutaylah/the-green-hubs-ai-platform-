@@ -19,6 +19,14 @@ Foundation) never accept ``organization_id`` from the client in any
 form (query, header, body) -- tenant scope always comes from
 ``current_user`` inside ``DocumentReadService``, matching every other
 tenant-scoped router in this codebase.
+
+MVP Slice 3 (Organization Data Isolation): upload and process now return
+404, not 403, for an Engagement/Document belonging to another
+organization -- the declared ``responses`` below reflect that. 403 on
+these routes now means only what it says on the other tenant-scoped
+routers: the caller has no organization at all, or lacks the required
+permission (Slice 2). Neither status distinguishes a foreign resource
+from a nonexistent one.
 """
 
 from uuid import UUID
@@ -127,8 +135,8 @@ def _to_read_response(document: DocumentReadModel) -> DocumentReadResponse:
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
-        404: {"description": "Engagement not found"},
-        403: {"description": "Not authorized for this engagement"},
+        403: {"description": "User has no organization, or lacks the required permission"},
+        404: {"description": "Engagement not found in the caller's organization"},
     },
     summary="Upload a PDF document to an engagement",
 )
@@ -154,8 +162,8 @@ async def upload_document(
     "/{document_id}/process",
     response_model=DocumentResponse,
     responses={
-        404: {"description": "Document or Engagement not found"},
-        403: {"description": "Not authorized for this engagement"},
+        403: {"description": "User has no organization, or lacks the required permission"},
+        404: {"description": "Document not found in the caller's organization"},
         409: {"description": "Document is not in a state that can begin processing"},
     },
     summary="Process an uploaded PDF document into extracted text and chunks",
@@ -173,8 +181,8 @@ async def process_document(
     "/{document_id}/embeddings",
     response_model=EmbeddingGenerationSummaryResponse,
     responses={
-        404: {"description": "Document not found"},
-        403: {"description": "Not authorized for this document"},
+        403: {"description": "User has no organization, or lacks the required permission"},
+        404: {"description": "Document not found in the caller's organization"},
         409: {"description": "Document has not been processed yet"},
     },
     summary="Idempotently generate embeddings for a processed document's chunks",

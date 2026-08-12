@@ -49,8 +49,6 @@ class FakeEngagementRepository(IEngagementRepository):
         self._rows[engagement_id] = engagement
         return engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self._rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -113,8 +111,10 @@ class FakeOrganizationRepository(IOrganizationRepository):
             id=organization_id, name="Seed Org", created_at=datetime.now(timezone.utc)
         )
 
-    async def get(self, entity_id: uuid.UUID) -> Organization | None:
-        return self._rows.get(entity_id)
+    async def get_for_organization(
+        self, organization_id: uuid.UUID
+    ) -> Organization | None:
+        return self._rows.get(organization_id)
 
     async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Organization]:
         return list(self._rows.values())[offset : offset + limit]

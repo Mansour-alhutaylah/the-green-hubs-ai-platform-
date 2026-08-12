@@ -66,6 +66,9 @@ def _make_pdf_bytes(text: str = "Integration test document content") -> bytes:
 class FakeDocumentStorage(IDocumentStorage):
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        # Recorded so a cross-tenant test can assert the stored PDF was
+        # never even requested, not merely that the response was a 404.
+        self.get_calls: list[str] = []
 
     def seed(self, object_key: str, content: bytes) -> None:
         self.objects[object_key] = content
@@ -74,6 +77,7 @@ class FakeDocumentStorage(IDocumentStorage):
         self.objects[object_key] = content
 
     async def get(self, object_key: str) -> bytes:
+        self.get_calls.append(object_key)
         return self.objects[object_key]
 
     async def delete(self, object_key: str) -> None:
@@ -301,13 +305,28 @@ async def test_successful_processing_persists_extracted_text_and_chunks(
         assert len(starts) == len(set(starts))
 
 
-async def test_organization_mismatch_returns_403_and_leaves_document_untouched(
+async def test_organization_mismatch_returns_404_and_leaves_document_untouched(
     client: AsyncClient,
     keypair,
     real_verifier: SupabaseJWTVerifier,
     fake_storage: FakeDocumentStorage,
     cleanup_ids: dict[str, list[uuid.UUID]],
 ) -> None:
+    """MVP Slice 3: a real Document UUID from another organization is
+    rejected as 404, not 403.
+
+    Organization B's user holds a *valid, existing* document id belonging
+    to Organization A. Before this slice the response was 403 while an
+    unknown UUID was 404, so the pair of responses confirmed which foreign
+    document ids were real -- a cross-tenant existence oracle. Compare
+    ``test_process_missing_document_returns_404`` in this module: the two
+    now produce identical responses, which is the point.
+
+    The document must also be left completely untouched -- in particular
+    it must not be claimed into PROCESSING, because the tenant predicate
+    is inside the claiming UPDATE itself, not a check that ran before it.
+    """
+
     private_key, _public_key = keypair
     _organization_id, engagement_id, _profile_id = await _make_organization_engagement_and_profile(
         cleanup_ids
@@ -340,7 +359,10 @@ async def test_organization_mismatch_returns_403_and_leaves_document_untouched(
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
+    # The body must not name the document, its filename, or its owner.
+    assert "Other Org" not in response.text
+    assert fake_storage.get_calls == []  # the PDF was never even fetched
 
     async with AsyncSessionLocal() as verify_session:
         document_model = await verify_session.get(DocumentModel, document_id)

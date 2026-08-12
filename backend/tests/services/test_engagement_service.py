@@ -38,17 +38,11 @@ class FakeEngagementRepository(IEngagementRepository):
         self._rows[engagement_id] = engagement
         return engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self._rows.get(entity_id)
 
     async def list(
-        self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
+        self, *, organization_id: uuid.UUID, limit: int = 100, offset: int = 0
     ) -> Sequence[Engagement]:
-        rows = [
-            e
-            for e in self._rows.values()
-            if organization_id is None or e.organization_id == organization_id
-        ]
+        rows = [e for e in self._rows.values() if e.organization_id == organization_id]
         rows.sort(key=lambda e: (e.created_at, str(e.id)))
         return rows[offset : offset + limit]
 
@@ -106,14 +100,10 @@ class FakeOrganizationRepository(IOrganizationRepository):
             id=organization_id, name="Seed Org", created_at=datetime.now(timezone.utc)
         )
 
-    async def get(self, entity_id: uuid.UUID) -> Organization | None:
-        return self._rows.get(entity_id)
-
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Organization]:
-        return list(self._rows.values())[offset : offset + limit]
-
-    async def count(self) -> int:
-        return len(self._rows)
+    async def get_for_organization(
+        self, organization_id: uuid.UUID
+    ) -> Organization | None:
+        return self._rows.get(organization_id)
 
     async def create(self, entity: Organization) -> Organization:
         raise NotImplementedError
@@ -400,7 +390,12 @@ async def test_update_does_not_change_another_tenants_engagement(
             current_user=user_a,
         )
 
-    untouched = await engagement_repository.get(engagement.id)  # type: ignore[arg-type]
+    # Verified from the *owner's* scope: the repository no longer offers an
+    # unscoped get (MVP Slice 3 closure), and reading Organization B's row
+    # as Organization B is what "unchanged for its owner" actually means.
+    untouched = await engagement_repository.get_for_organization(
+        engagement.id, organization_id=organization_b_id  # type: ignore[arg-type]
+    )
     assert untouched is not None
     assert untouched.title == "Original Title"
 
@@ -442,7 +437,9 @@ async def test_cross_tenant_reassignment_does_not_change_the_row(
             current_user=user_a,
         )
 
-    untouched = await engagement_repository.get(engagement.id)  # type: ignore[arg-type]
+    untouched = await engagement_repository.get_for_organization(
+        engagement.id, organization_id=organization_a_id  # type: ignore[arg-type]
+    )
     assert untouched is not None
     assert untouched.organization_id == organization_a_id
 

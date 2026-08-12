@@ -13,6 +13,16 @@ application-supplied value -- an ``INSERT ... SELECT ... JOIN`` shape
 that is more directly and auditably expressed as explicit SQL than
 coaxed out of the ORM-enabled bulk-insert API, which is built for plain
 VALUES inserts, not INSERT-from-SELECT-with-JOIN.
+
+MVP Slice 3 (Organization Data Isolation): every statement in this class
+now also carries ``organization_id = :organization_id`` (or, for
+``claim_new``, ``e.organization_id = :organization_id`` on the derived
+lineage). ``search`` already did; the state-transition methods did not,
+and located rows by bare embedding id alone. These rows hold the vectors
+retrieval ranks over, so an unscoped write here could have corrupted or
+resurrected another tenant's embeddings, and an unscoped read could have
+fed them into a ranking. Tenant filtering is in the query for every one
+of them -- never applied to candidates after retrieval.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -70,6 +80,7 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
         self,
         chunk_ids: Sequence[UUID],
         *,
+        organization_id: UUID,
         provider: str,
         model: str,
         model_version: str,
@@ -79,6 +90,11 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
         if not chunk_ids:
             return []
         claimed: list[DocumentChunkEmbedding] = []
+        # `e.organization_id` is still the value written to the new row --
+        # derived from the chunk's real lineage, never from the caller.
+        # `= :organization_id` is a separate, additional constraint on
+        # which chunks may be claimed at all, so a foreign chunk_id
+        # inserts nothing rather than claiming another tenant's chunk.
         stmt = text(
             f"""
             INSERT INTO document_chunk_embeddings
@@ -89,7 +105,7 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
             FROM document_chunks dc
             JOIN documents d ON d.id = dc.document_id
             JOIN engagements e ON e.id = d.engagement_id
-            WHERE dc.id = :chunk_id
+            WHERE dc.id = :chunk_id AND e.organization_id = :organization_id
             ON CONFLICT (chunk_id, provider, model, model_version) DO NOTHING
             RETURNING {_COLUMNS}
             """
@@ -99,6 +115,7 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                 stmt,
                 {
                     "chunk_id": chunk_id,
+                    "organization_id": organization_id,
                     "provider": provider,
                     "model": model,
                     "model_version": model_version,
@@ -113,7 +130,13 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
         return claimed
 
     async def get_existing(
-        self, chunk_ids: Sequence[UUID], *, provider: str, model: str, model_version: str
+        self,
+        chunk_ids: Sequence[UUID],
+        *,
+        organization_id: UUID,
+        provider: str,
+        model: str,
+        model_version: str,
     ) -> Sequence[DocumentChunkEmbedding]:
         if not chunk_ids:
             return []
@@ -121,12 +144,14 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
             text(
                 f"""
                 SELECT {_COLUMNS} FROM document_chunk_embeddings
-                WHERE chunk_id = ANY(:chunk_ids) AND provider = :provider
+                WHERE chunk_id = ANY(:chunk_ids) AND organization_id = :organization_id
+                  AND provider = :provider
                   AND model = :model AND model_version = :model_version
                 """
             ),
             {
                 "chunk_ids": list(chunk_ids),
+                "organization_id": organization_id,
                 "provider": provider,
                 "model": model,
                 "model_version": model_version,
@@ -135,7 +160,7 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
         return [_row_to_domain(row) for row in result.mappings().all()]
 
     async def retry_failed(
-        self, embedding_ids: Sequence[UUID]
+        self, embedding_ids: Sequence[UUID], *, organization_id: UUID
     ) -> Sequence[DocumentChunkEmbedding]:
         if not embedding_ids:
             return []
@@ -145,18 +170,23 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                 UPDATE document_chunk_embeddings
                 SET status = 'PROCESSING', processing_started_at = now(),
                     attempt_count = attempt_count + 1, error_message = NULL, updated_at = now()
-                WHERE id = ANY(:ids) AND status = 'FAILED'
+                WHERE id = ANY(:ids) AND organization_id = :organization_id
+                  AND status = 'FAILED'
                 RETURNING {_COLUMNS}
                 """
             ),
-            {"ids": list(embedding_ids)},
+            {"ids": list(embedding_ids), "organization_id": organization_id},
         )
         rows = result.mappings().all()
         await self._session.commit()
         return [_row_to_domain(row) for row in rows]
 
     async def reclaim_stale(
-        self, embedding_ids: Sequence[UUID], *, stale_after_seconds: int
+        self,
+        embedding_ids: Sequence[UUID],
+        *,
+        organization_id: UUID,
+        stale_after_seconds: int,
     ) -> Sequence[DocumentChunkEmbedding]:
         if not embedding_ids:
             return []
@@ -167,17 +197,24 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                 UPDATE document_chunk_embeddings
                 SET processing_started_at = now(), attempt_count = attempt_count + 1,
                     error_message = NULL, updated_at = now()
-                WHERE id = ANY(:ids) AND status = 'PROCESSING' AND processing_started_at < :cutoff
+                WHERE id = ANY(:ids) AND organization_id = :organization_id
+                  AND status = 'PROCESSING' AND processing_started_at < :cutoff
                 RETURNING {_COLUMNS}
                 """
             ),
-            {"ids": list(embedding_ids), "cutoff": cutoff},
+            {
+                "ids": list(embedding_ids),
+                "organization_id": organization_id,
+                "cutoff": cutoff,
+            },
         )
         rows = result.mappings().all()
         await self._session.commit()
         return [_row_to_domain(row) for row in rows]
 
-    async def mark_completed(self, results: Sequence[tuple[UUID, Sequence[float]]]) -> None:
+    async def mark_completed(
+        self, results: Sequence[tuple[UUID, Sequence[float]]], *, organization_id: UUID
+    ) -> None:
         if not results:
             return
         stmt = text(
@@ -185,16 +222,23 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
             UPDATE document_chunk_embeddings
             SET status = 'COMPLETED', embedding = :embedding, error_message = NULL,
                 updated_at = now()
-            WHERE id = :id
+            WHERE id = :id AND organization_id = :organization_id
             """
         )
         for embedding_id, vector in results:
             await self._session.execute(
-                stmt, {"id": embedding_id, "embedding": _vector_literal(vector)}
+                stmt,
+                {
+                    "id": embedding_id,
+                    "organization_id": organization_id,
+                    "embedding": _vector_literal(vector),
+                },
             )
         await self._session.commit()
 
-    async def mark_failed(self, embedding_ids: Sequence[UUID], *, error_message: str) -> None:
+    async def mark_failed(
+        self, embedding_ids: Sequence[UUID], *, organization_id: UUID, error_message: str
+    ) -> None:
         if not embedding_ids:
             return
         await self._session.execute(
@@ -202,10 +246,14 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                 """
                 UPDATE document_chunk_embeddings
                 SET status = 'FAILED', error_message = :error_message, updated_at = now()
-                WHERE id = ANY(:ids)
+                WHERE id = ANY(:ids) AND organization_id = :organization_id
                 """
             ),
-            {"ids": list(embedding_ids), "error_message": error_message},
+            {
+                "ids": list(embedding_ids),
+                "organization_id": organization_id,
+                "error_message": error_message,
+            },
         )
         await self._session.commit()
 

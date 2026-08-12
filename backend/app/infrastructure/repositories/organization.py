@@ -1,11 +1,19 @@
 """Concrete async repository for the ``Organization`` aggregate.
 
-Implements ``IOrganizationRepository`` directly rather than subclassing the
-generic ``SQLAlchemyRepository``, mirroring ``SQLAlchemyDocumentRepository``:
-every method maps explicitly between ``OrganizationModel`` (ORM, imported
-aliased since the ORM class and the domain entity share the name
-``Organization``) and the domain ``Organization`` via ``_to_domain`` -- the
-ORM type never crosses the repository boundary.
+Implements ``IOrganizationRepository`` directly, mirroring
+``SQLAlchemyDocumentRepository``: every method maps explicitly between
+``OrganizationModel`` (ORM, imported aliased since the ORM class and the
+domain entity share the name ``Organization``) and the domain
+``Organization`` via ``_to_domain`` -- the ORM type never crosses the
+repository boundary.
+
+MVP Slice 3 closure: ``list()`` and ``count()`` have been **removed**.
+Both were global across every tenant -- one enumerating all organizations
+by name, the other disclosing how many exist -- and neither was called by
+any service. ``get()`` became ``get_for_organization()``, which takes the
+caller's own trusted organization id; since the organization id *is* the
+tenant scope, that is what makes the read safe. See
+``IOrganizationRepository``.
 
 ``id``/``created_at`` are server-generated (``gen_random_uuid()`` /
 ``CURRENT_TIMESTAMP``), so ``create()`` never assigns them; they are only
@@ -16,10 +24,8 @@ exposed through ``OrganizationService`` or any route this sprint -- it
 exists solely so integration tests can remove the exact rows they create.
 """
 
-from typing import Sequence
 from uuid import UUID
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
@@ -38,24 +44,9 @@ class SQLAlchemyOrganizationRepository(IOrganizationRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get(self, entity_id: UUID) -> Organization | None:
-        model = await self._session.get(OrganizationModel, entity_id)
+    async def get_for_organization(self, organization_id: UUID) -> Organization | None:
+        model = await self._session.get(OrganizationModel, organization_id)
         return _to_domain(model) if model is not None else None
-
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Organization]:
-        stmt = (
-            select(OrganizationModel)
-            .order_by(OrganizationModel.created_at.asc(), OrganizationModel.id.asc())
-            .limit(limit)
-            .offset(offset)
-        )
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars().all()]
-
-    async def count(self) -> int:
-        stmt = select(func.count()).select_from(OrganizationModel)
-        result = await self._session.execute(stmt)
-        return result.scalar_one()
 
     async def create(self, entity: Organization) -> Organization:
         model = OrganizationModel(name=entity.name)

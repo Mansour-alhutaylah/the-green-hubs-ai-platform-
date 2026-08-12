@@ -19,6 +19,16 @@ derived chain's ``organization_id`` matches the analysis run's own
 ``document_chunk_embeddings`` established in Sprint 3.6A, now closing
 the specific risk Mandatory Correction 2 is about: an LLM-cited source
 key must resolve to a chunk this tenant's run is actually entitled to.
+
+MVP Slice 3 (Organization Data Isolation): every remaining method that
+addressed a run by bare id -- ``retry_failed``, ``reclaim_stale``,
+``mark_completed``, ``mark_failed``, ``mark_insufficient_evidence`` and
+``get_citations`` -- now takes the caller's trusted ``organization_id``
+as a mandatory keyword-only constraint, matching ``get_by_id``'s
+long-standing shape. ``get_citations`` is the sharpest of these: a
+citation row carries ``quoted_snippet``, verbatim text from the source
+document, so an unscoped read of it by run id would have disclosed
+another tenant's document content directly.
 """
 
 from abc import ABC, abstractmethod
@@ -84,18 +94,20 @@ class IAnalysisRunRepository(ABC):
         ...
 
     @abstractmethod
-    async def retry_failed(self, analysis_run_id: UUID) -> AnalysisRun | None:
+    async def retry_failed(
+        self, analysis_run_id: UUID, *, organization_id: UUID
+    ) -> AnalysisRun | None:
         """Atomically transitions FAILED -> PROCESSING for retry: resets
         ``processing_started_at``, increments ``attempt_count``, clears
         ``error_message``/``insufficient_evidence_reason``, explicitly
         sets ``updated_at``. Returns ``None`` if the row is no longer
-        FAILED when this runs (raced by a concurrent retry). Committed
-        immediately."""
+        FAILED when this runs (raced by a concurrent retry) or belongs to
+        another organization. Committed immediately."""
         ...
 
     @abstractmethod
     async def reclaim_stale(
-        self, analysis_run_id: UUID, *, stale_after_seconds: int
+        self, analysis_run_id: UUID, *, organization_id: UUID, stale_after_seconds: int
     ) -> AnalysisRun | None:
         """Atomically reclaims a PROCESSING row whose
         ``processing_started_at`` is older than ``stale_after_seconds``:
@@ -103,9 +115,9 @@ class IAnalysisRunRepository(ABC):
         ``attempt_count``, keeps ``status = 'PROCESSING'``, explicitly
         sets ``updated_at``. The staleness check and the update happen in
         the same conditional statement, so a row that is not actually
-        stale (or was already reclaimed by a concurrent caller) is never
-        reclaimed twice -- returns ``None`` instead. Committed
-        immediately."""
+        stale (or was already reclaimed by a concurrent caller, or
+        belongs to another organization) is never reclaimed twice --
+        returns ``None`` instead. Committed immediately."""
         ...
 
     @abstractmethod
@@ -113,6 +125,7 @@ class IAnalysisRunRepository(ABC):
         self,
         analysis_run_id: UUID,
         *,
+        organization_id: UUID,
         structured_output: dict,
         prompt_tokens: int | None,
         completion_tokens: int | None,
@@ -121,21 +134,26 @@ class IAnalysisRunRepository(ABC):
     ) -> None:
         """Resolves a claimed row to COMPLETED with its validated
         structured output and token usage, setting ``completed_at`` and
-        ``updated_at``. Only transitions rows currently PROCESSING.
-        Committed immediately, after the external LLM call has already
-        returned -- never called while any other transaction-scoped work
-        is pending."""
+        ``updated_at``. Only transitions rows currently PROCESSING *and*
+        owned by ``organization_id``. Committed immediately, after the
+        external LLM call has already returned -- never called while any
+        other transaction-scoped work is pending."""
         ...
 
     @abstractmethod
-    async def mark_failed(self, analysis_run_id: UUID, *, error_message: str) -> None:
+    async def mark_failed(
+        self, analysis_run_id: UUID, *, organization_id: UUID, error_message: str
+    ) -> None:
         """Resolves a claimed row to FAILED with an already-sanitized
         error message, clearing ``structured_output``. Only transitions
-        rows currently PROCESSING. Committed immediately."""
+        rows currently PROCESSING and owned by ``organization_id``.
+        Committed immediately."""
         ...
 
     @abstractmethod
-    async def mark_insufficient_evidence(self, analysis_run_id: UUID, *, reason: str) -> None:
+    async def mark_insufficient_evidence(
+        self, analysis_run_id: UUID, *, organization_id: UUID, reason: str
+    ) -> None:
         """Resolves a claimed row to INSUFFICIENT_EVIDENCE with a
         required reason, clearing ``structured_output``, setting
         ``completed_at``. Only transitions rows currently PROCESSING.
@@ -163,9 +181,13 @@ class IAnalysisRunRepository(ABC):
         ...
 
     @abstractmethod
-    async def get_citations(self, analysis_run_id: UUID) -> Sequence[AnalysisSourceReference]:
+    async def get_citations(
+        self, analysis_run_id: UUID, *, organization_id: UUID
+    ) -> Sequence[AnalysisSourceReference]:
         """Returns all persisted citations for a run, ordered by
-        ``citation_order``."""
+        ``citation_order``. Tenant-scoped: a run id belonging to another
+        organization yields an empty sequence, never its
+        ``quoted_snippet`` text."""
         ...
 
     @abstractmethod

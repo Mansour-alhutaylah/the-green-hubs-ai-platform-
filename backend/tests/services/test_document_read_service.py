@@ -166,16 +166,19 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity):  # type: ignore[override]
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id):  # type: ignore[override]
+    async def get_for_organization(self, document_id, *, organization_id):  # type: ignore[override]
         raise NotImplementedError
 
-    async def update_status(self, document_id, status):  # type: ignore[override]
+    async def get_by_engagement(self, engagement_id, *, organization_id):  # type: ignore[override]
         raise NotImplementedError
 
-    async def begin_processing(self, document_id):  # type: ignore[override]
+    async def update_status(self, document_id, status, *, organization_id):  # type: ignore[override]
         raise NotImplementedError
 
-    async def complete_processing(self, document_id):  # type: ignore[override]
+    async def begin_processing(self, document_id, *, organization_id):  # type: ignore[override]
+        raise NotImplementedError
+
+    async def complete_processing(self, document_id, *, organization_id):  # type: ignore[override]
         raise NotImplementedError
 
 

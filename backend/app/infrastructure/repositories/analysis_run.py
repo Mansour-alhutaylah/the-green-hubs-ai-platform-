@@ -14,6 +14,14 @@ Raw ``text()`` SQL is used throughout, mirroring
 Bind parameters are never followed directly by a ``::type`` cast
 shorthand -- always ``CAST(:param AS type)`` -- per this project's
 established SQLAlchemy ``text()`` gotcha.
+
+MVP Slice 3 (Organization Data Isolation): every statement here now
+carries ``organization_id = :organization_id`` alongside the row id.
+``claim_or_get``/``get_by_id``/``add_citations`` already did;
+``retry_failed``, ``reclaim_stale``, the three ``mark_*`` transitions and
+``get_citations`` did not. ``analysis_source_references.quoted_snippet``
+holds verbatim source-document text, so ``get_citations`` in particular
+was a direct content-disclosure path keyed on nothing but a run UUID.
 """
 
 import json
@@ -189,7 +197,9 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
         row = result.mappings().first()
         return _run_from_row(row) if row is not None else None
 
-    async def retry_failed(self, analysis_run_id: UUID) -> AnalysisRun | None:
+    async def retry_failed(
+        self, analysis_run_id: UUID, *, organization_id: UUID
+    ) -> AnalysisRun | None:
         result = await self._session.execute(
             text(
                 f"""
@@ -197,18 +207,18 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
                 SET status = 'PROCESSING', processing_started_at = now(),
                     attempt_count = attempt_count + 1, error_message = NULL,
                     insufficient_evidence_reason = NULL, updated_at = now()
-                WHERE id = :id AND status = 'FAILED'
+                WHERE id = :id AND organization_id = :organization_id AND status = 'FAILED'
                 RETURNING {_RUN_COLUMNS}
                 """
             ),
-            {"id": analysis_run_id},
+            {"id": analysis_run_id, "organization_id": organization_id},
         )
         row = result.mappings().first()
         await self._session.commit()
         return _run_from_row(row) if row is not None else None
 
     async def reclaim_stale(
-        self, analysis_run_id: UUID, *, stale_after_seconds: int
+        self, analysis_run_id: UUID, *, organization_id: UUID, stale_after_seconds: int
     ) -> AnalysisRun | None:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=stale_after_seconds)
         result = await self._session.execute(
@@ -217,11 +227,16 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
                 UPDATE analysis_runs
                 SET processing_started_at = now(), attempt_count = attempt_count + 1,
                     updated_at = now()
-                WHERE id = :id AND status = 'PROCESSING' AND processing_started_at < :cutoff
+                WHERE id = :id AND organization_id = :organization_id
+                  AND status = 'PROCESSING' AND processing_started_at < :cutoff
                 RETURNING {_RUN_COLUMNS}
                 """
             ),
-            {"id": analysis_run_id, "cutoff": cutoff},
+            {
+                "id": analysis_run_id,
+                "organization_id": organization_id,
+                "cutoff": cutoff,
+            },
         )
         row = result.mappings().first()
         await self._session.commit()
@@ -231,6 +246,7 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
         self,
         analysis_run_id: UUID,
         *,
+        organization_id: UUID,
         structured_output: dict,
         prompt_tokens: int | None,
         completion_tokens: int | None,
@@ -245,11 +261,12 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
                     error_message = NULL, prompt_tokens = :prompt_tokens,
                     completion_tokens = :completion_tokens, total_tokens = :total_tokens,
                     estimated_cost = :estimated_cost, completed_at = now(), updated_at = now()
-                WHERE id = :id AND status = 'PROCESSING'
+                WHERE id = :id AND organization_id = :organization_id AND status = 'PROCESSING'
                 """
             ),
             {
                 "id": analysis_run_id,
+                "organization_id": organization_id,
                 "structured_output": json.dumps(structured_output),
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
@@ -259,21 +276,29 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
         )
         await self._session.commit()
 
-    async def mark_failed(self, analysis_run_id: UUID, *, error_message: str) -> None:
+    async def mark_failed(
+        self, analysis_run_id: UUID, *, organization_id: UUID, error_message: str
+    ) -> None:
         await self._session.execute(
             text(
                 """
                 UPDATE analysis_runs
                 SET status = 'FAILED', error_message = :error_message, structured_output = NULL,
                     updated_at = now()
-                WHERE id = :id AND status = 'PROCESSING'
+                WHERE id = :id AND organization_id = :organization_id AND status = 'PROCESSING'
                 """
             ),
-            {"id": analysis_run_id, "error_message": error_message},
+            {
+                "id": analysis_run_id,
+                "organization_id": organization_id,
+                "error_message": error_message,
+            },
         )
         await self._session.commit()
 
-    async def mark_insufficient_evidence(self, analysis_run_id: UUID, *, reason: str) -> None:
+    async def mark_insufficient_evidence(
+        self, analysis_run_id: UUID, *, organization_id: UUID, reason: str
+    ) -> None:
         await self._session.execute(
             text(
                 """
@@ -281,10 +306,14 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
                 SET status = 'INSUFFICIENT_EVIDENCE', insufficient_evidence_reason = :reason,
                     structured_output = NULL, error_message = NULL, completed_at = now(),
                     updated_at = now()
-                WHERE id = :id AND status = 'PROCESSING'
+                WHERE id = :id AND organization_id = :organization_id AND status = 'PROCESSING'
                 """
             ),
-            {"id": analysis_run_id, "reason": reason},
+            {
+                "id": analysis_run_id,
+                "organization_id": organization_id,
+                "reason": reason,
+            },
         )
         await self._session.commit()
 
@@ -333,13 +362,16 @@ class SQLAlchemyAnalysisRunRepository(IAnalysisRunRepository):
         await self._session.commit()
         return inserted
 
-    async def get_citations(self, analysis_run_id: UUID) -> Sequence[AnalysisSourceReference]:
+    async def get_citations(
+        self, analysis_run_id: UUID, *, organization_id: UUID
+    ) -> Sequence[AnalysisSourceReference]:
         result = await self._session.execute(
             text(
                 f"SELECT {_CITATION_COLUMNS} FROM analysis_source_references "
-                "WHERE analysis_run_id = :analysis_run_id ORDER BY citation_order"
+                "WHERE analysis_run_id = :analysis_run_id "
+                "AND organization_id = :organization_id ORDER BY citation_order"
             ),
-            {"analysis_run_id": analysis_run_id},
+            {"analysis_run_id": analysis_run_id, "organization_id": organization_id},
         )
         return [_citation_from_row(row) for row in result.mappings().all()]
 

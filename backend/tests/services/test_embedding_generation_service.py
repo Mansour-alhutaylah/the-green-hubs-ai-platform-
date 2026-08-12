@@ -30,17 +30,24 @@ DIMENSION = 1536
 
 
 class FakeDocumentRepository(IDocumentRepository):
-    def __init__(self) -> None:
+    """Models the real ``documents -> engagements`` ownership join, so a
+    foreign ``document_id`` genuinely resolves to nothing here too."""
+
+    def __init__(self, engagements: "FakeEngagementRepository") -> None:
         self.rows: dict[uuid.UUID, Document] = {}
+        self._engagements = engagements
 
     def seed(self, document: Document) -> None:
         self.rows[document.id] = document
 
-    async def get(self, entity_id: uuid.UUID) -> Document | None:
-        return self.rows.get(entity_id)
+    def organization_of(self, document_id: uuid.UUID) -> uuid.UUID | None:
+        document = self.rows.get(document_id)
+        if document is None:
+            return None
+        engagement = self._engagements.rows.get(document.engagement_id)
+        return engagement.organization_id if engagement is not None else None
 
-    async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[Document]:
-        return list(self.rows.values())
+
 
     async def create(self, entity: Document) -> Document:
         raise NotImplementedError
@@ -51,16 +58,32 @@ class FakeDocumentRepository(IDocumentRepository):
     async def delete(self, entity: Document) -> None:
         raise NotImplementedError
 
-    async def get_by_engagement(self, engagement_id: uuid.UUID) -> Sequence[Document]:
+    async def get_for_organization(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document | None:
+        owner = self.organization_of(document_id)
+        if owner is None or owner != organization_id:
+            return None
+        return self.rows.get(document_id)
+
+    async def get_by_engagement(
+        self, engagement_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[Document]:
         return [d for d in self.rows.values() if d.engagement_id == engagement_id]
 
-    async def update_status(self, document_id: uuid.UUID, status: str) -> Document:
+    async def update_status(
+        self, document_id: uuid.UUID, status: str, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def begin_processing(self, document_id: uuid.UUID) -> Document:
+    async def begin_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
-    async def complete_processing(self, document_id: uuid.UUID) -> Document:
+    async def complete_processing(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Document:
         raise NotImplementedError
 
     async def get_read_model_for_organization(self, document_id: uuid.UUID, *, organization_id: uuid.UUID):
@@ -81,8 +104,6 @@ class FakeEngagementRepository(IEngagementRepository):
         assert engagement.id is not None
         self.rows[engagement.id] = engagement
 
-    async def get(self, entity_id: uuid.UUID) -> Engagement | None:
-        return self.rows.get(entity_id)
 
     async def list(
         self, *, limit: int = 100, offset: int = 0, organization_id: uuid.UUID | None = None
@@ -114,8 +135,13 @@ class FakeEngagementRepository(IEngagementRepository):
 
 
 class FakeDocumentChunkRepository(IDocumentChunkRepository):
-    def __init__(self) -> None:
+    """Resolves ownership through the document repository's own join, the
+    same ``document_chunks -> documents -> engagements`` chain the real
+    query walks."""
+
+    def __init__(self, documents: FakeDocumentRepository) -> None:
         self.rows: dict[uuid.UUID, list[DocumentChunk]] = {}
+        self._documents = documents
 
     def seed(self, document_id: uuid.UUID, chunks: list[DocumentChunk]) -> None:
         self.rows[document_id] = chunks
@@ -123,7 +149,11 @@ class FakeDocumentChunkRepository(IDocumentChunkRepository):
     async def create_many(self, entities: Sequence[DocumentChunk]) -> Sequence[DocumentChunk]:
         raise NotImplementedError
 
-    async def get_by_document(self, document_id: uuid.UUID) -> Sequence[DocumentChunk]:
+    async def get_by_document(
+        self, document_id: uuid.UUID, *, organization_id: uuid.UUID
+    ) -> Sequence[DocumentChunk]:
+        if self._documents.organization_of(document_id) != organization_id:
+            return []
         return self.rows.get(document_id, [])
 
     async def delete(self, entity: DocumentChunk) -> None:
@@ -178,6 +208,7 @@ class FakeDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingRepository):
         self,
         chunk_ids: Sequence[uuid.UUID],
         *,
+        organization_id: uuid.UUID,
         provider: str,
         model: str,
         model_version: str,
@@ -194,7 +225,11 @@ class FakeDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingRepository):
             )
             if exists:
                 continue
-            document_id, engagement_id, organization_id = self.chunk_lineage[chunk_id]
+            document_id, engagement_id, chunk_organization_id = self.chunk_lineage[chunk_id]
+            # Mirrors the real INSERT ... SELECT's tenant predicate: a
+            # chunk outside the caller's organization claims nothing.
+            if chunk_organization_id != organization_id:
+                continue
             now = datetime.now(timezone.utc)
             row = DocumentChunkEmbedding(
                 id=uuid.uuid4(), chunk_id=chunk_id, document_id=document_id,
@@ -209,22 +244,33 @@ class FakeDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingRepository):
         return claimed
 
     async def get_existing(
-        self, chunk_ids: Sequence[uuid.UUID], *, provider: str, model: str, model_version: str
+        self,
+        chunk_ids: Sequence[uuid.UUID],
+        *,
+        organization_id: uuid.UUID,
+        provider: str,
+        model: str,
+        model_version: str,
     ) -> Sequence[DocumentChunkEmbedding]:
         chunk_id_set = set(chunk_ids)
         return [
             r for r in self.rows.values()
-            if r.chunk_id in chunk_id_set and r.provider == provider and r.model == model
+            if r.chunk_id in chunk_id_set and r.organization_id == organization_id
+            and r.provider == provider and r.model == model
             and r.model_version == model_version
         ]
 
     async def retry_failed(
-        self, embedding_ids: Sequence[uuid.UUID]
+        self, embedding_ids: Sequence[uuid.UUID], *, organization_id: uuid.UUID
     ) -> Sequence[DocumentChunkEmbedding]:
         retried = []
         for eid in embedding_ids:
             row = self.rows.get(eid)
-            if row is not None and row.status == "FAILED":
+            if (
+                row is not None
+                and row.organization_id == organization_id
+                and row.status == "FAILED"
+            ):
                 updated = replace(
                     row, status="PROCESSING", processing_started_at=datetime.now(timezone.utc),
                     attempt_count=row.attempt_count + 1, error_message=None,
@@ -235,14 +281,19 @@ class FakeDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingRepository):
         return retried
 
     async def reclaim_stale(
-        self, embedding_ids: Sequence[uuid.UUID], *, stale_after_seconds: int
+        self,
+        embedding_ids: Sequence[uuid.UUID],
+        *,
+        organization_id: uuid.UUID,
+        stale_after_seconds: int,
     ) -> Sequence[DocumentChunkEmbedding]:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=stale_after_seconds)
         reclaimed = []
         for eid in embedding_ids:
             row = self.rows.get(eid)
             if (
-                row is not None and row.status == "PROCESSING"
+                row is not None and row.organization_id == organization_id
+                and row.status == "PROCESSING"
                 and row.processing_started_at is not None and row.processing_started_at < cutoff
             ):
                 updated = replace(
@@ -254,19 +305,30 @@ class FakeDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingRepository):
                 reclaimed.append(updated)
         return reclaimed
 
-    async def mark_completed(self, results: Sequence[tuple[uuid.UUID, Sequence[float]]]) -> None:
+    async def mark_completed(
+        self,
+        results: Sequence[tuple[uuid.UUID, Sequence[float]]],
+        *,
+        organization_id: uuid.UUID,
+    ) -> None:
         for eid, vector in results:
             row = self.rows.get(eid)
-            if row is not None:
+            if row is not None and row.organization_id == organization_id:
                 self.rows[eid] = replace(
                     row, status="COMPLETED", embedding=list(vector), error_message=None,
                     updated_at=datetime.now(timezone.utc),
                 )
 
-    async def mark_failed(self, embedding_ids: Sequence[uuid.UUID], *, error_message: str) -> None:
+    async def mark_failed(
+        self,
+        embedding_ids: Sequence[uuid.UUID],
+        *,
+        organization_id: uuid.UUID,
+        error_message: str,
+    ) -> None:
         for eid in embedding_ids:
             row = self.rows.get(eid)
-            if row is not None:
+            if row is not None and row.organization_id == organization_id:
                 self.rows[eid] = replace(
                     row, status="FAILED", error_message=error_message,
                     updated_at=datetime.now(timezone.utc),
@@ -309,18 +371,22 @@ def _chunk(document_id: uuid.UUID, index: int, content: str) -> DocumentChunk:
 
 
 @pytest.fixture
-def document_repository() -> FakeDocumentRepository:
-    return FakeDocumentRepository()
-
-
-@pytest.fixture
 def engagement_repository() -> FakeEngagementRepository:
     return FakeEngagementRepository()
 
 
 @pytest.fixture
-def chunk_repository() -> FakeDocumentChunkRepository:
-    return FakeDocumentChunkRepository()
+def document_repository(
+    engagement_repository: FakeEngagementRepository,
+) -> FakeDocumentRepository:
+    return FakeDocumentRepository(engagement_repository)
+
+
+@pytest.fixture
+def chunk_repository(
+    document_repository: FakeDocumentRepository,
+) -> FakeDocumentChunkRepository:
+    return FakeDocumentChunkRepository(document_repository)
 
 
 @pytest.fixture
@@ -336,13 +402,14 @@ def provider() -> FakeEmbeddingProvider:
 @pytest.fixture
 def service(
     document_repository: FakeDocumentRepository,
-    engagement_repository: FakeEngagementRepository,
     chunk_repository: FakeDocumentChunkRepository,
     embedding_repository: FakeDocumentChunkEmbeddingRepository,
     provider: FakeEmbeddingProvider,
 ) -> EmbeddingGenerationService:
+    # No engagement repository: MVP Slice 3 moved the ownership chain into
+    # IDocumentRepository's own tenant-scoped queries.
     return EmbeddingGenerationService(
-        document_repository, engagement_repository, chunk_repository, embedding_repository,
+        document_repository, chunk_repository, embedding_repository,
         provider, provider_name=PROVIDER_NAME, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, max_batch_size=100, stale_after_seconds=300,
     )
@@ -667,7 +734,7 @@ async def test_provider_failure_marks_the_whole_batch_failed(
     )
     provider.error = EmbeddingProviderUnavailableError("down")
     service = EmbeddingGenerationService(
-        document_repository, engagement_repository, chunk_repository, embedding_repository,
+        document_repository, chunk_repository, embedding_repository,
         provider, provider_name=PROVIDER_NAME, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, max_batch_size=100, stale_after_seconds=300,
     )
@@ -707,7 +774,7 @@ async def test_second_round_failure_leaves_first_round_completed(
 
     flaky_provider = FlakyProvider()
     service = EmbeddingGenerationService(
-        document_repository, engagement_repository, chunk_repository, embedding_repository,
+        document_repository, chunk_repository, embedding_repository,
         flaky_provider, provider_name=PROVIDER_NAME, model=MODEL, model_version=MODEL_VERSION,
         embedding_dimension=DIMENSION, max_batch_size=2, stale_after_seconds=300,
     )

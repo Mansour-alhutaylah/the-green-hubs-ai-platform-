@@ -85,79 +85,52 @@ async def test_create_persists_organization_with_server_generated_id_and_created
 # ---------------------------------------------------------------------------
 
 
-async def test_get_retrieves_by_id(
+async def test_get_for_organization_retrieves_the_tenant_root_by_its_own_id(
     repository: SQLAlchemyOrganizationRepository, cleanup_ids: list[uuid.UUID]
 ) -> None:
     created = await repository.create(Organization(id=None, name="Get Org", created_at=None))
     assert created.id is not None
     cleanup_ids.append(created.id)
 
-    fetched = await repository.get(created.id)
+    fetched = await repository.get_for_organization(created.id)
 
     assert fetched is not None
     assert fetched.id == created.id
     assert fetched.name == "Get Org"
 
 
-async def test_get_returns_none_for_missing_id(
+async def test_get_for_organization_returns_none_for_missing_id(
     repository: SQLAlchemyOrganizationRepository,
 ) -> None:
-    assert await repository.get(uuid.uuid4()) is None
+    assert await repository.get_for_organization(uuid.uuid4()) is None
 
 
-async def test_list_returns_empty_when_no_matching_rows(
-    repository: SQLAlchemyOrganizationRepository,
-) -> None:
-    # Not a claim the table is globally empty -- only that a very large
-    # offset past any realistic row count returns nothing, without
-    # depending on (or mutating) unrelated rows.
-    results = await repository.list(limit=10, offset=1_000_000)
-    assert results == []
-
-
-async def test_list_returns_created_rows_in_deterministic_order(
+async def test_the_repository_offers_no_global_listing_or_count(
     repository: SQLAlchemyOrganizationRepository, cleanup_ids: list[uuid.UUID]
 ) -> None:
-    first = await repository.create(Organization(id=None, name="Order Org A", created_at=None))
-    second = await repository.create(Organization(id=None, name="Order Org B", created_at=None))
-    assert first.id is not None and second.id is not None
-    cleanup_ids.extend([first.id, second.id])
+    """MVP Slice 3 closure. ``list()`` and ``count()`` used to exist here
+    and were global across every tenant -- one enumerating all
+    organizations by name, the other disclosing how many exist.
 
-    results = await repository.list(limit=1000, offset=0)
+    This replaces the three tests that exercised them. It is deliberately
+    a structural assertion rather than a behavioural one: the point is
+    that the methods are *gone*, so no caller can reach a cross-tenant
+    result, not that some particular caller currently avoids them. Rows
+    are still created here so the check runs against a repository with
+    real data behind it.
+    """
 
-    ids_in_order = [r.id for r in results]
-    assert ids_in_order.index(first.id) < ids_in_order.index(second.id)
-
-
-async def test_list_pagination_respects_limit_and_offset(
-    repository: SQLAlchemyOrganizationRepository, cleanup_ids: list[uuid.UUID]
-) -> None:
-    created_ids = []
-    for i in range(3):
+    for index in range(2):
         created = await repository.create(
-            Organization(id=None, name=f"Paginated Org {i}", created_at=None)
+            Organization(id=None, name=f"No Global Listing {index}", created_at=None)
         )
         assert created.id is not None
-        created_ids.append(created.id)
-    cleanup_ids.extend(created_ids)
+        cleanup_ids.append(created.id)
 
-    page = await repository.list(limit=1, offset=1)
-
-    assert len(page) == 1
-
-
-async def test_count_reflects_created_rows(
-    repository: SQLAlchemyOrganizationRepository, cleanup_ids: list[uuid.UUID]
-) -> None:
-    before = await repository.count()
-
-    created = await repository.create(Organization(id=None, name="Count Org", created_at=None))
-    assert created.id is not None
-    cleanup_ids.append(created.id)
-
-    after = await repository.count()
-
-    assert after == before + 1
+    assert not hasattr(repository, "list")
+    assert not hasattr(repository, "count")
+    # The only read this repository offers is the scoped one.
+    assert hasattr(repository, "get_for_organization")
 
 
 # ---------------------------------------------------------------------------
@@ -241,4 +214,4 @@ async def test_delete_removes_the_record(
 
     await repository.delete(created)
 
-    assert await repository.get(created.id) is None
+    assert await repository.get_for_organization(created.id) is None

@@ -14,13 +14,21 @@ atomicity for its own COMPLETED/FAILED outcome (see
 ``mark_completed``/``mark_failed``) -- one round failing never affects
 an earlier round's already-committed COMPLETED rows.
 
-Cross-tenant authorization mirrors ``DocumentProcessingService.process()``'s
-existing checks for document/engagement existence and organization-null
-handling, but returns an indistinguishable 404 (not 403) for a
-cross-tenant document, matching the newer, information-leak-safe
-convention Sprint 3.5.1 established for Organization/Engagement -- a
-deliberate improvement over Sprint 3.5's own, now-superseded, 403-on-
-mismatch behavior.
+A cross-tenant document returns an indistinguishable 404, matching the
+information-leak-safe convention Sprint 3.5.1 established for
+Organization/Engagement.
+
+MVP Slice 3 (Organization Data Isolation): that 404 is now produced by
+the query rather than by a comparison after it. The document is loaded
+via ``IDocumentRepository.get_for_organization``, its chunks via a
+tenant-scoped ``get_by_document``, and every embedding read and state
+transition carries the caller's ``organization_id`` into its own SQL
+predicate. This matters most for the write paths -- ``claim_new``,
+``retry_failed``, ``reclaim_stale``, ``mark_completed``, ``mark_failed``
+-- which previously addressed rows by bare id, so their tenant safety
+depended entirely on the single in-memory check at the top of this
+method. ``IEngagementRepository`` is no longer a dependency: the
+ownership chain it was used to walk is now resolved in SQL.
 """
 
 import hashlib
@@ -33,7 +41,6 @@ from app.domain.entities.user import User
 from app.domain.repositories.document import IDocumentRepository
 from app.domain.repositories.document_chunk import IDocumentChunkRepository
 from app.domain.repositories.document_chunk_embedding import IDocumentChunkEmbeddingRepository
-from app.domain.repositories.engagement import IEngagementRepository
 
 _SAFE_ERROR_MESSAGES = {
     "EmbeddingAuthenticationError": "Embedding provider authentication failed",
@@ -73,7 +80,6 @@ class EmbeddingGenerationService:
     def __init__(
         self,
         document_repository: IDocumentRepository,
-        engagement_repository: IEngagementRepository,
         chunk_repository: IDocumentChunkRepository,
         embedding_repository: IDocumentChunkEmbeddingRepository,
         provider: EmbeddingProvider,
@@ -86,7 +92,6 @@ class EmbeddingGenerationService:
         stale_after_seconds: int,
     ) -> None:
         self._document_repository = document_repository
-        self._engagement_repository = engagement_repository
         self._chunk_repository = chunk_repository
         self._embedding_repository = embedding_repository
         self._provider = provider
@@ -100,25 +105,23 @@ class EmbeddingGenerationService:
     async def generate_for_document(
         self, document_id: UUID, current_user: User
     ) -> EmbeddingGenerationSummary:
-        document = await self._document_repository.get(document_id)
-        if document is None:
-            raise NotFoundError(f"Document {document_id} not found")
-        engagement = await self._engagement_repository.get(document.engagement_id)
-        if engagement is None:
-            raise NotFoundError(f"Engagement {document.engagement_id} not found")
-        if current_user.organization_id is None:
+        organization_id = current_user.organization_id
+        if organization_id is None:
             raise AuthorizationError("User has no organization")
-        if (
-            engagement.organization_id is None
-            or engagement.organization_id != current_user.organization_id
-        ):
+
+        document = await self._document_repository.get_for_organization(
+            document_id, organization_id=organization_id
+        )
+        if document is None:
             raise NotFoundError(f"Document {document_id} not found")
         if document.processing_status != "PROCESSED":
             raise InvalidStateTransitionError(
                 "Document must be processed before embeddings can be generated."
             )
 
-        chunks = await self._chunk_repository.get_by_document(document_id)
+        chunks = await self._chunk_repository.get_by_document(
+            document_id, organization_id=organization_id
+        )
         chunk_by_id = {chunk.id: chunk for chunk in chunks if chunk.id is not None}
         chunk_ids = list(chunk_by_id.keys())
         content_hashes = {
@@ -127,6 +130,7 @@ class EmbeddingGenerationService:
 
         existing = await self._embedding_repository.get_existing(
             chunk_ids,
+            organization_id=organization_id,
             provider=self._provider_name,
             model=self._model,
             model_version=self._model_version,
@@ -164,6 +168,7 @@ class EmbeddingGenerationService:
 
         claimed = await self._embedding_repository.claim_new(
             to_claim,
+            organization_id=organization_id,
             provider=self._provider_name,
             model=self._model,
             model_version=self._model_version,
@@ -172,11 +177,15 @@ class EmbeddingGenerationService:
         )
         in_progress += len(to_claim) - len(claimed)
 
-        retried = await self._embedding_repository.retry_failed(to_retry)
+        retried = await self._embedding_repository.retry_failed(
+            to_retry, organization_id=organization_id
+        )
         in_progress += len(to_retry) - len(retried)
 
         reclaimed = await self._embedding_repository.reclaim_stale(
-            to_reclaim, stale_after_seconds=self._stale_after_seconds
+            to_reclaim,
+            organization_id=organization_id,
+            stale_after_seconds=self._stale_after_seconds,
         )
         in_progress += len(to_reclaim) - len(reclaimed)
 
@@ -192,7 +201,9 @@ class EmbeddingGenerationService:
             except EmbeddingProviderError as exc:
                 batch_ids = [row.id for row in batch if row.id is not None]
                 await self._embedding_repository.mark_failed(
-                    batch_ids, error_message=_safe_error_message(exc)
+                    batch_ids,
+                    organization_id=organization_id,
+                    error_message=_safe_error_message(exc),
                 )
                 failed += len(batch)
                 continue
@@ -201,7 +212,9 @@ class EmbeddingGenerationService:
                 for row, result in zip(batch, results)
                 if row.id is not None
             ]
-            await self._embedding_repository.mark_completed(resolved)
+            await self._embedding_repository.mark_completed(
+                resolved, organization_id=organization_id
+            )
             newly_completed += len(batch)
 
         return EmbeddingGenerationSummary(

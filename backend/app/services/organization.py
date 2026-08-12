@@ -54,7 +54,13 @@ class OrganizationService:
         )
 
     async def _get_or_404(self, organization_id: UUID) -> Organization:
-        organization = await self._repository.get(organization_id)
+        # Only ever reached with an id `_require_own_organization` has
+        # already proven equals the caller's trusted organization, so this
+        # is a scoped read of the caller's own tenant root -- never an
+        # arbitrary lookup by client-supplied id.
+        organization = await self._repository.get_for_organization(
+            organization_id=organization_id
+        )
         if organization is None:
             raise NotFoundError(f"Organization {organization_id} not found")
         return organization

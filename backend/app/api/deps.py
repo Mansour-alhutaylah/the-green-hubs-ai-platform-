@@ -144,7 +144,13 @@ async def get_current_user(
     identity: UUID = Depends(get_current_auth_identity),
     repository: IUserRepository = Depends(get_user_repository),
 ) -> User:
-    user = await repository.get(identity)
+    # The authentication bootstrap, and the only unscoped tenant-owned read
+    # in the application. `identity` is the `sub` of a JWT whose signature,
+    # issuer and audience were already verified, so this can only return the
+    # caller's own profile -- which is what establishes organization_id in
+    # the first place. See IUserRepository for the full justification; the
+    # architecture guard allows this one call site and no other.
+    user = await repository.get_by_authenticated_id(identity)
     if user is None:
         raise ProfileNotProvisionedError("No application profile found for this account")
     enrich_request_context(user_id=user.id, organization_id=user.organization_id)
@@ -239,15 +245,16 @@ def get_processing_unit_of_work(
 
 def get_document_processing_service(
     document_repository: IDocumentRepository = Depends(get_document_repository),
-    engagement_repository: IEngagementRepository = Depends(get_engagement_repository),
     extracted_text_repository: IExtractedTextRepository = Depends(get_extracted_text_repository),
     chunk_repository: IDocumentChunkRepository = Depends(get_document_chunk_repository),
     storage: IDocumentStorage = Depends(get_document_storage),
     unit_of_work: IProcessingUnitOfWork = Depends(get_processing_unit_of_work),
 ) -> DocumentProcessingService:
+    # No IEngagementRepository: MVP Slice 3 moved the document ->
+    # engagement -> organization ownership chain into the document
+    # repository's own tenant-scoped SQL.
     return DocumentProcessingService(
         document_repository,
-        engagement_repository,
         extracted_text_repository,
         chunk_repository,
         storage,
@@ -268,7 +275,6 @@ def get_embedding_provider() -> EmbeddingProvider:
 
 def get_embedding_generation_service(
     document_repository: IDocumentRepository = Depends(get_document_repository),
-    engagement_repository: IEngagementRepository = Depends(get_engagement_repository),
     chunk_repository: IDocumentChunkRepository = Depends(get_document_chunk_repository),
     embedding_repository: IDocumentChunkEmbeddingRepository = Depends(
         get_document_chunk_embedding_repository
@@ -276,9 +282,9 @@ def get_embedding_generation_service(
     provider: EmbeddingProvider = Depends(get_embedding_provider),
     settings: Settings = Depends(get_app_settings),
 ) -> EmbeddingGenerationService:
+    # No IEngagementRepository -- see get_document_processing_service.
     return EmbeddingGenerationService(
         document_repository,
-        engagement_repository,
         chunk_repository,
         embedding_repository,
         provider,

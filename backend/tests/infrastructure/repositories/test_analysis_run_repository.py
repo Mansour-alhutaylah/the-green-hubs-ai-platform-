@@ -328,6 +328,86 @@ async def test_get_by_id_returns_none_for_foreign_organization(
 
 
 # ---------------------------------------------------------------------------
+# MVP Slice 3 -- every remaining by-id method is tenant-scoped too
+# ---------------------------------------------------------------------------
+
+
+async def test_no_state_transition_touches_another_organizations_run(
+    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], ctx: dict
+) -> None:
+    """Before Slice 3 these five methods located rows by run id alone.
+
+    Each is invoked here with a *real* run id and a foreign organization.
+    All must be complete no-ops, leaving the run exactly as claimed.
+    """
+
+    repository = SQLAlchemyAnalysisRunRepository(session)
+    run, _is_new = await repository.claim_or_get(
+        organization_id=ctx["organization_id"], engagement_id=ctx["engagement_id"],
+        document_id=ctx["document_id"], requested_by_user_id=ctx["user_id"],
+        request_hash=_hash(), **_claim_kwargs(),
+    )
+    _track_run(cleanup_ids, run)
+    attacker = uuid.uuid4()
+
+    assert await repository.retry_failed(run.id, organization_id=attacker) is None
+    assert await repository.reclaim_stale(
+        run.id, organization_id=attacker, stale_after_seconds=0
+    ) is None
+    await repository.mark_completed(
+        run.id, organization_id=attacker,
+        structured_output={"executive_summary": "stolen", "overall_confidence": 1.0},
+        prompt_tokens=1, completion_tokens=1, total_tokens=2, estimated_cost=None,
+    )
+    await repository.mark_failed(
+        run.id, organization_id=attacker, error_message="sabotage"
+    )
+    await repository.mark_insufficient_evidence(
+        run.id, organization_id=attacker, reason="sabotage"
+    )
+
+    owner_view = await repository.get_by_id(
+        run.id, organization_id=ctx["organization_id"]
+    )
+    assert owner_view is not None
+    assert owner_view.status == "PROCESSING"  # never advanced by the attacker
+    assert owner_view.structured_output is None
+    assert owner_view.error_message is None
+    assert owner_view.insufficient_evidence_reason is None
+    assert owner_view.attempt_count == 1
+
+
+async def test_get_citations_never_returns_another_organizations_snippets(
+    session: AsyncSession, cleanup_ids: dict[str, list[uuid.UUID]], ctx: dict
+) -> None:
+    """``quoted_snippet`` is verbatim text from the source document, so an
+    unscoped citation read is direct content disclosure."""
+
+    repository = SQLAlchemyAnalysisRunRepository(session)
+    run, _is_new = await repository.claim_or_get(
+        organization_id=ctx["organization_id"], engagement_id=ctx["engagement_id"],
+        document_id=ctx["document_id"], requested_by_user_id=ctx["user_id"],
+        request_hash=_hash(), **_claim_kwargs(),
+    )
+    _track_run(cleanup_ids, run)
+    citations = await repository.add_citations(
+        run.id, organization_id=ctx["organization_id"],
+        citations=[
+            NewCitation(
+                chunk_id=ctx["chunk_id"], citation_order=1, relevance_score=Decimal("0.9"),
+                char_start=0, char_end=5, quoted_snippet="secret verbatim text",
+            )
+        ],
+    )
+    _track_citations(cleanup_ids, citations)
+
+    assert await repository.get_citations(
+        run.id, organization_id=ctx["organization_id"]
+    ) != []
+    assert await repository.get_citations(run.id, organization_id=uuid.uuid4()) == []
+
+
+# ---------------------------------------------------------------------------
 # FAILED retry
 # ---------------------------------------------------------------------------
 
@@ -342,9 +422,9 @@ async def test_retry_failed_transitions_and_increments_attempt_count(
         request_hash=_hash(), **_claim_kwargs(),
     )
     _track_run(cleanup_ids, run)
-    await repository.mark_failed(run.id, error_message="Analysis provider unavailable")
+    await repository.mark_failed(run.id, organization_id=ctx["organization_id"], error_message="Analysis provider unavailable")
 
-    retried = await repository.retry_failed(run.id)
+    retried = await repository.retry_failed(run.id, organization_id=ctx["organization_id"])
 
     assert retried is not None
     assert retried.status == "PROCESSING"
@@ -364,7 +444,7 @@ async def test_retry_failed_does_not_touch_non_failed_rows(
     )
     _track_run(cleanup_ids, run)  # still PROCESSING, not FAILED
 
-    retried = await repository.retry_failed(run.id)
+    retried = await repository.retry_failed(run.id, organization_id=ctx["organization_id"])
 
     assert retried is None
 
@@ -385,7 +465,7 @@ async def test_non_stale_processing_row_cannot_be_reclaimed(
     )
     _track_run(cleanup_ids, run)  # processing_started_at = now(), not stale
 
-    reclaimed = await repository.reclaim_stale(run.id, stale_after_seconds=300)
+    reclaimed = await repository.reclaim_stale(run.id, organization_id=ctx["organization_id"], stale_after_seconds=300)
 
     assert reclaimed is None
 
@@ -408,8 +488,8 @@ async def test_stale_processing_row_can_be_reclaimed_exactly_once(
     )
     await session.commit()
 
-    first_reclaim = await repository.reclaim_stale(run.id, stale_after_seconds=300)
-    second_reclaim = await repository.reclaim_stale(run.id, stale_after_seconds=300)
+    first_reclaim = await repository.reclaim_stale(run.id, organization_id=ctx["organization_id"], stale_after_seconds=300)
+    second_reclaim = await repository.reclaim_stale(run.id, organization_id=ctx["organization_id"], stale_after_seconds=300)
 
     assert first_reclaim is not None
     assert first_reclaim.attempt_count == 2
@@ -437,7 +517,7 @@ async def test_two_concurrent_stale_reclaim_attempts_only_one_wins(
     async def _attempt() -> bool:
         async with AsyncSessionLocal() as reclaim_session:
             reclaim_repository = SQLAlchemyAnalysisRunRepository(reclaim_session)
-            reclaimed = await reclaim_repository.reclaim_stale(run.id, stale_after_seconds=300)
+            reclaimed = await reclaim_repository.reclaim_stale(run.id, organization_id=ctx["organization_id"], stale_after_seconds=300)
             return reclaimed is not None
 
     results = await asyncio.gather(_attempt(), _attempt())
@@ -462,7 +542,8 @@ async def test_mark_completed_persists_structured_output(
     _track_run(cleanup_ids, run)
 
     await repository.mark_completed(
-        run.id, structured_output={"executive_summary": "ok", "overall_confidence": 0.8},
+        run.id, organization_id=ctx["organization_id"],
+        structured_output={"executive_summary": "ok", "overall_confidence": 0.8},
         prompt_tokens=10, completion_tokens=20, total_tokens=30, estimated_cost=None,
     )
 
@@ -484,7 +565,7 @@ async def test_mark_failed_clears_structured_output(
     )
     _track_run(cleanup_ids, run)
 
-    await repository.mark_failed(run.id, error_message="Analysis provider unavailable")
+    await repository.mark_failed(run.id, organization_id=ctx["organization_id"], error_message="Analysis provider unavailable")
 
     fetched = await repository.get_by_id(run.id, organization_id=ctx["organization_id"])
     assert fetched is not None
@@ -504,7 +585,7 @@ async def test_mark_insufficient_evidence_persists_reason(
     )
     _track_run(cleanup_ids, run)
 
-    await repository.mark_insufficient_evidence(run.id, reason="No relevant content found.")
+    await repository.mark_insufficient_evidence(run.id, organization_id=ctx["organization_id"], reason="No relevant content found.")
 
     fetched = await repository.get_by_id(run.id, organization_id=ctx["organization_id"])
     assert fetched is not None
@@ -654,6 +735,6 @@ async def test_get_citations_ordered_by_citation_order(
     )
     _track_citations(cleanup_ids, citations)
 
-    fetched = await repository.get_citations(run.id)
+    fetched = await repository.get_citations(run.id, organization_id=ctx["organization_id"])
 
     assert [c.citation_order for c in fetched] == [1, 2]
