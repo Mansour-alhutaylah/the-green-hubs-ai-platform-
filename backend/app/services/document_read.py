@@ -28,6 +28,7 @@ from uuid import UUID
 from app.core.exceptions import AuthorizationError, NotFoundError
 from app.domain.entities.document_read_model import DocumentReadModel
 from app.domain.entities.user import User
+from app.domain.evidence.lifecycle import EvidenceStatus
 from app.domain.repositories.document import IDocumentRepository
 from app.domain.repositories.engagement import IEngagementRepository
 
@@ -59,6 +60,7 @@ class DocumentReadService:
         *,
         engagement_id: UUID | None,
         processing_status: str | None,
+        evidence_status: EvidenceStatus | None = None,
         limit: int,
         offset: int,
     ) -> tuple[Sequence[DocumentReadModel], int]:
@@ -73,16 +75,21 @@ class DocumentReadService:
             organization_id=organization_id,
             engagement_id=engagement_id,
             processing_status=processing_status,
+            evidence_status=evidence_status,
             limit=limit,
             offset=offset,
             embedding_provider=self._embedding_provider,
             embedding_model=self._embedding_model,
             embedding_model_version=self._embedding_model_version,
         )
+        # Same filters as the page above, so `total` counts the filtered
+        # set the caller is paging through -- a review queue's "12
+        # pending" must not silently mean "12 documents in total".
         total = await self._document_repository.count_for_organization(
             organization_id=organization_id,
             engagement_id=engagement_id,
             processing_status=processing_status,
+            evidence_status=evidence_status,
         )
         return items, total
 

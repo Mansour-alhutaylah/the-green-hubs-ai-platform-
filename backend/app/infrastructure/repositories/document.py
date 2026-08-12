@@ -44,6 +44,33 @@ locking and the second one re-evaluates the WHERE clause against the
 freshly committed value. A prior read followed by an unconditional write
 would not provide this guarantee.
 
+``transition_evidence()`` (MVP Slice 4) is ``begin_processing()``'s
+pattern applied to the evidence lifecycle, and for the same reason: a
+second reviewer can act between a read and a write, so the expected
+current state travels *inside* the ``UPDATE``'s ``WHERE`` clause rather
+than being checked in Python beforehand. The loser of that race matches
+zero rows and changes nothing, instead of overwriting a decision its
+author never saw. ``reviewed_at`` is ``now()`` evaluated by the database
+inside the same statement -- there is no parameter through which a
+client could supply a review timestamp, and no application clock
+participates.
+
+The successor predicate on the same statement is the part that cannot be
+delegated to the service: ``documents`` has no ``organization_id``
+column, so "the successor belongs to my organization" is a join, and
+writing it as a correlated ``EXISTS`` in this ``WHERE`` clause means a
+cross-tenant successor UUID fails the transition itself rather than
+merely failing an earlier check that a future refactor might drop.
+
+``get_evidence_for_organization()`` resolves the stored status string to
+``EvidenceStatus`` and raises ``PersistenceError`` on anything else.
+That branch should be unreachable -- ``ck_documents_evidence_status``
+constrains the column to the five canonical spellings -- which is
+exactly why it fails closed rather than guessing: an unrecognized value
+means the constraint was dropped or bypassed, and treating such a row as
+readable evidence state would be the one mistake this lifecycle cannot
+afford.
+
 ``get_read_model_for_organization``/``list_read_models_for_organization``/
 ``count_for_organization`` (Sprint 3, Document Read API Foundation) use
 raw ``text()`` SQL with ``LEFT JOIN LATERAL`` -- mirroring
@@ -86,7 +113,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, InvalidStateTransitionError, NotFoundError, PersistenceError
 from app.domain.entities.document import Document
+from app.domain.entities.document_evidence import DocumentEvidence
 from app.domain.entities.document_read_model import AnalysisSummary, DocumentReadModel, EmbeddingSummary
+from app.domain.evidence.lifecycle import EvidenceStatus, parse_evidence_status
 from app.domain.repositories.document import IDocumentRepository
 from app.infrastructure.db.models.document import DocumentModel
 from app.infrastructure.db.models.engagement import Engagement as EngagementModel
@@ -98,6 +127,11 @@ _READ_MODEL_COLUMNS = """
     d.processing_status AS processing_status,
     d.created_at AS created_at,
     d.updated_at AS updated_at,
+    d.evidence_status AS evidence_status,
+    d.reviewed_by AS reviewed_by,
+    d.reviewed_at AS reviewed_at,
+    d.review_reason AS review_reason,
+    d.superseded_by_document_id AS superseded_by_document_id,
     et.has_extracted_text AS has_extracted_text,
     ca.chunk_count AS chunk_count,
     ea.total_chunks AS embedding_total_chunks,
@@ -154,7 +188,107 @@ _TENANT_AND_FILTER_WHERE = """
         CAST(:processing_status AS varchar) IS NULL
         OR d.processing_status = CAST(:processing_status AS varchar)
       )
+      AND (
+        CAST(:evidence_status AS varchar) IS NULL
+        OR d.evidence_status = CAST(:evidence_status AS varchar)
+      )
 """
+
+_EVIDENCE_COLUMNS = """
+    d.id AS document_id,
+    d.engagement_id AS engagement_id,
+    d.evidence_status AS evidence_status,
+    d.processing_status AS processing_status,
+    d.reviewed_by AS reviewed_by,
+    d.reviewed_at AS reviewed_at,
+    d.review_reason AS review_reason,
+    d.superseded_by_document_id AS superseded_by_document_id,
+    d.updated_at AS updated_at
+"""
+
+#: One statement, one decision. Every clause in the ``WHERE`` is load-bearing:
+#: ``d.id`` identifies the row, the first ``EXISTS`` is the tenant predicate
+#: (``documents`` has no ``organization_id`` of its own), ``evidence_status =
+#: :expected_status`` is the concurrency guard, ``processing_status`` is the
+#: approval precondition (bound ``NULL`` by every command that has none), and
+#: the second ``EXISTS`` proves any named successor is the caller's own
+#: document. Zero matched rows means one of those failed; the caller
+#: disambiguates with a scoped re-read rather than this statement disclosing
+#: which.
+_TRANSITION_EVIDENCE_SQL = f"""
+    UPDATE documents AS d
+    SET evidence_status = :new_status,
+        reviewed_by = :reviewed_by,
+        reviewed_at = now(),
+        review_reason = CAST(:review_reason AS text),
+        superseded_by_document_id = CAST(:superseded_by_document_id AS uuid),
+        updated_at = now()
+    WHERE d.id = :document_id
+      AND d.evidence_status = :expected_status
+      AND EXISTS (
+        SELECT 1 FROM engagements e
+        WHERE e.id = d.engagement_id AND e.organization_id = :organization_id
+      )
+      AND (
+        CAST(:required_processing_status AS varchar) IS NULL
+        OR d.processing_status = CAST(:required_processing_status AS varchar)
+      )
+      AND (
+        CAST(:superseded_by_document_id AS uuid) IS NULL
+        OR EXISTS (
+          SELECT 1 FROM documents s
+          JOIN engagements se ON se.id = s.engagement_id
+          WHERE s.id = CAST(:superseded_by_document_id AS uuid)
+            AND se.organization_id = :organization_id
+            AND s.id <> d.id
+        )
+      )
+    RETURNING {_EVIDENCE_COLUMNS}
+"""
+
+
+def _require_evidence_status(raw: Any, document_id: Any) -> EvidenceStatus:
+    """Resolve a stored ``evidence_status``, or refuse to interpret the row.
+
+    ``ck_documents_evidence_status`` makes an unrecognized value
+    impossible through the schema, so reaching the raise means the
+    constraint was dropped, bypassed, or the column was written by
+    something outside this application. None of those may be resolved by
+    guessing a state -- least of all the eligible one -- so this fails
+    closed with a 500 and logs nothing about the row's contents."""
+
+    status = parse_evidence_status(raw)
+    if status is None:
+        raise PersistenceError(f"Document {document_id} has an unrecognized evidence status")
+    return status
+
+
+def _evidence_from_row(row: Any) -> DocumentEvidence:
+    return DocumentEvidence(
+        document_id=row.document_id,
+        engagement_id=row.engagement_id,
+        evidence_status=_require_evidence_status(row.evidence_status, row.document_id),
+        processing_status=row.processing_status,
+        reviewed_by=row.reviewed_by,
+        reviewed_at=row.reviewed_at,
+        review_reason=row.review_reason,
+        superseded_by_document_id=row.superseded_by_document_id,
+        updated_at=row.updated_at,
+    )
+
+
+def _evidence_from_model(model: DocumentModel) -> DocumentEvidence:
+    return DocumentEvidence(
+        document_id=model.id,
+        engagement_id=model.engagement_id,
+        evidence_status=_require_evidence_status(model.evidence_status, model.id),
+        processing_status=model.processing_status,
+        reviewed_by=model.reviewed_by,
+        reviewed_at=model.reviewed_at,
+        review_reason=model.review_reason,
+        superseded_by_document_id=model.superseded_by_document_id,
+        updated_at=model.updated_at,
+    )
 
 
 def _read_model_from_row(row: Any) -> DocumentReadModel:
@@ -198,6 +332,11 @@ def _read_model_from_row(row: Any) -> DocumentReadModel:
         chunk_count=row.chunk_count,
         embedding_summary=embedding_summary,
         latest_analysis_summary=latest_analysis_summary,
+        evidence_status=_require_evidence_status(row.evidence_status, row.id),
+        reviewed_by=row.reviewed_by,
+        reviewed_at=row.reviewed_at,
+        review_reason=row.review_reason,
+        superseded_by_document_id=row.superseded_by_document_id,
     )
 
 _STATE_TRANSITION_MESSAGES = {
@@ -412,6 +551,48 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         await self._session.refresh(model)
         return _to_domain(model)
 
+    async def get_evidence_for_organization(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> DocumentEvidence | None:
+        stmt = self._tenant_scoped_select(organization_id=organization_id).where(
+            DocumentModel.id == document_id
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return _evidence_from_model(model) if model is not None else None
+
+    async def transition_evidence(
+        self,
+        document_id: UUID,
+        *,
+        organization_id: UUID,
+        expected_status: EvidenceStatus,
+        new_status: EvidenceStatus,
+        reviewed_by: UUID,
+        review_reason: str | None,
+        superseded_by_document_id: UUID | None,
+        required_processing_status: str | None,
+    ) -> DocumentEvidence | None:
+        result = await self._session.execute(
+            text(_TRANSITION_EVIDENCE_SQL),
+            {
+                "document_id": document_id,
+                "organization_id": organization_id,
+                "expected_status": expected_status.value,
+                "new_status": new_status.value,
+                "reviewed_by": reviewed_by,
+                "review_reason": review_reason,
+                "superseded_by_document_id": superseded_by_document_id,
+                "required_processing_status": required_processing_status,
+            },
+        )
+        row = result.mappings().first()
+        # Committed immediately, exactly as begin_processing(): the
+        # decision is a concurrency fact another reviewer's request must
+        # observe at once, not something to leave pending in a session.
+        await self._session.commit()
+        return _evidence_from_row(row) if row is not None else None
+
     async def get_read_model_for_organization(
         self,
         document_id: UUID,
@@ -431,6 +612,7 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
                 "organization_id": organization_id,
                 "engagement_id": None,
                 "processing_status": None,
+                "evidence_status": None,
                 "document_id": document_id,
                 "embedding_provider": embedding_provider,
                 "embedding_model": embedding_model,
@@ -446,6 +628,7 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         organization_id: UUID,
         engagement_id: UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
         limit: int,
         offset: int,
         embedding_provider: str,
@@ -464,6 +647,7 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
                 "organization_id": organization_id,
                 "engagement_id": engagement_id,
                 "processing_status": processing_status,
+                "evidence_status": evidence_status.value if evidence_status is not None else None,
                 "limit": limit,
                 "offset": offset,
                 "embedding_provider": embedding_provider,
@@ -479,6 +663,7 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
         organization_id: UUID,
         engagement_id: UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
     ) -> int:
         stmt = text(
             "SELECT COUNT(*) "
@@ -492,6 +677,7 @@ class SQLAlchemyDocumentRepository(IDocumentRepository):
                 "organization_id": organization_id,
                 "engagement_id": engagement_id,
                 "processing_status": processing_status,
+                "evidence_status": evidence_status.value if evidence_status is not None else None,
             },
         )
         return result.scalar_one()

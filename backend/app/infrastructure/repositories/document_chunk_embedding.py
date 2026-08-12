@@ -14,6 +14,29 @@ that is more directly and auditably expressed as explicit SQL than
 coaxed out of the ORM-enabled bulk-insert API, which is built for plain
 VALUES inserts, not INSERT-from-SELECT-with-JOIN.
 
+MVP Slice 4 (Evidence Review Lifecycle) adds one predicate to ``search``
+and to nothing else: a chunk is a retrieval candidate only if its
+document is in a retrieval-eligible evidence state. It sits in the same
+``WHERE`` clause as the tenant predicate and the pgvector ``ORDER BY
+... <=> ...``, so an unapproved, rejected, restricted or superseded
+document's vectors are never *ranked* -- as opposed to being ranked and
+then filtered out, which would let an excluded document quietly consume
+``top_k`` slots and shrink the eligible evidence a caller receives.
+Because the state is read live from ``documents`` on every search, a
+withdrawal takes effect on the next query with no reindexing step.
+
+The eligible states are bound from ``RETRIEVAL_ELIGIBLE_STATUSES``
+rather than written as ``= 'VERIFIED'`` in the SQL: the lifecycle module
+is the only place allowed to decide what "eligible" means, and an
+``= ANY(...)`` predicate keeps this query correct if that set is ever
+widened by an approved decision rather than by an edit here.
+
+Embedding *generation* is deliberately untouched. Rejecting a document
+must not delete its chunks or embeddings (they are real, reprocessable
+work, and deletion would also destroy the record of what was rejected);
+it must only stop them being retrieved, which is exactly and only what
+this predicate does.
+
 MVP Slice 3 (Organization Data Isolation): every statement in this class
 now also carries ``organization_id = :organization_id`` (or, for
 ``claim_new``, ``e.organization_id = :organization_id`` on the derived
@@ -34,6 +57,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.document_chunk_embedding import DocumentChunkEmbedding
 from app.domain.entities.vector_search_result import VectorSearchResult
+from app.domain.evidence.lifecycle import retrieval_eligible_status_values
 from app.domain.repositories.document_chunk_embedding import IDocumentChunkEmbeddingRepository
 
 _COLUMNS = (
@@ -277,7 +301,9 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                        1 - (dce.embedding <=> :query_vector) AS similarity_score
                 FROM document_chunk_embeddings dce
                 JOIN document_chunks dc ON dc.id = dce.chunk_id
+                JOIN documents d ON d.id = dce.document_id
                 WHERE dce.organization_id = :organization_id
+                  AND d.evidence_status = ANY(:retrieval_eligible_statuses)
                   AND dce.status = 'COMPLETED'
                   AND dce.provider = :provider
                   AND dce.model = :model
@@ -298,6 +324,7 @@ class SQLAlchemyDocumentChunkEmbeddingRepository(IDocumentChunkEmbeddingReposito
                 "query_vector": _vector_literal(query_vector),
                 "engagement_id": engagement_id,
                 "document_id": document_id,
+                "retrieval_eligible_statuses": list(retrieval_eligible_status_values()),
                 "top_k": top_k,
             },
         )

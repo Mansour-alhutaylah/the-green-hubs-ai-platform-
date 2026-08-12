@@ -41,6 +41,15 @@ row. A cross-tenant ``document_id`` must therefore behave exactly like a
 nonexistent one -- no row returned, no row mutated, and no distinguishable
 error -- rather than being fetched first and rejected afterward by an
 in-application comparison a later refactor could drop.
+
+MVP Slice 4 (Evidence Review Lifecycle) adds ``get_evidence_for_organization``
+and ``transition_evidence``. Together they are the *only* way an evidence
+decision may be read or written: the inherited ``update()`` writes the
+upload/processing columns and nothing else, so no generic client-driven
+write can set ``evidence_status``. ``transition_evidence`` additionally
+carries the expected current state inside its predicate -- see its
+docstring for why a read-then-write pair is not an acceptable
+implementation.
 """
 
 from abc import ABC, abstractmethod
@@ -48,7 +57,9 @@ from typing import Sequence
 from uuid import UUID
 
 from app.domain.entities.document import Document
+from app.domain.entities.document_evidence import DocumentEvidence
 from app.domain.entities.document_read_model import DocumentReadModel
+from app.domain.evidence.lifecycle import EvidenceStatus
 from app.domain.repositories.base import IRepository
 
 
@@ -114,6 +125,72 @@ class IDocumentRepository(IRepository[Document], ABC):
         ...
 
     @abstractmethod
+    async def get_evidence_for_organization(
+        self, document_id: UUID, *, organization_id: UUID
+    ) -> DocumentEvidence | None:
+        """Tenant-scoped read of the current evidence decision.
+
+        Same ownership chain, and the same indistinguishable-``None`` for
+        a nonexistent and a foreign-tenant document, as
+        ``get_for_organization``. Implementations must resolve the stored
+        ``evidence_status`` string to :class:`EvidenceStatus` here and
+        fail closed on any other value, so no caller downstream can be
+        handed an unrecognized state to interpret."""
+        ...
+
+    @abstractmethod
+    async def transition_evidence(
+        self,
+        document_id: UUID,
+        *,
+        organization_id: UUID,
+        expected_status: EvidenceStatus,
+        new_status: EvidenceStatus,
+        reviewed_by: UUID,
+        review_reason: str | None,
+        superseded_by_document_id: UUID | None,
+        required_processing_status: str | None,
+    ) -> DocumentEvidence | None:
+        """Atomically record one evidence decision, or change nothing.
+
+        The entire decision is a single conditional, immediately-committed
+        ``UPDATE`` whose ``WHERE`` clause carries, at minimum, the
+        document identity, the tenant predicate, and
+        ``evidence_status = expected_status``. A read, an inspection in
+        Python, and an unconditional write by id is **not** an acceptable
+        implementation: two reviewers can act between those steps, and
+        the second write would silently replace a decision its author
+        never saw. The expected state in the predicate is what makes the
+        loser of that race change nothing at all.
+
+        ``required_processing_status`` joins that predicate when the
+        command has an approval precondition (``VERIFY`` requires
+        ``PROCESSED``; see ``required_processing_status_for``) and is
+        ``None`` otherwise, in which case the clause admits every
+        processing state. It belongs in the statement for the same
+        reason the expected evidence state does: a document can begin
+        reprocessing between an application-level check and the write.
+
+        Returns the new decision when exactly one row matched, and
+        ``None`` when none did. ``None`` deliberately does not say *why*:
+        the document may not exist, may belong to another organization,
+        may have been moved to a different state concurrently, may not be
+        processed, or (for a supersession) may name a successor that is
+        not the caller's. The service disambiguates with a second
+        tenant-scoped read, which keeps the cross-tenant cases collapsed
+        into the same ``NotFoundError`` an unknown UUID produces.
+
+        ``reviewed_by`` is the caller's trusted profile id and
+        ``reviewed_at`` is assigned by the database's own clock inside
+        this statement -- neither may be taken from the client, and no
+        parameter exists through which they could be.
+
+        ``superseded_by_document_id`` must be validated to belong to the
+        same organization inside this statement's predicate too, not by
+        an earlier application check alone."""
+        ...
+
+    @abstractmethod
     async def get_read_model_for_organization(
         self,
         document_id: UUID,
@@ -147,6 +224,7 @@ class IDocumentRepository(IRepository[Document], ABC):
         organization_id: UUID,
         engagement_id: UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
         limit: int,
         offset: int,
         embedding_provider: str,
@@ -155,8 +233,11 @@ class IDocumentRepository(IRepository[Document], ABC):
     ) -> Sequence[DocumentReadModel]:
         """Tenant-scoped, paginated, newest-first (``created_at`` desc,
         ``id`` desc tiebreak) document listing with derived fields.
-        ``engagement_id``/``processing_status`` are optional
-        already-validated filters applied at query time.
+        ``engagement_id``/``processing_status``/``evidence_status`` are
+        optional already-validated filters applied at query time --
+        ``evidence_status`` (Slice 4) is what makes a review queue
+        ("which of my documents are still PENDING_REVIEW?") a single
+        indexed query rather than a client-side scan of every page.
         ``embedding_provider``/``embedding_model``/``embedding_model_version``
         scope each item's ``embedding_summary`` exactly as documented on
         ``get_read_model_for_organization`` above."""
@@ -169,6 +250,7 @@ class IDocumentRepository(IRepository[Document], ABC):
         organization_id: UUID,
         engagement_id: UUID | None = None,
         processing_status: str | None = None,
+        evidence_status: EvidenceStatus | None = None,
     ) -> int:
         """Total row count for the same tenant scope and filters as
         ``list_read_models_for_organization``, for pagination."""

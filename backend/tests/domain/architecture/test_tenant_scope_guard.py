@@ -79,6 +79,13 @@ TENANT_SCOPED_REPOSITORY_METHODS: Final[frozenset[str]] = frozenset(
         "get_read_model_for_organization",
         "list_read_models_for_organization",
         "count_for_organization",
+        # Document evidence (MVP Slice 4). Both carry the tenant
+        # predicate inside their own SQL; `transition_evidence` carries
+        # the expected evidence state and any successor's ownership
+        # there too, so a call site that forgot the scope would be
+        # writing an evidence decision across a tenant boundary.
+        "get_evidence_for_organization",
+        "transition_evidence",
         # Engagement
         "update_for_organization",
         # DocumentChunk / ExtractedText
