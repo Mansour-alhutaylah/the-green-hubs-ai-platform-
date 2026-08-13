@@ -1,0 +1,67 @@
+{
+  "_comment": "Cross-language signing fixture for the AIOS internal HMAC protocol. The single source of expected values: the Python implementation and the reviewed n8n Code-node JavaScript are both proved against THIS file. Never copy an expected value into a test module.",
+  "_secret_warning": "secret_utf8 is a published TEST literal with no security property. It must never be configured anywhere. Real secrets live only in the platform secret store and are declared by name in render.yaml.",
+  "algorithm": "HMAC-SHA256",
+  "canonical_separator": "\n",
+  "signature_header_prefix": "sha256=",
+  "timestamp_format": "%Y-%m-%dT%H:%M:%SZ",
+  "secret_utf8": "gh-aios-test-secret-do-not-use-00000000",
+  "vectors": [
+    {
+      "name": "V1_empty_json_object",
+      "key_id": "gh-aios-f2n-dev-001",
+      "timestamp": "2026-08-12T14:47:05Z",
+      "request_id": "550e8400-e29b-41d4-a716-446655440000",
+      "workflow": "nora.health_check",
+      "body_utf8": "{}",
+      "body_byte_length": 2,
+      "body_sha256_hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "canonical_string_utf8": "gh-aios-f2n-dev-001\n2026-08-12T14:47:05Z\n550e8400-e29b-41d4-a716-446655440000\nnora.health_check\n44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "canonical_byte_length": 160,
+      "signature_hex": "0962b190d6936f172636448923d19cb060221a61df36386e3cf40da1497f54e3",
+      "signature_header_value": "sha256=0962b190d6936f172636448923d19cb060221a61df36386e3cf40da1497f54e3"
+    },
+    {
+      "name": "V2_health_check_envelope",
+      "key_id": "gh-aios-f2n-dev-001",
+      "timestamp": "2026-08-12T14:47:05Z",
+      "request_id": "550e8400-e29b-41d4-a716-446655440000",
+      "workflow": "nora.health_check",
+      "body_utf8": "{\"contract_version\":\"1.0\",\"request_id\":\"550e8400-e29b-41d4-a716-446655440000\",\"correlation_id\":\"7c9e6679-7425-40de-944b-e07fc1f90ae7\",\"requested_at\":\"2026-08-12T14:47:05Z\",\"actor\":{\"user_id\":\"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\"organization_id\":\"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d\"},\"workflow\":\"nora.health_check\",\"input\":{}}",
+      "body_byte_length": 330,
+      "body_sha256_hex": "bb4f78b7fd7280ce062bd8fd3c5bf4adeeeea2cce30e10d4493c9d36c59794a5",
+      "canonical_string_utf8": "gh-aios-f2n-dev-001\n2026-08-12T14:47:05Z\n550e8400-e29b-41d4-a716-446655440000\nnora.health_check\nbb4f78b7fd7280ce062bd8fd3c5bf4adeeeea2cce30e10d4493c9d36c59794a5",
+      "canonical_byte_length": 160,
+      "signature_hex": "1a91fcd0ce4b2a2c15cd29b3dfd6b6f1a07a80bce8051bd0147e95b2d8b7a21c",
+      "signature_header_value": "sha256=1a91fcd0ce4b2a2c15cd29b3dfd6b6f1a07a80bce8051bd0147e95b2d8b7a21c"
+    },
+    {
+      "name": "V3_zero_byte_body",
+      "key_id": "gh-aios-f2n-dev-001",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "request_id": "00000000-0000-4000-8000-000000000000",
+      "workflow": "nora.health_check",
+      "body_utf8": "",
+      "body_byte_length": 0,
+      "body_sha256_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_string_utf8": "gh-aios-f2n-dev-001\n2026-01-01T00:00:00Z\n00000000-0000-4000-8000-000000000000\nnora.health_check\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_byte_length": 160,
+      "signature_hex": "c01e6c0e422b85a1007e1f220c088853c4ab857c9a890d0e415d98217e9e11b0",
+      "signature_header_value": "sha256=c01e6c0e422b85a1007e1f220c088853c4ab857c9a890d0e415d98217e9e11b0"
+    },
+    {
+      "name": "V4_non_ascii_utf8",
+      "key_id": "gh-aios-f2n-prod-002",
+      "timestamp": "2026-08-12T14:47:05Z",
+      "request_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "workflow": "nora.health_check",
+      "body_utf8": "{\"note\":\"المركز الأخضر — GH\"}",
+      "body_byte_length": 43,
+      "body_sha256_hex": "e55f015a779fc2a951210aa670d10dadbe15a6079fceebbdbb59f1c22a36fab5",
+      "canonical_string_utf8": "gh-aios-f2n-prod-002\n2026-08-12T14:47:05Z\n7c9e6679-7425-40de-944b-e07fc1f90ae7\nnora.health_check\ne55f015a779fc2a951210aa670d10dadbe15a6079fceebbdbb59f1c22a36fab5",
+      "canonical_byte_length": 161,
+      "signature_hex": "73253f8ef6ebfb1ca2a3a67537fee06fdb9b694da2804ef34961a86284b153c9",
+      "signature_header_value": "sha256=73253f8ef6ebfb1ca2a3a67537fee06fdb9b694da2804ef34961a86284b153c9"
+    }
+  ]
+}

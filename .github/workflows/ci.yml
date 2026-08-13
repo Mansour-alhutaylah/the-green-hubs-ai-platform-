@@ -66,6 +66,37 @@ jobs:
       - name: Run guarded integration tests
         run: python scripts/run_integration_tests.py run
 
+  # The AIOS signing protocol must produce byte-identical signatures in
+  # Python and JavaScript. Both halves read ONE fixture
+  # (backend/tests/fixtures/aios_signature_vectors.json) -- two
+  # independently maintained copies of an expected signature would drift,
+  # and each suite would then agree with itself while the two languages
+  # disagreed on the wire.
+  #
+  # The NORA Health Check webhook must not be activated until this job
+  # passes.
+  aios-signature-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Python half of the parity gate
+        working-directory: backend
+        run: pytest tests/infrastructure/aios/test_internal_signature.py -q
+      - name: JavaScript half of the parity gate
+        run: node --test project-governance/07-aios/n8n-workflow-exports/nora-health-check/aios-signature.test.mjs
+      - name: Workflow export secret and drift scan
+        working-directory: backend
+        run: pytest tests/api/test_aios_workflow_export.py -q
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

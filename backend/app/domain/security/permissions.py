@@ -49,6 +49,7 @@ class Permission(str, Enum):
     DOCUMENT_PROCESS = "document.process"
     ANALYSIS_RUN = "analysis.run"
     EVIDENCE_REVIEW = "evidence.review"
+    AIOS_INVOKE = "aios.invoke"
 
 
 class Role(str, Enum):
@@ -96,6 +97,24 @@ _EVIDENCE_REVIEW_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.EVIDENCE_REVIEW}
 )
 
+#: AIOS foundation (Gate 3). Held as its own set for the same reason
+#: ``_EVIDENCE_REVIEW_PERMISSIONS`` is: *who may invoke orchestration* is
+#: a question **M-4** exists to answer, and backlog risk R-1 forbids
+#: engineering from answering it alone.
+#:
+#: Until M-4 lands this grants exactly what the existing policy already
+#: grants every write-capable role, and no more. That closes the property
+#: that matters today -- a ``viewer`` cannot invoke a workflow -- without
+#: inventing an operator/orchestrator distinction no approved source
+#: states.
+#:
+#: Deliberately **disjoint from** ``_EVIDENCE_REVIEW_PERMISSIONS``:
+#: holding ``aios.invoke`` grants no authority over evidence. n8n may
+#: request a human decision; it may never record one, and no AIOS route
+#: may reach ``EvidenceReviewService``. Narrowing this set later is a
+#: single edit here, and nothing outside this module changes.
+_AIOS_PERMISSIONS: frozenset[Permission] = frozenset({Permission.AIOS_INVOKE})
+
 #: The single authoritative role -> permission policy. Read-only at runtime:
 #: the mapping is a ``MappingProxyType`` and every value is a ``frozenset``,
 #: so neither the policy nor any individual permission set can be mutated
@@ -105,15 +124,17 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
         # Read-only. Holds no write permission at all -- this is the exact
         # bypass the audit recorded (a viewer calling POST /documents).
         Role.VIEWER: frozenset(),
-        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
+        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
         # Same as editor until M-4 defines approval authority. Slice 4
         # added the first route an approver would plausibly own
         # (evidence review), but the authority to *restrict* it to this
         # role is still M-4's to grant -- see
         # ``_EVIDENCE_REVIEW_PERMISSIONS``.
-        Role.APPROVER: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
-        Role.ADMIN: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
-        Role.OWNER: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
+        Role.APPROVER: (
+            _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS
+        ),
+        Role.ADMIN: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
+        Role.OWNER: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
     }
 )
 

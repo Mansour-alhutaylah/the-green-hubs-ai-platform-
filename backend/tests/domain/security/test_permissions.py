@@ -196,3 +196,49 @@ def test_permission_evaluation_opens_no_socket(monkeypatch: pytest.MonkeyPatch) 
     assert has_permission(Role.ADMIN, Permission.DOCUMENT_UPLOAD) is True
     assert has_permission(Role.VIEWER, Permission.DOCUMENT_UPLOAD) is False
     assert resolve_trusted_role(_user("owner")) is Role.OWNER
+
+
+# ---------------------------------------------------------------------------
+# AIOS orchestration (Gate 3)
+# ---------------------------------------------------------------------------
+
+
+def test_aios_invoke_is_catalogued() -> None:
+    assert Permission.AIOS_INVOKE.value == "aios.invoke"
+
+
+def test_a_viewer_may_not_invoke_orchestration() -> None:
+    """The same property Slice 2 closed for uploads: a read-only role
+    cannot reach a write-shaped capability by calling the API directly."""
+
+    assert has_permission(Role.VIEWER, Permission.AIOS_INVOKE) is False
+
+
+@pytest.mark.parametrize("role", [Role.EDITOR, Role.APPROVER, Role.ADMIN, Role.OWNER])
+def test_write_capable_roles_may_invoke_orchestration(role: Role) -> None:
+    """Granted exactly what the existing policy already grants every
+    write-capable role, and no more -- M-4 still owns the finer split."""
+
+    assert has_permission(role, Permission.AIOS_INVOKE) is True
+
+
+def test_aios_invoke_is_a_distinct_permission_from_evidence_review() -> None:
+    """Holding ``aios.invoke`` confers no authority over evidence. n8n may
+    request a human decision; it may never record one."""
+
+    assert Permission.AIOS_INVOKE is not Permission.EVIDENCE_REVIEW
+    assert Permission.AIOS_INVOKE.value != Permission.EVIDENCE_REVIEW.value
+
+
+def test_the_aios_grant_did_not_widen_any_other_permission() -> None:
+    """Adding a permission must not silently hand a role something else.
+    Viewer in particular must still hold nothing at all."""
+
+    assert permissions_for_role(Role.VIEWER) == frozenset()
+    assert Permission.ORGANIZATION_MANAGE not in permissions_for_role(Role.EDITOR)
+    assert Permission.ORGANIZATION_MANAGE not in permissions_for_role(Role.APPROVER)
+
+
+def test_an_unknown_role_may_not_invoke_orchestration() -> None:
+    assert has_permission(None, Permission.AIOS_INVOKE) is False
+    assert has_permission(resolve_trusted_role(_user("nobody")), Permission.AIOS_INVOKE) is False
