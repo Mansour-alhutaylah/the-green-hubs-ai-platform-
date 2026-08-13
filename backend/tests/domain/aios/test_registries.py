@@ -6,6 +6,8 @@ granted: deny by default, immutable at runtime, and *named* is not
 *active*.
 """
 
+from urllib.parse import urlsplit
+
 import pytest
 
 from app.domain.aios.contracts import (
@@ -37,7 +39,12 @@ from app.domain.aios.workflows import (
     NORA_HEALTH_CHECK,
     WORKFLOW_REGISTRY,
     AutonomyLevel,
+    AIOSN8NWebhookMode,
+    NORA_HEALTH_CHECK_PRODUCTION_WEBHOOK_PATH,
+    NORA_HEALTH_CHECK_TEST_WEBHOOK_PATH,
+    TEST_WEBHOOK_ENVIRONMENTS,
     is_dispatchable,
+    resolve_webhook_path,
     resolve_workflow,
 )
 
@@ -237,7 +244,82 @@ def test_the_health_check_is_registered_correctly() -> None:
     assert workflow.role is AIOSRole.NORA
     assert workflow.version == "1.0.0"
     assert workflow.autonomy_level is AutonomyLevel.READ_ONLY
-    assert workflow.webhook_path.startswith("/webhook/gh-aios/v1/")
+    assert (
+        workflow.production_webhook_path
+        == "/webhook/gh-aios/v1/nora/health-check"
+        == NORA_HEALTH_CHECK_PRODUCTION_WEBHOOK_PATH
+    )
+    assert (
+        workflow.test_webhook_path
+        == "/webhook-test/gh-aios/v1/nora/health-check"
+        == NORA_HEALTH_CHECK_TEST_WEBHOOK_PATH
+    )
+
+
+def test_production_mode_selects_only_the_reviewed_production_path() -> None:
+    workflow = WORKFLOW_REGISTRY[NORA_HEALTH_CHECK]
+    assert (
+        resolve_webhook_path(
+            workflow,
+            mode=AIOSN8NWebhookMode.PRODUCTION,
+            environment="production",
+        )
+        == NORA_HEALTH_CHECK_PRODUCTION_WEBHOOK_PATH
+    )
+
+
+@pytest.mark.parametrize("environment", sorted(TEST_WEBHOOK_ENVIRONMENTS))
+def test_test_mode_is_allowed_only_in_each_reviewed_environment(environment: str) -> None:
+    workflow = WORKFLOW_REGISTRY[NORA_HEALTH_CHECK]
+    assert (
+        resolve_webhook_path(
+            workflow,
+            mode=AIOSN8NWebhookMode.TEST,
+            environment=f" {environment.upper()} ",
+        )
+        == NORA_HEALTH_CHECK_TEST_WEBHOOK_PATH
+    )
+
+
+@pytest.mark.parametrize(
+    "environment", ["production", "prod", "", "   ", "preview", "stage", "unknown"]
+)
+def test_test_mode_fails_closed_outside_the_environment_allowlist(
+    environment: str,
+) -> None:
+    workflow = WORKFLOW_REGISTRY[NORA_HEALTH_CHECK]
+    with pytest.raises(RuntimeError):
+        resolve_webhook_path(
+            workflow,
+            mode=AIOSN8NWebhookMode.TEST,
+            environment=environment,
+        )
+
+
+def test_reviewed_webhook_paths_are_safe_absolute_unique_paths() -> None:
+    seen: set[str] = set()
+    for workflow in WORKFLOW_REGISTRY.values():
+        paths = (
+            (workflow.production_webhook_path, "/webhook/"),
+            (workflow.test_webhook_path, "/webhook-test/"),
+        )
+        for path, required_prefix in paths:
+            parsed = urlsplit(path)
+            assert path.startswith(required_prefix)
+            assert path.startswith("/") and not path.startswith("//")
+            assert parsed.scheme == parsed.netloc == parsed.query == parsed.fragment == ""
+            assert parsed.path == path
+            assert "\\" not in path
+            assert "//" not in path
+            assert "@" not in path
+            assert ":" not in path
+            assert all(segment not in {".", ".."} for segment in path.split("/"))
+            assert path not in seen
+            seen.add(path)
+
+        production_tail = workflow.production_webhook_path.removeprefix("/webhook/")
+        test_tail = workflow.test_webhook_path.removeprefix("/webhook-test/")
+        assert production_tail == test_tail
 
 
 def test_the_health_check_is_dispatchable() -> None:

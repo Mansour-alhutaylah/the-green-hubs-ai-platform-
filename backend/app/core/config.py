@@ -13,6 +13,8 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.aios.workflows import AIOSN8NWebhookMode
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -135,6 +137,12 @@ class Settings(BaseSettings):
     # clear. Left unset by default so a missing configuration fails
     # clearly rather than silently targeting somewhere plausible.
     aios_n8n_base_url: Optional[str] = None
+
+    # Explicitly selects one of the two reviewed paths stored in the workflow
+    # registry. Production remains the default. Test mode is additionally
+    # denied by N8NAIOSClient unless ENVIRONMENT is on the non-production
+    # allowlist; it is never inferred from the n8n base URL.
+    aios_n8n_webhook_mode: AIOSN8NWebhookMode = AIOSN8NWebhookMode.PRODUCTION
 
     # Bounded, and consistent with the existing provider clients: a short
     # connect timeout so an unreachable host fails fast, and a bounded

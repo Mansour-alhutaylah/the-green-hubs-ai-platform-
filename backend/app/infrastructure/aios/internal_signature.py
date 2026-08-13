@@ -139,10 +139,10 @@ class SigningKeyRing:
     verifies is not retired, so the removal step is not optional.
 
     The key id encodes direction and environment
-    (``gh-aios-<f2n|n2f>-<dev|prod>-<serial>``), so a development key
+    (``gh-aios-<f2n|n2f>-<dev|staging|prod>-<serial>``), so a non-production key
     presented to a production verifier is not merely wrong -- it is
     absent from that verifier's ring entirely and fails structurally.
-    That is what makes the dev/prod separation self-enforcing rather
+    That is what makes the environment separation self-enforcing rather
     than procedural.
     """
 

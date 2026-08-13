@@ -1,4 +1,6 @@
-"""Unit tests for ``resolve_ai_credentials`` -- the shared logic that
+"""Unit tests for application configuration and AI credential selection.
+
+``resolve_ai_credentials`` is the shared logic that
 decides whether ``OpenAIEmbeddingProvider`` and ``OpenAILLMGateway`` talk
 to direct OpenAI or an OpenAI-compatible gateway such as OpenRouter.
 
@@ -10,7 +12,11 @@ local ``.env`` by default, and this developer's has live
 these results.
 """
 
+import pytest
+from pydantic import ValidationError
+
 from app.core.config import Settings, resolve_ai_credentials
+from app.domain.aios.workflows import AIOSN8NWebhookMode
 
 _DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
@@ -101,6 +107,19 @@ def test_the_aios_base_url_has_no_default() -> None:
     silently targeting somewhere plausible."""
 
     assert Settings.model_fields["aios_n8n_base_url"].default is None
+
+
+def test_the_aios_webhook_mode_defaults_to_production() -> None:
+    assert (
+        Settings.model_fields["aios_n8n_webhook_mode"].default
+        is AIOSN8NWebhookMode.PRODUCTION
+    )
+
+
+@pytest.mark.parametrize("invalid", ["", " ", "stage", "testing", "prod", "arbitrary"])
+def test_an_invalid_aios_webhook_mode_is_rejected(invalid: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings.model_validate({"aios_n8n_webhook_mode": invalid})
 
 
 def test_the_aios_clock_skew_default_is_the_specified_five_minutes() -> None:

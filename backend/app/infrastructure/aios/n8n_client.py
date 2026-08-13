@@ -36,6 +36,10 @@ from app.domain.aios.client import (
     AIOSUnavailableError,
     AIOSUnexpectedResponseError,
 )
+from app.domain.aios.workflows import (
+    resolve_webhook_path,
+    validate_webhook_mode_environment,
+)
 from app.infrastructure.aios.internal_signature import (
     SigningKeyRing,
     build_signature_headers,
@@ -145,6 +149,15 @@ class N8NAIOSClient(AIOSClient):
             raise RuntimeError("aios_connect_timeout_seconds must be positive")
 
         self._base_url = base_url
+        # Resolve the mode/environment policy during construction so an
+        # enabled deployment fails before sending anything. The kill switch
+        # still prevents this client from being constructed at all.
+        self._webhook_mode = settings.aios_n8n_webhook_mode
+        self._environment = settings.environment
+        validate_webhook_mode_environment(
+            mode=self._webhook_mode,
+            environment=self._environment,
+        )
         self._key_ring = key_ring
         self._timeout = httpx.Timeout(
             settings.aios_request_timeout_seconds,
@@ -169,7 +182,12 @@ class N8NAIOSClient(AIOSClient):
         )
 
     async def invoke(self, dispatch: AIOSDispatch) -> Mapping[str, Any]:
-        url = f"{self._base_url}{dispatch.workflow.webhook_path}"
+        webhook_path = resolve_webhook_path(
+            dispatch.workflow,
+            mode=self._webhook_mode,
+            environment=self._environment,
+        )
+        url = f"{self._base_url}{webhook_path}"
         headers = build_signature_headers(
             key_ring=self._key_ring,
             workflow=dispatch.workflow.identifier,

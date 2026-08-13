@@ -19,11 +19,13 @@ from httpx import AsyncClient
 
 from app.api.deps import (
     get_aios_verification_rate_limiter,
+    get_app_settings,
     get_health_check_service,
     get_request_verification_service,
     get_supabase_jwt_verifier,
     get_user_repository,
 )
+from app.core.config import Settings
 from app.core.request_context import CORRELATION_HEADER_NAME
 from app.domain.aios.client import (
     AIOSClient,
@@ -430,6 +432,8 @@ async def test_a_client_supplied_authority_field_is_rejected_when_nested(
         {"input": {}, "unexpected": 1},
         {"input": {"unexpected": 1}},
         {"workflow": "hafidh.master_inbox", "input": {}},
+        {"webhook_mode": "test", "input": {}},
+        {"webhook_path": "/webhook-test/attacker-controlled", "input": {}},
         {"contract_version": "1.0", "input": {}},
         {"request_id": str(uuid.uuid4()), "input": {}},
         {"input": "not-an-object"},
@@ -441,6 +445,8 @@ async def test_a_client_supplied_authority_field_is_rejected_when_nested(
         "extra-top-level",
         "extra-nested",
         "workflow-override",
+        "webhook-mode-override",
+        "webhook-path-override",
         "contract-version-override",
         "request-id-override",
         "input-not-object",
@@ -496,6 +502,37 @@ async def test_an_unregistered_workflow_path_is_404(
         "/api/v1/aios/workflows/hafidh.master_inbox", headers=headers, json={"input": {}}
     )
     assert response.status_code == 404
+
+
+async def test_aios_disabled_still_returns_503_without_constructing_a_client(
+    client: AsyncClient,
+    fake_verifier: FakeVerifier,
+    fake_repository: FakeUserRepository,
+    stub_client: StubClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.api import deps
+
+    headers = _sign_in(fake_verifier, fake_repository, role="admin")
+    enabled_override = app.dependency_overrides.pop(get_health_check_service)
+    app.dependency_overrides[get_app_settings] = lambda: Settings(
+        aios_enabled=False,
+        environment="production",
+        aios_n8n_webhook_mode="test",
+    )
+    monkeypatch.setattr(
+        deps,
+        "get_aios_client",
+        lambda: pytest.fail("a disabled deployment constructed the n8n client"),
+    )
+    try:
+        response = await client.post(INVOKE_PATH, headers=headers, json={"input": {}})
+    finally:
+        app.dependency_overrides.pop(get_app_settings, None)
+        app.dependency_overrides[get_health_check_service] = enabled_override
+
+    assert response.status_code == 503
+    assert stub_client.dispatches == []
 
 
 # ---------------------------------------------------------------------------

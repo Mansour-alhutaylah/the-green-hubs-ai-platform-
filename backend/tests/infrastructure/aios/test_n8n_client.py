@@ -20,7 +20,11 @@ from app.domain.aios.client import (
     AIOSUnavailableError,
     AIOSUnexpectedResponseError,
 )
-from app.domain.aios.workflows import NORA_HEALTH_CHECK, resolve_workflow
+from app.domain.aios.workflows import (
+    NORA_HEALTH_CHECK,
+    TEST_WEBHOOK_ENVIRONMENTS,
+    resolve_workflow,
+)
 from app.infrastructure.aios.internal_signature import (
     HEADER_KEY_ID,
     HEADER_REQUEST_ID,
@@ -219,6 +223,100 @@ async def test_the_destination_is_built_only_from_configuration_and_registry() -
     assert url.scheme == "https"
     assert url.host == "thegreenhubs.app.n8n.cloud"
     assert url.query == b""
+
+
+async def test_staging_test_mode_selects_only_the_reviewed_test_path() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=_ok_body(_dispatch()))
+
+    await _client(
+        handler,
+        environment="staging",
+        aios_n8n_webhook_mode="test",
+    ).invoke(_dispatch())
+
+    assert str(seen[0].url) == (
+        f"{PRODUCTION_BASE_URL}/webhook-test/gh-aios/v1/nora/health-check"
+    )
+
+
+@pytest.mark.parametrize("environment", sorted(TEST_WEBHOOK_ENVIRONMENTS))
+def test_the_client_accepts_test_mode_in_every_reviewed_environment(
+    environment: str,
+) -> None:
+    _client(
+        lambda request: httpx.Response(200, content=b"{}"),
+        environment=environment,
+        aios_n8n_webhook_mode="test",
+    )
+
+
+@pytest.mark.parametrize(
+    "environment", ["production", "prod", "", "   ", "preview", "stage", "unknown"]
+)
+def test_the_client_refuses_test_mode_in_any_other_environment(
+    environment: str,
+) -> None:
+    with pytest.raises(RuntimeError):
+        _client(
+            lambda request: httpx.Response(200, content=b"{}"),
+            environment=environment,
+            aios_n8n_webhook_mode="test",
+        )
+
+
+async def test_caller_data_cannot_select_a_webhook_mode_or_path() -> None:
+    body = json.dumps(
+        {
+            "input": {},
+            "webhook_mode": "test",
+            "webhook_path": "/webhook-test/attacker-controlled",
+        },
+        separators=(",", ":"),
+    ).encode()
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=_ok_body(_dispatch(body)))
+
+    await _client(handler).invoke(_dispatch(body))
+
+    assert seen[0].url.path == "/webhook/gh-aios/v1/nora/health-check"
+    assert seen[0].content == body
+
+
+async def test_only_the_destination_path_changes_between_webhook_modes() -> None:
+    body = b'{"contract_version":"1.0","input":{}}'
+    production_requests: list[httpx.Request] = []
+    test_requests: list[httpx.Request] = []
+
+    def production_handler(request: httpx.Request) -> httpx.Response:
+        production_requests.append(request)
+        return httpx.Response(200, content=_ok_body(_dispatch(body)))
+
+    def test_handler(request: httpx.Request) -> httpx.Response:
+        test_requests.append(request)
+        return httpx.Response(200, content=_ok_body(_dispatch(body)))
+
+    await _client(production_handler).invoke(_dispatch(body))
+    await _client(
+        test_handler,
+        environment="staging",
+        aios_n8n_webhook_mode="test",
+    ).invoke(_dispatch(body))
+
+    production_request = production_requests[0]
+    test_request = test_requests[0]
+    assert production_request.url.host == test_request.url.host
+    assert production_request.url.path == "/webhook/gh-aios/v1/nora/health-check"
+    assert test_request.url.path == "/webhook-test/gh-aios/v1/nora/health-check"
+    assert production_request.content == test_request.content == body
+    for header in (HEADER_KEY_ID, HEADER_TIMESTAMP, HEADER_REQUEST_ID, HEADER_SIGNATURE):
+        assert production_request.headers[header] == test_request.headers[header]
 
 
 async def test_the_transmitted_bytes_are_exactly_the_signed_bytes() -> None:

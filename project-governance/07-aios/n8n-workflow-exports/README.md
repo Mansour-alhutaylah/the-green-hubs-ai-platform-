@@ -40,8 +40,9 @@ directory and fails the build if it finds:
 
 It additionally asserts that the webhook still captures the raw body, that the
 webhook path is versioned, and that the path matches
-`app.domain.aios.workflows.NORA_HEALTH_CHECK`'s registered `webhook_path`. A
-drift between those two is a 404 in production.
+`app.domain.aios.workflows.NORA_HEALTH_CHECK`'s registered production and Test
+webhook paths. A drift between the export path and either reviewed prefix is a
+404 in that mode.
 
 ## Current state
 
@@ -79,6 +80,19 @@ This is deliberate. The AIOS deployment URL is a Gate 10 configuration step, and
 a committed URL would eventually be promoted by accident. The CI scan asserts the
 placeholder is still there.
 
+### Staging Test Webhook mode
+
+The application setting `AIOS_N8N_WEBHOOK_MODE` defaults to `production`, which
+uses `/webhook/gh-aios/v1/nora/health-check`. An isolated staging deployment may
+set it to `test`, which uses
+`/webhook-test/gh-aios/v1/nora/health-check`, only while `ENVIRONMENT=staging`
+(or another explicitly approved non-production value). The workflow stays
+inactive and the operator selects **Listen for Test Event** before dispatch.
+
+The staging outbound key identifier is `gh-aios-f2n-staging-001`. No `n2f` key
+or secret is provisioned: this workflow forwards the original signed request to
+FastAPI for verification and does not originate a separately signed callback.
+
 ## Export procedure
 
 1. Make the change in n8n. **Never** in this repository first — the instance is
@@ -98,9 +112,9 @@ placeholder is still there.
 
 ## Promotion
 
-Development and production use **separate credentials and separate webhook
-URLs** (Founder decision, Gate 1). Native n8n environment support is not assumed
-and is not used.
+Development, staging and production use **separate credentials and reviewed
+webhook paths** (Founder decision, Gate 1). Native n8n environment support is
+not assumed and is not used.
 
 ```
 develop in dev  ->  export + review as a diff  ->  import to production inactive
@@ -117,6 +131,6 @@ In order of speed:
 1. **Deactivate** the workflow in n8n. FastAPI returns a safe `502` immediately.
 2. **Disable** at the gateway: set `AIOS_ENABLED=false`. The route answers `503`
    without attempting a dispatch.
-3. **Revoke** both signing keys. Nothing else depends on them.
+3. **Revoke** the configured outbound signing key. No `n2f` key exists yet.
 4. **Revert** the FastAPI commit. The AIOS surface is purely additive — no
    migration, no data to unwind.

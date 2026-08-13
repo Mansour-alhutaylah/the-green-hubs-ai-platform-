@@ -20,7 +20,7 @@ application's own verification endpoint.
 """
 
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import Enum, IntEnum
 from types import MappingProxyType
 from typing import Final, Mapping
 
@@ -43,6 +43,21 @@ class AutonomyLevel(IntEnum):
     PRE_AUTHORIZED_EXTERNAL = 4
 
 
+class AIOSN8NWebhookMode(str, Enum):
+    """The only two reviewed n8n webhook endpoint modes."""
+
+    PRODUCTION = "production"
+    TEST = "test"
+
+
+#: Test webhooks are an editor-only staging/development mechanism. An
+#: environment outside this explicit set is denied rather than guessed from
+#: its name or from the configured n8n host.
+TEST_WEBHOOK_ENVIRONMENTS: Final[frozenset[str]] = frozenset(
+    {"development", "test", "testing", "local", "staging"}
+)
+
+
 #: Founder decision (Gate 1): begin at Levels 0-2. A registry entry above
 #: this level is a policy violation, and the module refuses to define one
 #: -- see the assertion at the foot of this file.
@@ -62,13 +77,20 @@ class RegisteredWorkflow:
     version: str
     #: What this workflow is permitted to do.
     autonomy_level: AutonomyLevel
-    #: Path appended to the configured n8n base URL. Versioned, so a v2
-    #: contract can run beside v1 rather than replacing it in place.
-    webhook_path: str
+    #: The published-workflow path appended in production mode.
+    production_webhook_path: str
+    #: The temporary listener path used only by n8n's Test Webhook mode.
+    test_webhook_path: str
 
 
 #: The one workflow Gate 1 approved for implementation.
 NORA_HEALTH_CHECK: Final = "nora.health_check"
+NORA_HEALTH_CHECK_PRODUCTION_WEBHOOK_PATH: Final = (
+    "/webhook/gh-aios/v1/nora/health-check"
+)
+NORA_HEALTH_CHECK_TEST_WEBHOOK_PATH: Final = (
+    "/webhook-test/gh-aios/v1/nora/health-check"
+)
 
 WORKFLOW_REGISTRY: Final[Mapping[str, RegisteredWorkflow]] = MappingProxyType(
     {
@@ -77,7 +99,8 @@ WORKFLOW_REGISTRY: Final[Mapping[str, RegisteredWorkflow]] = MappingProxyType(
             role=AIOSRole.NORA,
             version="1.0.0",
             autonomy_level=AutonomyLevel.READ_ONLY,
-            webhook_path="/webhook/gh-aios/v1/nora/health-check",
+            production_webhook_path=NORA_HEALTH_CHECK_PRODUCTION_WEBHOOK_PATH,
+            test_webhook_path=NORA_HEALTH_CHECK_TEST_WEBHOOK_PATH,
         )
     }
 )
@@ -120,6 +143,44 @@ def is_dispatchable(workflow: RegisteredWorkflow) -> bool:
     )
 
 
+def resolve_webhook_path(
+    workflow: RegisteredWorkflow,
+    *,
+    mode: AIOSN8NWebhookMode,
+    environment: str,
+) -> str:
+    """Return one reviewed path, denying unsafe Test-mode environments.
+
+    The destination is never inferred from the n8n base URL and no caller
+    value can supply a path or prefix. Unknown modes also fail closed even
+    though :class:`Settings` rejects them before this boundary.
+    """
+
+    validate_webhook_mode_environment(mode=mode, environment=environment)
+    if mode is AIOSN8NWebhookMode.PRODUCTION:
+        return workflow.production_webhook_path
+    return workflow.test_webhook_path
+
+
+def validate_webhook_mode_environment(
+    *, mode: AIOSN8NWebhookMode, environment: str
+) -> None:
+    """Refuse Test mode outside the explicit non-production allowlist."""
+
+    if mode is AIOSN8NWebhookMode.PRODUCTION:
+        return
+    if (
+        mode is AIOSN8NWebhookMode.TEST
+        and environment.strip().lower() in TEST_WEBHOOK_ENVIRONMENTS
+    ):
+        return
+
+    raise RuntimeError(
+        "AIOS_N8N_WEBHOOK_MODE=test is allowed only in an explicitly "
+        "approved non-production environment"
+    )
+
+
 # The registry is small and hand-written, so the phase cap is checked at
 # import: a Level 3+ entry added by a future edit fails immediately and
 # loudly rather than being discovered by a workflow that acts externally.
@@ -130,3 +191,9 @@ for _registered in WORKFLOW_REGISTRY.values():
             f"{_registered.autonomy_level}, above the approved foundation "
             f"maximum {MAX_FOUNDATION_AUTONOMY_LEVEL}."
         )
+    if not _registered.production_webhook_path.startswith("/webhook/"):
+        raise RuntimeError("Production AIOS webhook paths must start with /webhook/")
+    if not _registered.test_webhook_path.startswith("/webhook-test/"):
+        raise RuntimeError("Test AIOS webhook paths must start with /webhook-test/")
+    if _registered.production_webhook_path == _registered.test_webhook_path:
+        raise RuntimeError("Production and Test AIOS webhook paths must be distinct")

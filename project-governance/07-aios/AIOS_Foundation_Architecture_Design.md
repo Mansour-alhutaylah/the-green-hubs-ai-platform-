@@ -29,7 +29,7 @@ Google Drive is ratified as the shared-folder platform but **no Drive credential
 folder, register or Master Inbox integration may exist until Gate 7**; the Founder
 is the production-activation approver and the Level 3 approver; autonomy begins at
 Levels 0–2; no OpenAI/OpenRouter credential is required for the Health Check;
-development and production use separate credentials and webhook URLs; and no
+development, staging and production use separate credentials and webhook URLs; and no
 secret may appear in a workflow export, repository file, prompt, log, document or
 execution response.
 
@@ -187,7 +187,7 @@ disabled rather than falling back to re-serialisation.
 ```
 gh-aios-<direction>-<env>-<serial>
   direction : f2n (FastAPI→n8n) | n2f (n8n→FastAPI)
-  env       : dev | prod
+  env       : dev | staging | prod
 ```
 
 The key id encodes direction and environment, so a development key presented to a
@@ -199,6 +199,11 @@ Rotation is an overlap, never a cutover: add the new key (both verify) → switc
 the active id → observe ≥24h → **remove the old key**. A retired key that still
 verifies is not retired. Key ids are never reused. An unknown key id is rejected
 identically to a bad signature.
+
+The isolated staging outbound identifier is
+`gh-aios-f2n-staging-001`. No `n2f` key or secret is provisioned in this
+foundation: n8n forwards the original FastAPI-signed request to the inert
+verification endpoint and does not originate a separately signed message.
 
 ---
 
@@ -263,6 +268,21 @@ signature's canonical string, so a second accepted spelling would mean signing o
 and registering another). Role names **are** normalised, exactly as
 `resolve_trusted_role` normalises a stored `users.role`. The asymmetry is
 deliberate and asserted.
+
+### Production and Test webhook paths
+
+Each workflow registry entry stores two explicit, immutable paths:
+
+- `production`: `/webhook/gh-aios/v1/nora/health-check`
+- `test`: `/webhook-test/gh-aios/v1/nora/health-check`
+
+`AIOS_N8N_WEBHOOK_MODE` is a strict `production`/`test` setting and defaults to
+`production`. Test mode is accepted only when normalized `ENVIRONMENT` is one
+of `development`, `test`, `testing`, `local` or `staging`; it fails closed for
+Production aliases, blank values and every unknown value. The mode is never
+inferred from the n8n base URL, and no request field, header or query parameter
+can supply a path or prefix. `AIOS_ENABLED=false` still prevents construction
+of the n8n client entirely.
 
 ---
 

@@ -302,7 +302,7 @@ def test_the_webhook_path_is_versioned() -> None:
     assert "/v1/" in f"/{webhook['parameters']['path']}"
 
 
-def test_the_export_matches_the_registered_webhook_path() -> None:
+def test_the_export_matches_the_registered_production_webhook_path() -> None:
     """The export and the application's workflow registry must describe
     the same endpoint; a drift here is a 404 in production."""
 
@@ -315,7 +315,8 @@ def test_the_export_matches_the_registered_webhook_path() -> None:
     webhook = next(
         node for node in _iter_nodes(document) if node["type"] == "n8n-nodes-base.webhook"
     )
-    assert workflow.webhook_path == f"/webhook/{webhook['parameters']['path']}"
+    assert workflow.production_webhook_path == f"/webhook/{webhook['parameters']['path']}"
+    assert workflow.test_webhook_path == f"/webhook-test/{webhook['parameters']['path']}"
 
 
 def test_the_only_outbound_request_is_the_verification_call() -> None:
