@@ -7,6 +7,7 @@ follow the policy instead of quietly defining a second one.
 """
 
 import base64
+import inspect
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -211,6 +212,20 @@ async def test_the_policy_actually_splits_the_roles() -> None:
     assert ALLOWED_ROLES, "no role may invoke -- the policy is broken"
     assert DENIED_ROLES, "every role may invoke -- the viewer bypass is back"
     assert "viewer" in DENIED_ROLES
+
+
+async def test_the_route_is_gated_to_administrative_roles_only() -> None:
+    """The recorded reviewer decision, asserted at the API boundary.
+
+    ``ALLOWED_ROLES``/``DENIED_ROLES`` are derived from
+    ``ROLE_PERMISSIONS``, so the parametrized tests below follow the
+    policy wherever it goes. This test pins *where it is supposed to be*
+    -- otherwise a silent re-widening would simply re-parametrize the
+    suite and every case would still pass.
+    """
+
+    assert ALLOWED_ROLES == ("admin", "owner")
+    assert DENIED_ROLES == ("approver", "editor", "viewer")
 
 
 async def test_an_unauthenticated_invoke_is_401(client: AsyncClient) -> None:
@@ -796,3 +811,109 @@ async def test_a_body_within_the_ceiling_is_accepted(
     headers = _sign_in(fake_verifier, fake_repository, role="admin")
     response = await client.post(INVOKE_PATH, headers=headers, json={"input": {}})
     assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# A client cannot promote itself into an administrative role
+# ---------------------------------------------------------------------------
+
+
+FORGED_AUTHORITY_HEADERS = (
+    {"X-Role": "admin"},
+    {"X-Roles": "admin,owner"},
+    {"X-User-Role": "owner"},
+    {"X-Permission": "aios.invoke"},
+    {"X-Permissions": "aios.invoke"},
+    {"X-Is-Admin": "true"},
+    {"Role": "admin"},
+    {"X-Forwarded-Role": "owner"},
+    {"X-Organization-Id": str(uuid.uuid4())},
+    {"X-User-Id": str(uuid.uuid4())},
+)
+
+
+@pytest.mark.parametrize("forged", FORGED_AUTHORITY_HEADERS, ids=lambda h: next(iter(h)))
+async def test_a_forged_role_header_cannot_grant_access(
+    client: AsyncClient,
+    fake_verifier: FakeVerifier,
+    fake_repository: FakeUserRepository,
+    stub_client: StubClient,
+    forged: dict[str, str],
+) -> None:
+    """The decision reads only the server-resolved profile.
+
+    An ``editor`` is authenticated and genuine -- only the *permission*
+    is missing. Adding a header that claims otherwise must change
+    nothing: ``require_permission`` consults ``resolve_trusted_role`` on
+    the stored profile, and no request header participates.
+    """
+
+    headers = _sign_in(fake_verifier, fake_repository, role="editor")
+    headers.update(forged)
+
+    response = await client.post(INVOKE_PATH, headers=headers, json={"input": {}})
+
+    assert response.status_code == 403
+    assert stub_client.dispatches == [], "a forged header reached the orchestrator"
+
+
+@pytest.mark.parametrize("forged", FORGED_AUTHORITY_HEADERS, ids=lambda h: next(iter(h)))
+async def test_a_forged_role_header_cannot_rescue_an_unauthenticated_caller(
+    client: AsyncClient, stub_client: StubClient, forged: dict[str, str]
+) -> None:
+    """Still 401 -- authentication is never satisfied by a claim."""
+
+    response = await client.post(INVOKE_PATH, headers=forged, json={"input": {}})
+
+    assert response.status_code == 401
+    assert stub_client.dispatches == []
+
+
+@pytest.mark.parametrize("claimed", ["admin", "owner"])
+async def test_a_forged_role_in_the_payload_is_rejected_outright(
+    client: AsyncClient,
+    fake_verifier: FakeVerifier,
+    fake_repository: FakeUserRepository,
+    stub_client: StubClient,
+    claimed: str,
+) -> None:
+    """A role claimed in the body is a forbidden authority field: refused
+    by name with 422, never quietly ignored and never honoured."""
+
+    headers = _sign_in(fake_verifier, fake_repository, role="admin")
+
+    response = await client.post(
+        INVOKE_PATH, headers=headers, json={"input": {"role": claimed}}
+    )
+
+    assert response.status_code == 422
+    assert stub_client.dispatches == []
+
+
+async def test_the_stored_profile_role_is_what_decides(
+    client: AsyncClient,
+    fake_verifier: FakeVerifier,
+    fake_repository: FakeUserRepository,
+) -> None:
+    """The same request succeeds or fails purely on the stored role, with
+    every other input held identical."""
+
+    denied = _sign_in(fake_verifier, fake_repository, role="approver", token="t-approver")
+    allowed = _sign_in(fake_verifier, fake_repository, role="admin", token="t-admin")
+
+    assert (await client.post(INVOKE_PATH, headers=denied, json={"input": {}})).status_code == 403
+    assert (await client.post(INVOKE_PATH, headers=allowed, json={"input": {}})).status_code == 200
+
+
+async def test_the_health_check_route_still_declares_the_aios_permission() -> None:
+    """The narrowing must not have detached the route from the policy.
+
+    Read from the route's own dependency tree, not from a docstring: a
+    route that lost ``require_permission`` would still pass every
+    role-based test above by returning 200 to everyone.
+    """
+
+    from app.api.v1.aios import invoke_nora_health_check
+
+    source = inspect.getsource(invoke_nora_health_check)
+    assert "require_permission(Permission.AIOS_INVOKE)" in source

@@ -214,12 +214,58 @@ def test_a_viewer_may_not_invoke_orchestration() -> None:
     assert has_permission(Role.VIEWER, Permission.AIOS_INVOKE) is False
 
 
-@pytest.mark.parametrize("role", [Role.EDITOR, Role.APPROVER, Role.ADMIN, Role.OWNER])
-def test_write_capable_roles_may_invoke_orchestration(role: Role) -> None:
-    """Granted exactly what the existing policy already grants every
-    write-capable role, and no more -- M-4 still owns the finer split."""
+#: The complete, recorded answer for this phase. Stated once, here, and
+#: derived from :data:`Role` so a future role added to the enum without a
+#: decision fails :func:`test_every_role_is_classified_for_aios_invoke`
+#: rather than silently defaulting to denied-and-untested.
+AIOS_ALLOWED_ROLES: frozenset[Role] = frozenset({Role.ADMIN, Role.OWNER})
+AIOS_DENIED_ROLES: frozenset[Role] = frozenset(Role) - AIOS_ALLOWED_ROLES
+
+
+@pytest.mark.parametrize("role", sorted(AIOS_ALLOWED_ROLES, key=lambda r: r.value))
+def test_administrative_roles_may_invoke_orchestration(role: Role) -> None:
+    """Admin and Owner only.
+
+    NORA is a Founder/administrative capability this phase, and
+    ``aios.invoke`` is a *generic* orchestration permission that will
+    gate more capable workflows later -- so it is granted narrowly now
+    rather than widened silently the day those workflows are registered.
+    """
 
     assert has_permission(role, Permission.AIOS_INVOKE) is True
+
+
+@pytest.mark.parametrize("role", sorted(AIOS_DENIED_ROLES, key=lambda r: r.value))
+def test_non_administrative_roles_may_not_invoke_orchestration(role: Role) -> None:
+    """Viewer, Editor and Approver are each denied, individually.
+
+    Editor and Approver are named explicitly because they *were* granted
+    this permission before the reviewer decision -- a regression here
+    would be a silent re-widening, which is exactly the failure this
+    parametrization exists to catch.
+    """
+
+    assert has_permission(role, Permission.AIOS_INVOKE) is False
+
+
+def test_every_role_is_classified_for_aios_invoke() -> None:
+    """No role may be left unclassified. A new member of :class:`Role`
+    added without a recorded decision fails here."""
+
+    assert AIOS_ALLOWED_ROLES | AIOS_DENIED_ROLES == frozenset(Role)
+    assert not (AIOS_ALLOWED_ROLES & AIOS_DENIED_ROLES)
+
+
+def test_the_policy_itself_grants_aios_invoke_to_exactly_two_roles() -> None:
+    """Read from ``ROLE_PERMISSIONS`` rather than from the constants
+    above, so the test and the policy cannot drift together."""
+
+    granting = {
+        role
+        for role, permissions in ROLE_PERMISSIONS.items()
+        if Permission.AIOS_INVOKE in permissions
+    }
+    assert granting == {Role.ADMIN, Role.OWNER}
 
 
 def test_aios_invoke_is_a_distinct_permission_from_evidence_review() -> None:
@@ -237,6 +283,41 @@ def test_the_aios_grant_did_not_widen_any_other_permission() -> None:
     assert permissions_for_role(Role.VIEWER) == frozenset()
     assert Permission.ORGANIZATION_MANAGE not in permissions_for_role(Role.EDITOR)
     assert Permission.ORGANIZATION_MANAGE not in permissions_for_role(Role.APPROVER)
+
+
+def test_narrowing_aios_invoke_changed_no_other_permission() -> None:
+    """Pins every non-AIOS grant to what it was before the narrowing.
+
+    The correction had to remove one permission from two roles and touch
+    nothing else. Comparing the full sets with ``aios.invoke`` factored
+    out is what proves that -- a test that only checked ``aios.invoke``
+    would not notice a neighbouring permission lost in the same edit.
+
+    The expectations are written out literally rather than rebuilt from
+    the module's own private constants: reusing ``_WRITE_PERMISSIONS``
+    here would make the assertion tautological, since a mistaken edit to
+    that constant would move the test and the policy together.
+    """
+
+    write_and_review = frozenset(
+        {
+            Permission.ENGAGEMENT_MANAGE,
+            Permission.DOCUMENT_UPLOAD,
+            Permission.DOCUMENT_PROCESS,
+            Permission.ANALYSIS_RUN,
+            Permission.EVIDENCE_REVIEW,
+        }
+    )
+    expected_without_aios = {
+        Role.VIEWER: frozenset(),
+        Role.EDITOR: write_and_review,
+        Role.APPROVER: write_and_review,
+        Role.ADMIN: write_and_review | {Permission.ORGANIZATION_MANAGE},
+        Role.OWNER: write_and_review | {Permission.ORGANIZATION_MANAGE},
+    }
+    for role, expected in expected_without_aios.items():
+        actual = permissions_for_role(role) - {Permission.AIOS_INVOKE}
+        assert actual == expected, f"{role.value} lost or gained an unrelated permission"
 
 
 def test_an_unknown_role_may_not_invoke_orchestration() -> None:

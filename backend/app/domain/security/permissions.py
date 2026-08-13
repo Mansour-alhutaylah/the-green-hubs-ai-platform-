@@ -97,22 +97,33 @@ _EVIDENCE_REVIEW_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.EVIDENCE_REVIEW}
 )
 
-#: AIOS foundation (Gate 3). Held as its own set for the same reason
-#: ``_EVIDENCE_REVIEW_PERMISSIONS`` is: *who may invoke orchestration* is
-#: a question **M-4** exists to answer, and backlog risk R-1 forbids
-#: engineering from answering it alone.
+#: AIOS foundation (Gate 3), narrowed by recorded reviewer decision.
 #:
-#: Until M-4 lands this grants exactly what the existing policy already
-#: grants every write-capable role, and no more. That closes the property
-#: that matters today -- a ``viewer`` cannot invoke a workflow -- without
-#: inventing an operator/orchestrator distinction no approved source
-#: states.
+#: **Administrative roles only: ``admin`` and ``owner``.** Denied to
+#: ``viewer``, ``editor``, ``approver``, and to any unknown or missing
+#: role.
+#:
+#: Two reasons, both interim and both deliberate:
+#:
+#: * NORA is currently a Founder/administrative capability, not general
+#:   operator tooling. Nobody below admin has a reason to invoke it.
+#: * ``aios.invoke`` is a *generic* orchestration permission. It gates
+#:   the deterministic Health Check today, but the same permission will
+#:   gate more capable workflows later. Granting it broadly now would
+#:   silently widen those future workflows the day they are registered.
+#:   Least privilege is cheap here and expensive to retrofit.
+#:
+#: This is not the M-4 answer -- **M-4 remains open**, and it may widen
+#: or re-partition this set once the authoritative role model exists.
+#: Deliberately a *narrowing* rather than a new Health-Check-specific
+#: permission: a per-workflow permission would multiply the catalog and
+#: still leave the generic question unanswered.
 #:
 #: Deliberately **disjoint from** ``_EVIDENCE_REVIEW_PERMISSIONS``:
 #: holding ``aios.invoke`` grants no authority over evidence. n8n may
 #: request a human decision; it may never record one, and no AIOS route
-#: may reach ``EvidenceReviewService``. Narrowing this set later is a
-#: single edit here, and nothing outside this module changes.
+#: may reach ``EvidenceReviewService``. Changing this set is a single
+#: edit here, and nothing outside this module changes.
 _AIOS_PERMISSIONS: frozenset[Permission] = frozenset({Permission.AIOS_INVOKE})
 
 #: The single authoritative role -> permission policy. Read-only at runtime:
@@ -124,15 +135,16 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
         # Read-only. Holds no write permission at all -- this is the exact
         # bypass the audit recorded (a viewer calling POST /documents).
         Role.VIEWER: frozenset(),
-        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
+        # No _AIOS_PERMISSIONS: orchestration is admin-class this phase.
+        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
         # Same as editor until M-4 defines approval authority. Slice 4
         # added the first route an approver would plausibly own
         # (evidence review), but the authority to *restrict* it to this
         # role is still M-4's to grant -- see
         # ``_EVIDENCE_REVIEW_PERMISSIONS``.
-        Role.APPROVER: (
-            _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS
-        ),
+        # Likewise no _AIOS_PERMISSIONS. An approver's authority is over
+        # evidence decisions, not over invoking orchestration.
+        Role.APPROVER: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
         Role.ADMIN: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
         Role.OWNER: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS | _AIOS_PERMISSIONS,
     }

@@ -269,14 +269,28 @@ deliberate and asserted.
 ## 8. Permission
 
 `Permission.AIOS_INVOKE` (`aios.invoke`) is added to the existing catalogue and
-granted to `editor`, `approver`, `admin`, `owner`; denied to `viewer` and to any
-unrecognised role.
+granted to **`admin` and `owner` only**; denied to `viewer`, `editor`, `approver`,
+and to any unknown or missing role.
+
+This is a recorded reviewer decision, narrowing an earlier draft that had granted
+it to every write-capable role. Two reasons, both interim:
+
+- NORA is currently a Founder/administrative capability, not general operator
+  tooling — nobody below admin has a reason to invoke it.
+- `aios.invoke` is a **generic** orchestration permission. It gates the
+  deterministic Health Check today, but the same permission will gate more
+  capable workflows later; granting it broadly now would silently widen those
+  the day they are registered. Least privilege is cheap here and expensive to
+  retrofit.
+
+A separate Health-Check-specific permission was deliberately **not** created: it
+would multiply the catalogue and still leave the generic question unanswered.
 
 It is held as its own set, disjoint from `_EVIDENCE_REVIEW_PERMISSIONS`, for the
 same reason that set exists: *who may invoke orchestration* is a question **M-4**
-owns, and backlog risk **R-1** forbids engineering from answering it alone. Until
-M-4 lands this grants exactly what the policy already grants every write-capable
-role, and no more.
+owns, and backlog risk **R-1** forbids engineering from answering it alone.
+**M-4 remains open** and may widen or re-partition this set once the
+authoritative role model exists.
 
 **Holding `aios.invoke` confers no authority over evidence.** A CI test asserts
 that no AIOS module so much as mentions `EVIDENCE_REVIEW` or
