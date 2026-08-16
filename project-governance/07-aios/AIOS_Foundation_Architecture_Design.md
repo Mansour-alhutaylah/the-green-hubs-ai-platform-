@@ -354,8 +354,14 @@ changes neither the webhook path nor the workflow id.
 Gate 10 configuration step; a committed URL would eventually be promoted by
 accident.
 
-**End-to-end n8n Cloud connectivity has not been exercised.** See the release
-evidence record for exactly what was and was not verified.
+**End-to-end n8n Cloud connectivity: local isolated Staging verified, Production
+not exercised.** A local FastAPI instance, a temporary HTTPS tunnel, an isolated
+Supabase Staging project and the n8n Cloud Test Webhook were exercised together
+on 2026-08-16 and passed — see
+[`NORA_LOCAL_STAGING_E2E_VERIFICATION_2026-08-16.md`](NORA_LOCAL_STAGING_E2E_VERIFICATION_2026-08-16.md)
+for exactly what was and was not verified. No permanent Staging deployment, no
+Production deployment, and no workflow activation have been exercised or
+authorized; those remain separate Gate 10 Founder decisions.
 
 **Trial-period continuity is unconfirmed.** Recorded as an operational risk, not
 as a reason to purchase or upgrade anything.
