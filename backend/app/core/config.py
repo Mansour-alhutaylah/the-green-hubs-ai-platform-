@@ -13,6 +13,8 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.aios.workflows import AIOSN8NWebhookMode
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -121,6 +123,61 @@ class Settings(BaseSettings):
     rag_prompt_template_version: str = "v1"
     rag_output_schema_version: str = "v1"
     rag_processing_stale_after_seconds: int = 300
+
+    # AIOS orchestration (Gate 3, NORA Health Check foundation).
+    #
+    # `aios_enabled` is a kill switch, not a feature flag: turning it off
+    # makes the route answer cleanly rather than attempting a dispatch,
+    # which is the second of the four documented rollback steps.
+    aios_enabled: bool = False
+
+    # The official n8n Cloud instance. Must be https:// -- N8NAIOSClient
+    # refuses to construct otherwise, because a plaintext base URL would
+    # put the signed envelope, including resolved actor context, in the
+    # clear. Left unset by default so a missing configuration fails
+    # clearly rather than silently targeting somewhere plausible.
+    aios_n8n_base_url: Optional[str] = None
+
+    # Explicitly selects one of the two reviewed paths stored in the workflow
+    # registry. Production remains the default. Test mode is additionally
+    # denied by N8NAIOSClient unless ENVIRONMENT is on the non-production
+    # allowlist; it is never inferred from the n8n base URL.
+    aios_n8n_webhook_mode: AIOSN8NWebhookMode = AIOSN8NWebhookMode.PRODUCTION
+
+    # Bounded, and consistent with the existing provider clients: a short
+    # connect timeout so an unreachable host fails fast, and a bounded
+    # total timeout so a hung orchestrator cannot occupy a worker.
+    aios_connect_timeout_seconds: float = 5.0
+    aios_request_timeout_seconds: float = 10.0
+
+    # Hard ceiling on an inbound orchestration payload, refused before
+    # parsing. The health check's own envelope is a few hundred bytes;
+    # this is generous room for a future workflow's input, not a target.
+    aios_max_payload_bytes: int = 64 * 1024
+
+    # Two-sided acceptance window for a signing timestamp. Rejects
+    # future-dated timestamps under the same bound -- a one-sided window
+    # lets a signer with a fast clock mint long-lived signatures.
+    aios_max_clock_skew_seconds: int = 300
+
+    # The signing key ring. `aios_signing_keys` maps key id -> secret and
+    # is parsed by pydantic-settings from a JSON object in the
+    # environment; `aios_active_key_id` selects which one signs. Both
+    # keys stay accepted during a rotation overlap, which is what makes
+    # rotation an overlap rather than a cutover.
+    #
+    # Never read for anything but signature computation, never logged,
+    # and never returned by any route. Declared by NAME ONLY in
+    # render.yaml, like every other secret in this repository.
+    aios_signing_keys: dict[str, str] = {}
+    aios_active_key_id: Optional[str] = None
+
+    # Abuse brake on the internal verification endpoint -- the one AIOS
+    # surface reachable without an end-user token. Per process and in
+    # memory; see app/infrastructure/aios/rate_limit.py for the limits
+    # that implies.
+    aios_verification_rate_limit: int = 120
+    aios_verification_rate_window_seconds: float = 60.0
 
 
 @lru_cache

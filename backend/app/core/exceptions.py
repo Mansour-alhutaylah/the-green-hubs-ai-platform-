@@ -54,6 +54,49 @@ class InvalidStateTransitionError(AppError):
     status_code = status.HTTP_409_CONFLICT
 
 
+class PayloadTooLargeError(AppError):
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+
+
+class UpstreamTimeoutError(AppError):
+    """An approved upstream service did not answer within its budget.
+
+    504 rather than 500: the failure is attributable and the request may
+    be safely retried by the caller. Its message is one of the fixed safe
+    sentences in ``app.domain.aios.contracts`` -- never an upstream's own
+    error text, which can carry hostnames and stack frames.
+    """
+
+    status_code = status.HTTP_504_GATEWAY_TIMEOUT
+
+
+class UpstreamUnavailableError(AppError):
+    """An approved upstream service could not be reached, or refused.
+
+    Also covers a reachable upstream whose answer cannot be trusted --
+    a caller cannot act differently on "unreachable" than on "answered
+    incoherently", so both map here.
+    """
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+
+
+class RateLimitedError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+
+
+class AIOSNotConfiguredError(AppError):
+    """AIOS is switched off, or has no signing key ring on this deployment.
+
+    503 rather than 500: nothing is broken, the capability is simply not
+    available here. This is what a caller sees after the documented
+    rollback -- disable the flag, or revoke the credentials -- so it must
+    be a clean, honest answer rather than an error.
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
 class UnexpectedErrorMiddleware:
     """Convert unexpected HTTP exceptions into a safe response.
 

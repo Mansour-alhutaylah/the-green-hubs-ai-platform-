@@ -14,17 +14,21 @@ from functools import lru_cache
 from typing import AsyncIterator, Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
+    AIOSNotConfiguredError,
     AuthenticationError,
     AuthorizationError,
+    PayloadTooLargeError,
     ProfileNotProvisionedError,
 )
 from app.core.request_context import enrich_request_context
+from app.domain.aios.client import AIOSClient
+from app.domain.aios.contracts import AIOSErrorCategory, safe_message_for
 from app.domain.security import Permission, has_permission, resolve_trusted_role
 from app.domain.embedding_provider import EmbeddingProvider
 from app.domain.entities.user import User
@@ -41,6 +45,9 @@ from app.domain.repositories.user import IUserRepository
 from app.domain.storage.document_storage import IDocumentStorage
 from app.infrastructure.ai.openai_embedding_provider import OpenAIEmbeddingProvider
 from app.infrastructure.ai.openai_llm_gateway import OpenAILLMGateway
+from app.infrastructure.aios.internal_signature import SigningKeyRing, build_key_ring
+from app.infrastructure.aios.n8n_client import N8NAIOSClient
+from app.infrastructure.aios.rate_limit import FixedWindowRateLimiter
 from app.infrastructure.db.session import get_db as _get_db
 from app.infrastructure.processing_unit_of_work import SQLAlchemyProcessingUnitOfWork
 from app.infrastructure.repositories.analysis_run import SQLAlchemyAnalysisRunRepository
@@ -58,6 +65,8 @@ from app.infrastructure.security.supabase_jwt import (
     build_verifier_from_settings,
 )
 from app.infrastructure.storage.supabase_document_storage import SupabaseDocumentStorage
+from app.services.aios.health_check import HealthCheckService
+from app.services.aios.request_verification import RequestVerificationService
 from app.services.analysis.rag_analysis import RagAnalysisService
 from app.services.document_processing import DocumentProcessingService
 from app.services.document_read import DocumentReadService
@@ -337,6 +346,101 @@ def get_analysis_run_repository(
 @lru_cache
 def get_llm_gateway() -> LLMGateway:
     return OpenAILLMGateway(get_settings())
+
+
+async def read_bounded_body(request: Request, *, max_bytes: int) -> bytes:
+    """Read a request body, refusing anything over ``max_bytes``.
+
+    Shared by both AIOS routes so the ceiling is enforced identically on
+    the product-facing route and on the internal verification endpoint.
+
+    The declared ``Content-Length`` is checked *first*, so an oversized
+    body is refused before it is materialised in memory. That header is
+    client-supplied and therefore not trusted on its own -- the actual
+    length is re-checked after reading, which is what a chunked request
+    with no ``Content-Length`` falls through to. Neither check alone is
+    sufficient: the first bounds the common case cheaply, the second is
+    the one that cannot be lied to.
+    """
+
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > max_bytes:
+                raise PayloadTooLargeError(
+                    safe_message_for(AIOSErrorCategory.PAYLOAD_TOO_LARGE)
+                )
+        except ValueError:
+            # A malformed Content-Length is not a size decision; fall
+            # through to the authoritative post-read check.
+            pass
+
+    body = await request.body()
+    if len(body) > max_bytes:
+        raise PayloadTooLargeError(safe_message_for(AIOSErrorCategory.PAYLOAD_TOO_LARGE))
+    return body
+
+
+@lru_cache
+def get_aios_key_ring() -> SigningKeyRing:
+    """The configured signing key ring, or a clear failure.
+
+    ``build_key_ring`` returns ``None`` when nothing is configured, so
+    importing and booting the app without AIOS credentials stays possible
+    -- the same deliberate choice ``get_settings()`` makes about a
+    missing ``.env``. Reaching *this* provider means a route actually
+    needs to sign or verify, and at that point an absent key ring is a
+    real misconfiguration rather than a tolerable one.
+    """
+
+    settings = get_settings()
+    key_ring = build_key_ring(settings.aios_signing_keys, settings.aios_active_key_id)
+    if key_ring is None:
+        raise AIOSNotConfiguredError(
+            "The orchestration service is not configured on this deployment."
+        )
+    return key_ring
+
+
+@lru_cache
+def get_aios_client() -> AIOSClient:
+    return N8NAIOSClient(get_settings(), get_aios_key_ring())
+
+
+def get_health_check_service(
+    settings: Settings = Depends(get_app_settings),
+) -> HealthCheckService:
+    # The kill switch is checked here rather than inside the service, so
+    # a disabled deployment never constructs a client and never resolves
+    # a key ring -- one of the four documented rollback steps.
+    if not settings.aios_enabled:
+        raise AIOSNotConfiguredError(
+            "The orchestration service is not enabled on this deployment."
+        )
+    return HealthCheckService(get_aios_client())
+
+
+def get_request_verification_service(
+    settings: Settings = Depends(get_app_settings),
+) -> RequestVerificationService:
+    if not settings.aios_enabled:
+        raise AIOSNotConfiguredError(
+            "The orchestration service is not enabled on this deployment."
+        )
+    return RequestVerificationService(
+        get_aios_key_ring(),
+        max_clock_skew_seconds=settings.aios_max_clock_skew_seconds,
+        max_body_bytes=settings.aios_max_payload_bytes,
+    )
+
+
+@lru_cache
+def get_aios_verification_rate_limiter() -> FixedWindowRateLimiter:
+    settings = get_settings()
+    return FixedWindowRateLimiter(
+        limit=settings.aios_verification_rate_limit,
+        window_seconds=settings.aios_verification_rate_window_seconds,
+    )
 
 
 def get_rag_analysis_service(

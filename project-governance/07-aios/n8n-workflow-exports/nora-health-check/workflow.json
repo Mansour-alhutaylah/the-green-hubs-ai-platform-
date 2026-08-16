@@ -1,0 +1,340 @@
+{
+  "_comment": [
+    "Reviewed export of GH-AIOS / NORA / Health Check, n8n Cloud workflow id bo6U1KIJyNKjQzex.",
+    "INACTIVE. Activation is a Gate 10 Founder decision and is not authorized.",
+    "Contains no secret and no credential reference. The FastAPI verification URL is an",
+    "explicit unset placeholder, not a configured value.",
+    "Scanned in CI by backend/tests/api/test_aios_workflow_export.py."
+  ],
+  "name": "GH-AIOS / NORA / Health Check",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "name": "Receive FastAPI Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gh-aios/v1/nora/health-check",
+        "authentication": "none",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "name": "Capture Raw Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first();\nconst received = (item.json && item.json.headers) || {};\nconst headers = {};\nconst names = Object.keys(received);\nfor (let index = 0; index < names.length; index++) { const value = received[names[index]]; headers[names[index].toLowerCase()] = value === undefined || value === null ? '' : String(value); }\nconst binary = item.binary || {};\nconst property = binary.data || binary.body;\nif (!property || typeof property.data !== 'string') { throw new Error('Raw body capture is not enabled on the Webhook node. Enable options.rawBody. Re-serialising the parsed body would produce a different digest and break signature verification.'); }\nreturn [{ json: { workflow: 'nora.health_check', key_id: headers['x-gh-aios-key-id'] || '', timestamp: headers['x-gh-aios-timestamp'] || '', request_id: headers['x-gh-request-id'] || '', signature: headers['x-gh-aios-signature'] || '', correlation_id: headers['x-correlation-id'] || '', body_base64: property.data, started_at: $now.toISO() } }];"
+      }
+    },
+    {
+      "name": "Request FastAPI Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__FastAPI internal verification endpoint, e.g. https://your-api-host/api/v1/internal/aios/verify-request__>",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"workflow\":\"{{ $json.workflow }}\",\"key_id\":\"{{ $json.key_id }}\",\"timestamp\":\"{{ $json.timestamp }}\",\"request_id\":\"{{ $json.request_id }}\",\"signature\":\"{{ $json.signature }}\",\"body_base64\":\"{{ $json.body_base64 }}\"}",
+        "options": {
+          "timeout": 5000
+        }
+      }
+    },
+    {
+      "name": "Signature Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "signature-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Parse Verified Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const captured = $('Capture Raw Request').first().json;\nconst decoded = Buffer.from(captured.body_base64, 'base64').toString('utf8');\nconst parsed = (function () { try { return JSON.parse(decoded); } catch (error) { return null; } })();\nconst isObject = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed);\nreturn [{ json: { envelope: isObject ? parsed : {}, parsed: isObject, request_id_header: captured.request_id, started_at: captured.started_at } }];"
+      }
+    },
+    {
+      "name": "Validate AIOS Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const input = $input.first().json;\nconst envelope = input.envelope || {};\nconst actor = envelope.actor || {};\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;\nconst emptyInput = JSON.stringify(envelope.input === undefined ? {} : envelope.input) === '{}';\nconst valid = input.parsed === true && envelope.contract_version === '1.0' && envelope.workflow === 'nora.health_check' && uuid.test(String(envelope.request_id || '')) && uuid.test(String(envelope.correlation_id || '')) && uuid.test(String(actor.user_id || '')) && uuid.test(String(actor.organization_id || '')) && envelope.request_id === input.request_id_header && emptyInput;\nreturn [{ json: { contract_valid: valid, category: valid ? null : 'contract_invalid', request_id: valid ? envelope.request_id : null, correlation_id: valid ? envelope.correlation_id : null, started_at: input.started_at } }];"
+      }
+    },
+    {
+      "name": "Contract Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "contract-valid",
+              "leftValue": "={{ $json.contract_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Build Health Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1540,
+        -220
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"contract_version\":\"1.0\",\"request_id\":\"{{ $json.request_id }}\",\"correlation_id\":\"{{ $json.correlation_id }}\",\"workflow\":\"nora.health_check\",\"status\":\"completed\",\"output\":{\"service\":\"gh-aios\",\"orchestrator\":\"n8n\",\"role\":\"NORA\",\"health\":\"ok\"},\"metadata\":{\"execution_id\":\"{{ $execution.id }}\",\"workflow_version\":\"1.0.0\",\"started_at\":\"{{ $json.started_at }}\",\"completed_at\":\"{{ $now.toISO() }}\"}}",
+        "includeOtherFields": false,
+        "options": {
+          "includeBinary": false
+        }
+      }
+    },
+    {
+      "name": "Return Health Check",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        -220
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "name": "Build Invalid Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1540,
+        140
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"contract_version\":\"1.0\",\"request_id\":null,\"correlation_id\":null,\"workflow\":\"nora.health_check\",\"status\":\"rejected\",\"error\":{\"category\":\"{{ $json.category }}\",\"message\":\"The orchestration request was not valid.\"}}",
+        "includeOtherFields": false,
+        "options": {
+          "includeBinary": false
+        }
+      }
+    },
+    {
+      "name": "Return Invalid Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        140
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": "={{ $json.error.category == \"contract_invalid\" ? 422 : 401 }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive FastAPI Request": {
+      "main": [
+        [
+          {
+            "node": "Capture Raw Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Raw Request": {
+      "main": [
+        [
+          {
+            "node": "Request FastAPI Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request FastAPI Verification": {
+      "main": [
+        [
+          {
+            "node": "Signature Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature Valid?": {
+      "main": [
+        [
+          {
+            "node": "Parse Verified Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Invalid Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Verified Contract": {
+      "main": [
+        [
+          {
+            "node": "Validate AIOS Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AIOS Contract": {
+      "main": [
+        [
+          {
+            "node": "Contract Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contract Valid?": {
+      "main": [
+        [
+          {
+            "node": "Build Health Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Invalid Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Health Response": {
+      "main": [
+        [
+          {
+            "node": "Return Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Invalid Response": {
+      "main": [
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

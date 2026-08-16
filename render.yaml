@@ -67,3 +67,28 @@ services:
         sync: false
       - key: OPENAI_MODEL
         sync: false
+
+      # AIOS orchestration (n8n Cloud). Disabled until Gate 10 approves
+      # production activation -- the route answers 503 while it is off.
+      - key: AIOS_ENABLED
+        value: "false"
+
+      # https://thegreenhubs.app.n8n.cloud -- must be https://, the client
+      # refuses to construct otherwise.
+      - key: AIOS_N8N_BASE_URL
+        sync: false
+
+      # Safe default: published-workflow endpoint. An isolated staging
+      # service may explicitly select "test" only together with an approved
+      # non-production ENVIRONMENT; the client refuses that mode elsewhere.
+      - key: AIOS_N8N_WEBHOOK_MODE
+        value: production
+
+      # The HMAC signing key ring, as a JSON object mapping key id to
+      # secret, e.g. {"gh-aios-f2n-prod-001":"<secret>"}. Both keys stay
+      # present during a rotation overlap. NEVER add a value here.
+      - key: AIOS_SIGNING_KEYS
+        sync: false
+      # Which key id signs outbound requests, e.g. gh-aios-f2n-prod-001.
+      - key: AIOS_ACTIVE_KEY_ID
+        sync: false
