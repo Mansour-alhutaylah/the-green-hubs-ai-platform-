@@ -1,12 +1,29 @@
 import { Link } from 'react-router';
-import { DemoDataBadge, Icon } from '@/design-system';
+import { Icon } from '@/design-system';
 import { ROUTES } from '@/app/navigation/routePaths';
 import { findNavItem } from '@/app/navigation/navConfig';
 import { useHasMinTier } from '@/features/rbac/useHasMinTier';
-import type { DemoUser } from '@/features/auth/types';
+import type { AuthUser } from '@/features/auth/types';
+import type { DashboardTotals } from '@/lib/data/contracts';
 import { useLocale } from '@/lib/i18n/useLocale';
 
-export function DashboardHero({ user }: { user?: DemoUser | null }) {
+/**
+ * The dashboard's identity band. It states who is signed in and where to go
+ * next — never a metric it has not been given.
+ *
+ * `totals` is optional on purpose: when no source has supplied a snapshot
+ * (Live today, since no dashboard endpoint exists), the counts strip is not
+ * rendered at all rather than falling back to a placeholder figure. The
+ * previous version hard-coded "4" documents and "3" analysis runs into the
+ * markup, which were shown to every user regardless of their workspace.
+ */
+export function DashboardHero({
+  user,
+  totals,
+}: {
+  user?: AuthUser | null;
+  totals?: DashboardTotals;
+}) {
   const { t } = useLocale();
   const canUpload = useHasMinTier(findNavItem('upload').minTier);
   const displayName = user?.name ?? 'Green Hubs team';
@@ -21,7 +38,6 @@ export function DashboardHero({ user }: { user?: DemoUser | null }) {
 
       <div className="relative z-10 max-w-3xl px-5 py-6 sm:px-7 sm:py-7 lg:pe-12">
         <div className="flex flex-wrap items-center gap-2">
-          <DemoDataBadge label={t('dashboard.sampleData')} />
           <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/7 px-3 py-1 text-caption font-semibold text-white/80">
             <span className="h-1.5 w-1.5 rounded-full bg-leaf-500 shadow-signal" aria-hidden />
             {t('dashboard.hero.workspace')}
@@ -69,11 +85,22 @@ export function DashboardHero({ user }: { user?: DemoUser | null }) {
         </div>
       </div>
 
-      <dl className="relative z-10 grid border-t border-white/10 bg-black/10 min-[520px]:grid-cols-3">
-        <HeroMetric label={t('dashboard.hero.documentsTracked')} value="4" />
-        <HeroMetric label={t('dashboard.hero.analysisRuns')} value="3" />
-        <HeroMetric label={t('dashboard.hero.workspaceState')} value={t('dashboard.hero.reviewReady')} />
-      </dl>
+      {totals && (
+        <dl className="relative z-10 grid border-t border-white/10 bg-black/10 min-[520px]:grid-cols-3">
+          <HeroMetric
+            label={t('dashboard.hero.documentsTracked')}
+            value={String(totals.documentsTracked)}
+          />
+          <HeroMetric
+            label={t('dashboard.hero.analysisRuns')}
+            value={String(totals.analysisRuns)}
+          />
+          <HeroMetric
+            label={t('dashboard.hero.workspaceState')}
+            value={t('dashboard.hero.reviewReady')}
+          />
+        </dl>
+      )}
     </section>
   );
 }

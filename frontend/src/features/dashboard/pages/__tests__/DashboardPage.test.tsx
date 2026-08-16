@@ -1,25 +1,37 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, buildTestSession } from '@/test/renderWithProviders';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { Role } from '@/features/rbac/roles';
 import { DashboardPage } from '../DashboardPage';
 
 function userWithRole(role: Role) {
-  const user = DEMO_USERS.find((demoUser) => demoUser.role === role);
-  if (!user) throw new Error(`No demo user seeded for role ${role}`);
+  const user = TEST_USERS.find((candidate) => candidate.role === role);
+  if (!user) throw new Error(`No test user seeded for role ${role}`);
   return user;
 }
 
+/** The charts only have data to draw in Preview mode — Live has no
+ * dashboard source yet (see DashboardTruthfulness.test.tsx). */
+function usePreviewMode() {
+  vi.stubEnv('VITE_APP_MODE', 'preview');
+  vi.stubEnv('VITE_APP_ENVIRONMENT', 'preview');
+}
+
 describe('DashboardPage — analysis chart, donut, and quick actions', () => {
-  it('renders the Analysis Activity chart and Analysis Summary donut with real totals', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('renders the Analysis Activity chart and Analysis Summary donut with the snapshot totals', () => {
+    usePreviewMode();
     renderWithProviders(<DashboardPage />, { session: buildTestSession(userWithRole(Role.Admin)) });
 
     expect(screen.getByRole('heading', { name: /analysis activity/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /analysis summary/i })).toBeInTheDocument();
-    // 9 total mock analysis runs across all statuses (see mockAnalysisData.ts).
-    expect(screen.getByText('9')).toBeInTheDocument();
+    // 18 + 4 + 2 + 3 analysis outcomes in the Preview fixture.
+    expect(screen.getAllByText('27').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Processing').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
@@ -27,6 +39,7 @@ describe('DashboardPage — analysis chart, donut, and quick actions', () => {
   });
 
   it('switches the chart between Monthly and Quarterly views', async () => {
+    usePreviewMode();
     const user = userEvent.setup();
     renderWithProviders(<DashboardPage />, { session: buildTestSession(userWithRole(Role.Admin)) });
 

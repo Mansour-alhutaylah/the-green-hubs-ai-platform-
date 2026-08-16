@@ -1,6 +1,6 @@
 import { Role } from '@/features/rbac/roles';
 import type { UserProfileResponse } from '@/lib/api/types';
-import type { DemoUser } from '../types';
+import type { AuthUser } from '../types';
 
 const KNOWN_ROLES: readonly Role[] = [Role.Viewer, Role.Editor, Role.Approver, Role.Admin, Role.Owner];
 
@@ -16,13 +16,13 @@ export function mapBackendRole(role: string | null): Role {
   return match ?? Role.Viewer;
 }
 
-/** Maps the backend's `UserProfileResponse` to the shared `DemoUser` shape
+/** Maps the backend's `UserProfileResponse` to the shared `AuthUser` shape
  * every existing UI (ProfileMenu, RoleGuard, useHasMinTier, the dashboard
  * greeting) already reads — this is purely a display/authorization-UX
  * mapping, not a re-derivation of tenant scope: `organization_id` /
  * `orgIds` here is used for display only, never sent back to the backend
  * as an authority. */
-export function mapBackendUser(profile: UserProfileResponse): DemoUser {
+export function mapBackendUser(profile: UserProfileResponse): AuthUser {
   return {
     id: profile.id,
     name: profile.full_name,

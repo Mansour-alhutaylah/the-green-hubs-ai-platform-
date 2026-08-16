@@ -22,10 +22,6 @@ function buildLiveOnlyService(overrides: Partial<AuthService> = {}): AuthService
     async requestLogin(): Promise<LoginResult> {
       throw new Error('not used in this test');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('not used in this test');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {},
     getSession: () => null,
     setActiveOrg: () => null,
@@ -77,7 +73,6 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
   });
 
   it('routes through the existing session-expired page after an out-of-band 401, not a bare logout redirect', async () => {
-    window.sessionStorage.setItem('ghp:dashboard-visited', '1');
     const service = buildLiveOnlyService({
       restoreSession: async () => buildLiveSession(),
     });

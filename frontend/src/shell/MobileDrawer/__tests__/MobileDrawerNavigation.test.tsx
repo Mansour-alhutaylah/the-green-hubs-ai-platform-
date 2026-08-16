@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '@/app/router/routes';
 import { Role } from '@/features/rbac/roles';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { buildTestSession, renderWithProviders } from '@/test/renderWithProviders';
 // Vite's `?raw` import — reads the real token file without pulling Node
 // APIs (and their types) into the app tsconfig.
@@ -31,7 +31,7 @@ function setViewport(width: number) {
 }
 
 function renderShell(initialPath = '/dashboard') {
-  const admin = DEMO_USERS.find((user) => user.role === Role.Admin);
+  const admin = TEST_USERS.find((user) => user.role === Role.Admin);
   if (!admin) throw new Error('No Admin demo user seeded');
   return renderWithProviders(<AppRoutes />, {
     initialEntries: [initialPath],
@@ -76,7 +76,6 @@ describe('MobileDrawer — stacking invariant (the actual defect)', () => {
 describe('MobileDrawer — navigation and dismissal', () => {
   beforeEach(() => {
     setViewport(MOBILE_WIDTH);
-    window.sessionStorage.setItem('ghp:dashboard-visited', '1');
   });
 
   it('opens the drawer from the Context Bar trigger', async () => {

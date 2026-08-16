@@ -1,60 +1,56 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../useAuth';
 import {
-  ChallengeExpiredError,
   InvalidCredentialsError,
-  InvalidOtpError,
   ProfileNotProvisionedError,
   RateLimitedError,
 } from '../services/AuthService';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
 import { LoginForm } from '../components/LoginForm';
-import { OtpForm } from '../components/OtpForm';
-import { ROUTES } from '@/app/navigation/routePaths';
-
-type Step = { name: 'credentials' } | { name: 'otp'; challengeId: string; maskedContact: string };
+import { PreviewWorkspaceEntry } from '../components/PreviewWorkspaceEntry';
+import { resolveReturnPath } from '@/app/router/returnPath';
 
 /**
- * §6.1/§9.1: a single route whose card content swaps between the
- * credentials step and the OTP step, rather than two separate pages.
- * OTP success always navigates to /dashboard (the landing rule, §7) —
- * never to whatever deep link was originally attempted.
+ * The single sign-in route.
  *
- * Live (Supabase) sign-in has no OTP step — `requestLogin` resolves with
- * `kind: 'authenticated'` directly and this navigates straight to
- * /dashboard, exactly like the demo-workspace path below. Only the mock's
- * two-step login ever produces `kind: 'otpRequired'`.
+ * Live: the real Supabase email/password sign-in, one step. There is no OTP
+ * screen — Supabase's password grant has no second factor, so the step that
+ * used to render here could only ever be satisfied by a mock. Real MFA is a
+ * later dedicated security phase and is not represented anywhere in this
+ * flow today.
+ *
+ * Preview: a credential-free workspace entry (see `PreviewWorkspaceEntry`);
+ * the password form is not rendered at all, so there is nothing to fall
+ * through to.
+ *
+ * On success the user lands on the protected route they originally asked
+ * for, when there was one and it validates — otherwise /dashboard.
  */
 export function LoginPage() {
-  const { requestLogin, verifyOtp, resendOtp, enterDemoWorkspace } = useAuth();
+  const { requestLogin, enterPreviewWorkspace } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [step, setStep] = useState<Step>({ name: 'credentials' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const [lockoutSeconds, setLockoutSeconds] = useState<number>();
+
+  const returnPath = resolveReturnPath(location.state);
 
   async function handleCredentials(email: string, password: string) {
     setIsSubmitting(true);
     setError(undefined);
     try {
-      const result = await requestLogin(email, password);
-      if (result.kind === 'otpRequired') {
-        setStep({
-          name: 'otp',
-          challengeId: result.challengeId,
-          maskedContact: result.maskedContact,
-        });
-      } else {
-        navigate(ROUTES.dashboard, { replace: true });
-      }
+      await requestLogin(email, password);
+      navigate(returnPath, { replace: true });
     } catch (caught) {
       if (caught instanceof RateLimitedError) {
         setLockoutSeconds(caught.retryAfterSec);
-      } else if (caught instanceof InvalidCredentialsError) {
-        setError(caught.message);
-      } else if (caught instanceof ProfileNotProvisionedError) {
+      } else if (
+        caught instanceof InvalidCredentialsError ||
+        caught instanceof ProfileNotProvisionedError
+      ) {
         setError(caught.message);
       } else {
         setError('Something went wrong. Try again.');
@@ -64,36 +60,15 @@ export function LoginPage() {
     }
   }
 
-  async function handleOtpComplete(code: string) {
-    if (step.name !== 'otp') return;
+  async function handlePreviewEntry() {
+    if (!enterPreviewWorkspace) return;
     setIsSubmitting(true);
     setError(undefined);
     try {
-      await verifyOtp(step.challengeId, code);
-      navigate(ROUTES.dashboard, { replace: true });
-    } catch (caught) {
-      if (caught instanceof InvalidOtpError) {
-        setError(caught.message);
-      } else if (caught instanceof ChallengeExpiredError) {
-        setError(caught.message);
-        setStep({ name: 'credentials' });
-      } else {
-        setError('Something went wrong. Try again.');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDemoWorkspace() {
-    if (!enterDemoWorkspace) return;
-    setIsSubmitting(true);
-    setError(undefined);
-    try {
-      await enterDemoWorkspace();
-      navigate(ROUTES.dashboard, { replace: true });
+      await enterPreviewWorkspace();
+      navigate(returnPath, { replace: true });
     } catch {
-      setError('Development demo access is unavailable.');
+      setError('The Preview workspace is unavailable.');
     } finally {
       setIsSubmitting(false);
     }
@@ -101,22 +76,18 @@ export function LoginPage() {
 
   return (
     <AuthSplitLayout variant="login">
-      {step.name === 'credentials' ? (
+      {enterPreviewWorkspace ? (
+        <PreviewWorkspaceEntry
+          onEnter={() => void handlePreviewEntry()}
+          isSubmitting={isSubmitting}
+          error={error}
+        />
+      ) : (
         <LoginForm
           onSubmit={handleCredentials}
           isSubmitting={isSubmitting}
           error={error}
           lockoutSeconds={lockoutSeconds}
-          onEnterDemoWorkspace={enterDemoWorkspace ? handleDemoWorkspace : undefined}
-        />
-      ) : (
-        <OtpForm
-          maskedContact={step.maskedContact}
-          onComplete={handleOtpComplete}
-          onBack={() => setStep({ name: 'credentials' })}
-          onResend={() => void resendOtp(step.challengeId)}
-          isSubmitting={isSubmitting}
-          error={error}
         />
       )}
     </AuthSplitLayout>

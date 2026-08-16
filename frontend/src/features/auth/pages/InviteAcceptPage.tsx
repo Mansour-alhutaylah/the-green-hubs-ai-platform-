@@ -1,100 +1,48 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router';
-import { Button, Input, OtpCells, useToast } from '@/design-system';
+import { Link } from 'react-router';
+import { DiamondGlyph } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { ROUTES } from '@/app/navigation/routePaths';
-import { MOCK_ORGANIZATIONS, localizedOrgName } from '@/features/organizations/mockOrgs';
 import { AuthSplitLayout } from '../components/AuthSplitLayout';
 import { AuthPageHeader } from '../components/AuthPageHeader';
-import { OrgInviteChip } from '../components/OrgInviteChip';
-import { OtpDevHint } from '../components/OtpDevHint';
-import { useAuth } from '../useAuth';
 
-type Step = 'details' | 'otp';
-
-const invitingOrg = MOCK_ORGANIZATIONS[0]!;
-
-/** §9.1: "set name + password -> OTP -> /dashboard (first-run coachmarks)".
- * Phase 1 has no seeded invite tokens to attach a real session to, so this
- * confirms the code and returns the new user to /login to sign in with
- * their credentials — the OTP mechanics themselves are real and shared
- * with LoginPage's OtpForm pattern. */
+/**
+ * Invitation acceptance is not implemented.
+ *
+ * This screen used to collect a name and password and then run a
+ * verification-code step that checked the submitted code against a
+ * hard-coded development value. Nothing was created, nothing was verified,
+ * and the code step read as a working second factor — three claims the
+ * product could not support. Real invitations need a backend endpoint that
+ * does not exist yet, and real MFA is a later dedicated security phase.
+ *
+ * What is left is the truth: the link is recognized, the flow is not
+ * available yet, and here is the way to sign in if you already have an
+ * account. No credential is collected on a screen that cannot use one.
+ */
 export function InviteAcceptPage() {
-  const { t, locale } = useLocale();
-  const navigate = useNavigate();
-  const { showToast } = useToast();
-  const { checkDevOtpCode } = useAuth();
-  const [step, setStep] = useState<Step>('details');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [otpError, setOtpError] = useState<string>();
-
-  function handleDetailsSubmit(event: FormEvent) {
-    event.preventDefault();
-    setStep('otp');
-  }
-
-  function handleOtpComplete(code: string) {
-    if (!checkDevOtpCode(code)) {
-      setOtpError(t('auth.otp.invalid'));
-      return;
-    }
-    showToast(t('auth.invite.success', { name }), { kind: 'success' });
-    navigate(ROUTES.login, { replace: true });
-  }
+  const { t } = useLocale();
 
   return (
     <AuthSplitLayout>
-      {step === 'details' ? (
-        <form onSubmit={handleDetailsSubmit}>
-          <AuthPageHeader
-            eyebrow={t('auth.invite.eyebrow')}
-            heading={t('auth.invite.title')}
-            supporting={t('auth.invite.supporting', { org: localizedOrgName(invitingOrg, locale) })}
-          />
-          <OrgInviteChip organization={invitingOrg} />
-          <div className="flex flex-col gap-4">
-            <Input
-              label={t('auth.invite.nameLabel')}
-              inputSize="xl"
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <Input
-              label={t('auth.invite.passwordLabel')}
-              type="password"
-              inputSize="xl"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <Button type="submit" size="xl" className="mt-1 w-full">
-              {t('auth.invite.submit')}
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div>
-          <AuthPageHeader
-            eyebrow={t('auth.otp.eyebrow')}
-            heading={t('auth.otp.heading')}
-            supporting={t('auth.otp.supporting', { contact: name })}
-          />
-          <div className="flex flex-col gap-4">
-            <OtpDevHint />
-            <OtpCells
-              label={t('auth.otp.supporting', { contact: name })}
-              error={Boolean(otpError)}
-              onComplete={handleOtpComplete}
-            />
-            {otpError && <p className="text-meta text-amber-700" role="alert">{otpError}</p>}
-          </div>
-        </div>
-      )}
+      <AuthPageHeader
+        eyebrow={t('auth.invite.eyebrow')}
+        heading={t('auth.invite.unavailable.title')}
+        supporting={t('auth.invite.unavailable.supporting')}
+      />
+
+      <div className="rounded-l border border-leaf-300 bg-mist-50 p-3 sm:p-4">
+        <p className="flex items-start gap-2 text-meta leading-6 text-gray-600">
+          <DiamondGlyph variant="hollow" size={10} className="mt-1.5 shrink-0 text-leaf-700" />
+          <span>{t('auth.invite.unavailable.notice')}</span>
+        </p>
+      </div>
+
+      <Link
+        to={ROUTES.login}
+        className="mt-4 inline-flex min-h-10 items-center rounded-m px-1 text-meta font-semibold text-leaf-700 hover:bg-leaf-100"
+      >
+        {t('auth.invite.unavailable.signIn')}
+      </Link>
     </AuthSplitLayout>
   );
 }

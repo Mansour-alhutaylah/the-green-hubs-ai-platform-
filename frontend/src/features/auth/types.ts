@@ -1,30 +1,34 @@
 import type { Role } from '@/features/rbac/roles';
 
-export interface DemoUser {
+export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: Role;
-  /** Organization ids this user belongs to. Demo users may belong to
-   * several (§0.5); a live backend user belongs to exactly one, or none
-   * (`organization_id: null`) — see `mapBackendUser.ts`. */
+  /** Organization ids this user belongs to. A live backend user belongs to
+   * exactly one, or none (`organization_id: null`) — see `mapBackendUser.ts`.
+   * The Preview workspace user belongs to one synthetic organization. */
   orgIds: string[];
 }
 
-/** Which backing service produced this session — the one explicit
- * discriminant every consumer (OrgSwitcher, the API client's callers, the
- * document pages) branches on to keep mock and live data from ever mixing
- * on the same page. */
-export type SessionKind = 'demo' | 'live';
+/**
+ * Which backing service produced this session.
+ *
+ * `'preview'` sessions exist **only** in a Preview build: they are created
+ * by `previewAuthService`, which asserts the build-time mode before it will
+ * produce one. A Live build has exactly one way to become authenticated —
+ * the real Supabase password sign-in — so `'preview'` is unreachable there.
+ */
+export type SessionKind = 'preview' | 'live';
 
 export interface Session {
   kind: SessionKind;
-  user: DemoUser;
+  user: AuthUser;
   /** Never the real Supabase access token: the API client reads that
    * fresh from the Supabase SDK on every request instead (§ live token
    * handling), so nothing here can go stale or leak through app state,
-   * devtools, or this object's own persistence. A demo session's token is
-   * likewise never a real/fake JWT — just an opaque local marker. */
+   * devtools, or this object's own persistence. A Preview session's token
+   * is likewise never a real or fake JWT — just an opaque local marker. */
   token: string;
   /** Epoch millis. */
   expiresAt: number;

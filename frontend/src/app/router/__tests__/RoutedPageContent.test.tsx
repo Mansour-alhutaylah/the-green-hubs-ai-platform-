@@ -3,22 +3,21 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '../routes';
 import { Role } from '@/features/rbac/roles';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { buildTestSession, renderWithProviders } from '@/test/renderWithProviders';
 
 describe('routed page content', () => {
-  const admin = DEMO_USERS.find((user) => user.role === Role.Admin);
+  const admin = TEST_USERS.find((user) => user.role === Role.Admin);
 
   beforeEach(() => {
     vi.mocked(window.scrollTo).mockClear();
-    window.sessionStorage.setItem('ghp:dashboard-visited', '1');
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
     window.dispatchEvent(new Event('resize'));
   });
 
   if (!admin) throw new Error('No Admin demo user seeded');
 
-  it('renders the complete Dashboard experience inside the app shell', async () => {
+  it('renders the Dashboard route inside the app shell', async () => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/dashboard'],
       session: buildTestSession(admin),
@@ -27,12 +26,11 @@ describe('routed page content', () => {
     expect(
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeVisible();
-    expect(screen.getByText(/documents analyzed/i)).toBeVisible();
-    expect(screen.getByText(/active reports/i)).toBeVisible();
-    expect(screen.getByText(/compliance score/i)).toBeVisible();
-    expect(screen.getByText(/pending approvals/i)).toBeVisible();
-    expect(screen.getByRole('heading', { name: /recent documents/i })).toBeVisible();
-    expect(screen.getByRole('heading', { name: /recent activity/i })).toBeVisible();
+    // This is a Live session, and no dashboard endpoint exists yet, so the
+    // page states that rather than rendering metric cards — see
+    // DashboardTruthfulness.test.tsx for the full rule.
+    expect(screen.getByText(/dashboard metrics are not connected yet/i)).toBeVisible();
+    expect(screen.queryByText(/documents analyzed/i)).toBeNull();
     const main = screen.getByRole('main');
     expect(main).not.toBeEmptyDOMElement();
     expect(main).toHaveClass('py-4', 'md:py-5', 'xl:py-6');

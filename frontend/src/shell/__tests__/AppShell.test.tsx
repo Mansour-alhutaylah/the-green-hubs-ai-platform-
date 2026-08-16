@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders, buildTestSession } from '@/test/renderWithProviders';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { Role } from '@/features/rbac/roles';
 import { AppShell } from '../AppShell';
 
@@ -14,7 +14,7 @@ describe('AppShell', () => {
   });
 
   it('renders the Command Rail, Context Bar, and sovereignty seal for an authenticated user', async () => {
-    const owner = DEMO_USERS.find((user) => user.role === Role.Owner);
+    const owner = TEST_USERS.find((user) => user.role === Role.Owner);
     if (!owner) throw new Error('No Owner demo user seeded');
 
     renderWithProviders(

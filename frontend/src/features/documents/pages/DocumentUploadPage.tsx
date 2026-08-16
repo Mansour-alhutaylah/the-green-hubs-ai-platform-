@@ -1,6 +1,15 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, DemoDataBadge, EmptyState, Icon, LoadingSkeleton, SectionCard, StatusBadge } from '@/design-system';
+import {
+  Button,
+  DemoDataBadge,
+  EmptyState,
+  Icon,
+  LoadingSkeleton,
+  SectionCard,
+  Select,
+  StatusBadge,
+} from '@/design-system';
 import { useAuth } from '@/features/auth/useAuth';
 import { useEngagements } from '@/features/engagements/useEngagements';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -131,19 +140,20 @@ function LiveDocumentUpload() {
                 <label className="mb-1.5 block text-meta font-bold text-ink-900" htmlFor="upload-engagement">
                   {t('documents.upload.engagement.label')}
                 </label>
-                <select
+                <Select
                   id="upload-engagement"
+                  controlSize="md"
+                  className="w-full sm:w-80"
                   value={selectedEngagementId}
                   onChange={(event) => setSelectedEngagementId(event.target.value)}
-                  className="h-10 w-full rounded-m border border-line-300 bg-surface-0 px-3 text-body text-ink-900 outline-none transition-colors focus:border-forest-900 sm:w-80"
-                >
-                  <option value="">{t('documents.upload.engagement.placeholder')}</option>
-                  {engagementsState.engagements.map((engagement) => (
-                    <option key={engagement.id} value={engagement.id}>
-                      {engagement.title}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: t('documents.upload.engagement.placeholder') },
+                    ...engagementsState.engagements.map((engagement) => ({
+                      value: engagement.id,
+                      label: engagement.title,
+                    })),
+                  ]}
+                />
               </div>
             ) : (
               <p className="mb-4 text-meta font-semibold text-gray-600" data-user-content>

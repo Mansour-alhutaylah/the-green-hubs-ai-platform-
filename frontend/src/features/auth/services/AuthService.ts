@@ -2,61 +2,48 @@ import type { Session } from '../types';
 
 /**
  * Clean seam between the UI and whatever actually authenticates a user.
- * `mockAuthService` (demo-shaped, two-step OTP) and the live
- * Supabase-backed service (`liveAuthService.ts`, single-step
- * email/password — Supabase has no OTP step for a password grant) are
- * both implementations of this one interface; LoginPage branches on
- * `LoginResult.kind` instead of assuming a step always follows.
+ *
+ * There are exactly two implementations and they never coexist:
+ * `liveAuthService` (the real Supabase email/password sign-in, the only
+ * authentication a Production build has) and `previewAuthService` (a local,
+ * credential-free Preview workspace entry that touches no network).
+ * `resolvedAuthService` picks one at build time.
+ *
+ * The OTP members that used to live here are gone. Supabase's password
+ * grant has no second factor, so `verifyOtp`/`resendOtp` were only ever
+ * satisfiable by the mock — keeping them in the interface presented MFA as
+ * a working capability that does not exist. Real MFA is a later dedicated
+ * security phase; when it lands it will be modelled against whatever
+ * Supabase actually implements, not against this placeholder.
  */
 export interface AuthService {
-  /** Starts a login attempt. Mock: validates credentials and dispatches a
-   * (mock) OTP challenge the UI must then verify. Live: performs the real
-   * Supabase sign-in and resolves the backend profile in one step — there
-   * is no second factor to collect, so the session is already established
-   * when this resolves. */
+  /** Real credential sign-in. Live: performs the Supabase sign-in and
+   * resolves the backend profile in one step. Preview: rejects — a Preview
+   * build has no credential flow to fall through to. */
   requestLogin(email: string, password: string): Promise<LoginResult>;
-  /** Step 2 of the mock's two-step login: verify the OTP code, establish a
-   * session. Never called for a live `requestLogin` (its result never has
-   * `kind: 'otpRequired'`). */
-  verifyOtp(challengeId: string, code: string): Promise<Session>;
-  resendOtp(challengeId: string): Promise<void>;
-  /** Explicit local-session entry point exposed only by a development mock. */
-  enterDemoWorkspace?(): Promise<Session>;
+  /** Preview-only: enters the local synthetic workspace. Absent from the
+   * live service, so the UI simply does not render the entry point in a
+   * Live build. */
+  enterPreviewWorkspace?(): Promise<Session>;
   logout(): Promise<void>;
-  /** Synchronous session lookup — used only for the mock's localStorage-
-   * backed demo/OTP sessions, which are available instantly with no
-   * network round trip. A live service returns `null` here and instead
-   * implements `restoreSession`/`subscribe` below. */
+  /** Synchronous session lookup — used only for the Preview service's
+   * localStorage-backed session, which is available instantly with no
+   * network round trip. The live service returns `null` here and
+   * implements `restoreSession`/`subscribe` below instead. */
   getSession(): Session | null;
   setActiveOrg(orgId: string): Session | null;
-  /** Dev-mode-only convenience, intentionally optional: a mock
-   * implementation can surface a hint (e.g. "enter 123456") for the OTP
-   * screen to display. A real implementation simply omits this and the
-   * hint stops rendering — no UI code change required. */
-  getDevOtpHint?(): string | null;
-  /** Dev-mode-only convenience for flows with no backing challenge to
-   * verify against yet (e.g. invite-accept, which has no seeded invite
-   * token in Phase 1). A real implementation omits this. */
-  checkDevOtpCode?(code: string): boolean;
   /** Live-only: asynchronously restores a Supabase session that survived a
    * page refresh (Supabase's own SDK persists it) and resolves the backend
-   * profile. Omitted by the mock, which restores synchronously via
-   * `getSession` instead. */
+   * profile. */
   restoreSession?(): Promise<Session | null>;
   /** Live-only: subscribes to out-of-band session changes (token refresh,
    * expiry, sign-out from another tab). Returns an unsubscribe function. */
   subscribe?(onChange: (session: Session | null) => void): () => void;
 }
 
-export interface LoginChallenge {
-  challengeId: string;
-  /** e.g. "f•••@co.sa" — the OTP screen never shows the full address. */
-  maskedContact: string;
-}
-
-export type LoginResult =
-  | ({ kind: 'otpRequired' } & LoginChallenge)
-  | { kind: 'authenticated'; session: Session };
+/** A successful `requestLogin` always establishes the session directly —
+ * there is no intermediate challenge step in any implementation. */
+export type LoginResult = { kind: 'authenticated'; session: Session };
 
 export class InvalidCredentialsError extends Error {
   constructor() {
@@ -73,20 +60,6 @@ export class RateLimitedError extends Error {
     super('Too many attempts.');
     this.name = 'RateLimitedError';
     this.retryAfterSec = retryAfterSec;
-  }
-}
-
-export class InvalidOtpError extends Error {
-  constructor() {
-    super('Invalid verification code.');
-    this.name = 'InvalidOtpError';
-  }
-}
-
-export class ChallengeExpiredError extends Error {
-  constructor() {
-    super('This login attempt has expired.');
-    this.name = 'ChallengeExpiredError';
   }
 }
 

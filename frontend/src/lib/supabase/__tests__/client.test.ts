@@ -33,15 +33,16 @@ describe('supabase client configuration', () => {
     expect(first).toBe(second);
   });
 
-  it('demo mode does not require Supabase configuration to be present', async () => {
+  it('Preview mode does not require Supabase configuration to be present', async () => {
     vi.stubEnv('VITE_SUPABASE_URL', '');
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
-    vi.stubEnv('VITE_DEV_AUTH_BYPASS', 'true');
+    vi.stubEnv('VITE_APP_MODE', 'preview');
+    vi.stubEnv('VITE_APP_ENVIRONMENT', 'preview');
 
     const { getSupabaseClient } = await import('../client');
-    const { isDevAuthBypassEnabled } = await import('@/features/auth/devAuthBypass');
+    const { isPreviewMode } = await import('@/lib/data/source');
 
-    expect(isDevAuthBypassEnabled()).toBe(true);
+    expect(isPreviewMode()).toBe(true);
     expect(getSupabaseClient()).toBeNull();
   });
 });

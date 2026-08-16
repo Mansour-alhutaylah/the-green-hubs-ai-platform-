@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { AppRoutes } from '@/app/router/routes';
 import { Role } from '@/features/rbac/roles';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { buildTestSession, renderWithProviders } from '@/test/renderWithProviders';
 import { en } from '@/lib/i18n/strings/en';
 
@@ -13,16 +13,20 @@ import { en } from '@/lib/i18n/strings/en';
  * truthfulness assertions, not styling ones.
  */
 describe('manager preview clarity', () => {
-  const admin = DEMO_USERS.find((user) => user.role === Role.Admin);
-  if (!admin) throw new Error('No Admin demo user seeded');
+  const admin = TEST_USERS.find((user) => user.role === Role.Admin);
+  if (!admin) throw new Error('No Admin test user seeded');
 
   beforeEach(() => {
-    window.sessionStorage.setItem('ghp:dashboard-visited', '1');
     Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true });
     window.dispatchEvent(new Event('resize'));
   });
 
-  it('discloses the internal MVP preview and sample data on the Dashboard', async () => {
+  /* The Dashboard's disclosure changed shape in F1: a Live build shows no
+     metrics at all (there is no endpoint to supply them), so there is
+     nothing to label as "sample". The old assertion — a page-level notice
+     saying "some metrics are sample data" while every metric on screen was
+     synthetic — is exactly what the audit flagged. */
+  it('tells a Live user that dashboard metrics are not connected, instead of showing invented ones', async () => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/dashboard'],
       session: buildTestSession(admin),
@@ -32,12 +36,8 @@ describe('manager preview clarity', () => {
       await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
     ).toBeVisible();
 
-    const notice = screen.getByRole('complementary', { name: en['preview.label'] });
-    expect(notice).toBeVisible();
-    expect(notice).toHaveTextContent(en['preview.notice']);
-
-    // The pre-existing sample-data indication must survive alongside it.
-    expect(screen.getByText(en['dashboard.sampleData'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.unavailable.description'])).toBeVisible();
   });
 
   it.each([

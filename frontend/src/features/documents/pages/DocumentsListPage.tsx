@@ -1,6 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Button, DemoDataBadge, Icon, Pagination, SectionCard, type IconName } from '@/design-system';
+import {
+  Button,
+  DemoDataBadge,
+  Icon,
+  Pagination,
+  SectionCard,
+  Select,
+  TabPanel,
+  Tabs,
+  type IconName,
+} from '@/design-system';
 import { useAuth } from '@/features/auth/useAuth';
 import { useEngagements } from '@/features/engagements/useEngagements';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -52,6 +62,9 @@ const TAB_LABEL_KEY: Record<TabValue, StringKey> = {
 };
 
 const DEMO_ENGAGEMENT_NAMES = Array.from(new Set(MOCK_DOCUMENTS.map((document) => document.engagement)));
+
+const TABS_ID = 'documents-status-filter';
+const PANEL_ID = 'documents-results';
 
 interface DocumentRow {
   id: string;
@@ -110,8 +123,29 @@ export function DocumentsListPage() {
 
   const total = isLive ? documentsQuery.total : demoFiltered.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = isLive ? page : Math.min(page, pageCount);
+  const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
+
+  /**
+   * Live pagination is server-side, so an offset past the end of a
+   * *shrunk* result set returns an empty page while earlier pages still
+   * hold rows — the user is stranded on "no results" for a filter that
+   * plainly has some. That happens whenever the total drops beneath the
+   * current offset: a document is deleted, processing moves a row out of
+   * the active status filter, or another session removes rows.
+   *
+   * Clamping `currentPage` above fixes what is *displayed*; this syncs the
+   * page state that feeds the request, so the next fetch asks for a valid
+   * offset. It runs only on a settled (`ready`) response, and only when the
+   * page is genuinely out of range — after it fires once, `page <= maxPage`
+   * holds, so it cannot loop or issue duplicate requests. Filter changes
+   * already reset to page 1 through `updateFilter`.
+   */
+  useEffect(() => {
+    if (!isLive || documentsQuery.status !== 'ready') return;
+    const maxPage = Math.max(1, Math.ceil(documentsQuery.total / PAGE_SIZE));
+    setPage((current) => (current > maxPage ? maxPage : current));
+  }, [isLive, documentsQuery.status, documentsQuery.total]);
 
   const rows: DocumentRow[] = isLive
     ? documentsQuery.items.map((document) => {
@@ -250,23 +284,14 @@ export function DocumentsListPage() {
           contentClassName="p-0 sm:p-0"
         >
           <div className="flex flex-col gap-3 border-b border-line-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={t('documents.table.title')}>
-              {TAB_VALUES.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === value}
-                  onClick={() => updateFilter({ tab: value })}
-                  className={cn(
-                    'rounded-m px-3 py-1.5 text-caption font-bold transition-colors',
-                    tab === value ? 'bg-forest-900 text-white' : 'text-gray-600 hover:bg-tint-100 hover:text-forest-900',
-                  )}
-                >
-                  {t(TAB_LABEL_KEY[value])}
-                </button>
-              ))}
-            </div>
+            <Tabs<TabValue>
+              id={TABS_ID}
+              panelId={PANEL_ID}
+              label={t('documents.table.title')}
+              value={tab}
+              onChange={(value) => updateFilter({ tab: value })}
+              items={TAB_VALUES.map((value) => ({ value, label: t(TAB_LABEL_KEY[value]) }))}
+            />
 
             <div className="flex items-center gap-2">
               {!isLive && (
@@ -286,29 +311,20 @@ export function DocumentsListPage() {
                   />
                 </div>
               )}
-              <div className="relative">
-                <Icon
-                  name="filter"
-                  size={14}
-                  className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-                <select
-                  value={engagementFilter}
-                  onChange={(event) => updateFilter({ engagement: event.target.value })}
-                  aria-label={t('documents.filter.label')}
-                  className="h-9 rounded-m border border-line-300 bg-surface-0 ps-8 pe-3 text-meta text-ink-900 outline-none transition-colors focus:border-forest-900"
-                >
-                  <option value="ALL">{t('documents.filter.allEngagements')}</option>
-                  {engagementOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                icon="filter"
+                value={engagementFilter}
+                onChange={(event) => updateFilter({ engagement: event.target.value })}
+                aria-label={t('documents.filter.label')}
+                options={[
+                  { value: 'ALL', label: t('documents.filter.allEngagements') },
+                  ...engagementOptions,
+                ]}
+              />
             </div>
           </div>
 
+          <TabPanel id={PANEL_ID} tabsId={TABS_ID} value={tab}>
           <div className="hidden grid-cols-[minmax(0,1.8fr)_minmax(10rem,1fr)_9rem_9rem_2.5rem] gap-4 border-b border-line-200 bg-mist-50 px-5 py-3 text-caption font-bold text-gray-600 md:grid">
             <span>{t('documents.table.column.document')}</span>
             <span>{t('documents.table.column.engagement')}</span>
@@ -384,6 +400,7 @@ export function DocumentsListPage() {
             previousLabel={t('documents.pagination.previous')}
             nextLabel={t('documents.pagination.next')}
           />
+          </TabPanel>
         </SectionCard>
       </DocumentCollectionState>
     </div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { Role } from '@/features/rbac/roles';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { buildTestSession, renderWithProviders } from '@/test/renderWithProviders';
 import { DocumentTitle } from '../DocumentTitle';
 import { AppRoutes } from '../routes';
@@ -54,9 +54,8 @@ describe('DocumentTitle', () => {
   });
 
   it('is mounted by the router, so a real navigation sets the title', async () => {
-    const admin = DEMO_USERS.find((user) => user.role === Role.Admin);
+    const admin = TEST_USERS.find((user) => user.role === Role.Admin);
     if (!admin) throw new Error('No Admin demo user seeded');
-    window.sessionStorage.setItem('ghp:dashboard-visited', '1');
 
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/documents'],
