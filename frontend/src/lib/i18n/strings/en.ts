@@ -71,10 +71,11 @@ export const en = {
   'auth.welcome.supporting':
     'Manage documents, analyses, and evidence-grounded insights in one secure workspace.',
   'auth.copyright': '© 2026 The Green Hubs. All rights reserved.',
-  'auth.demo.or': 'or',
-  'auth.demo.label': 'Development demo access',
-  'auth.demo.supporting': 'No account or verification is required in development mode.',
-  'auth.demo.enter': 'Enter Demo Workspace',
+  'auth.preview.title': 'Preview workspace',
+  'auth.preview.supporting': 'This build renders demonstration data only.',
+  'auth.preview.notice':
+    'No account, password, or verification is used here. Entering the Preview workspace creates a local demonstration session and contacts no external service.',
+  'auth.preview.enter': 'Enter Preview workspace',
   'auth.signin.forgotPassword': 'Forgot password?',
   'auth.localeToggle': 'العربية',
   'auth.errors.invalidCredentials': 'That email and password combination is not recognized.',
@@ -82,15 +83,10 @@ export const en = {
   'auth.errors.expiredInvite': 'This invitation has expired.',
   'auth.errors.expiredInvite.action': 'Request new invite',
 
-  'auth.otp.eyebrow': 'Verification',
-  'auth.otp.heading': 'Verify your identity',
-  'auth.otp.supporting': 'Enter the 6-digit code sent to {contact}',
-  'auth.otp.resend': 'Resend in {countdown}',
-  'auth.otp.resendAction': 'Resend code',
-  'auth.otp.back': 'Back',
-  'auth.otp.devHint': 'Development mode — enter {code} to sign in.',
-  'auth.otp.invalid': 'That code is not correct.',
-  'auth.otp.verifying': 'Verifying…',
+  /* The only surviving verification-code string. It labels the individual
+     cells of the `OtpCells` visual primitive, which is currently unused —
+     no flow in the product asks for a code, and multi-factor
+     authentication is not implemented. */
   'auth.otp.digitLabel': 'Digit {position} of {total}',
 
   'auth.forgot.eyebrow': 'Account recovery',
@@ -115,12 +111,12 @@ export const en = {
   'auth.reset.passwordMismatch': "Passwords don't match.",
 
   'auth.invite.eyebrow': 'Invitation',
-  'auth.invite.title': 'Accept your invitation',
-  'auth.invite.supporting': "You've been invited to join {org} on The Green Hubs.",
-  'auth.invite.nameLabel': 'Full name',
-  'auth.invite.passwordLabel': 'Choose a password',
-  'auth.invite.submit': 'Accept invitation',
-  'auth.invite.success': 'Welcome, {name}. Sign in with your new password to continue.',
+  'auth.invite.unavailable.title': 'Invitations are not available yet',
+  'auth.invite.unavailable.supporting':
+    'Accepting an invitation from this link is not connected to a backend service yet.',
+  'auth.invite.unavailable.notice':
+    'No account is created and no credential is collected on this screen. Ask your administrator to create your account, then sign in with your work email and password.',
+  'auth.invite.unavailable.signIn': 'Go to sign in',
 
   'auth.sessionExpired.eyebrow': 'Session',
   'auth.sessionExpired.heading': 'Session expired',
@@ -144,11 +140,24 @@ export const en = {
 
   'stub.laterPhase': LATER_RELEASE_NOTICE,
 
-  'preview.label': 'Internal MVP Preview',
-  'preview.notice':
-    'Some dashboard metrics are sample data. Current live functionality focuses on document upload, processing, and document-level analysis.',
+  'preview.ribbon.label': 'Preview',
+  'preview.ribbon.demonstration':
+    'Everything shown here is demonstration data, and every action is a demonstration.',
+  'preview.ribbon.notProduction': 'This build is not connected to Production.',
 
   'dashboard.sampleData': 'Sample data · Demo workspace',
+  'dashboard.unavailable.title': 'Dashboard metrics are not connected yet',
+  'dashboard.unavailable.description':
+    'No workspace metrics, activity, or queue data is shown because no service provides them yet. Nothing on this screen is estimated or filled in.',
+  'dashboard.unavailable.detail':
+    'Documents, upload, and document-level analysis are connected and available from the navigation.',
+  'dashboard.state.empty.title': 'Nothing in this workspace yet',
+  'dashboard.state.empty.description': 'Upload a document to begin.',
+  'dashboard.state.error.title': 'Workspace metrics could not be loaded',
+  'dashboard.state.error.description': 'Reload the page to try again.',
+  'dashboard.state.forbidden.title': 'You do not have access to workspace metrics',
+  'dashboard.state.forbidden.description': 'Ask an administrator if you believe this is a mistake.',
+  'dashboard.state.partial': 'Some sections have no data yet.',
   'dashboard.hero.eyebrow': 'Sustainability intelligence',
   'dashboard.hero.welcome': 'Welcome back, {name}',
   'dashboard.hero.description':
@@ -456,13 +465,21 @@ export const en = {
   'dashboard.status.analyzed': 'Analyzed',
   'dashboard.status.processing': 'Processing',
   'dashboard.status.queued': 'Queued',
+  'dashboard.status.failed': 'Failed',
   'dashboard.status.onTrack': 'On track',
   'dashboard.status.needsReview': 'Needs review',
   'dashboard.activity.uploaded': '{actor} uploaded {doc}',
   'dashboard.activity.approved': '{actor} approved {doc}',
   'dashboard.activity.viewed': '{actor} viewed {doc}',
   'dashboard.activity.published': '{actor} published {doc}',
-  'dashboard.queue.eta': 'ETA {eta}',
+  'dashboard.activity.latest': 'Latest activity',
+  'dashboard.activity.history': 'Workspace history',
+  'dashboard.kpi.value.percentage': '{value}%',
+  'dashboard.insight.extracted': '{figures} figures extracted, {flagged} flagged for review',
+  'dashboard.insight.processing': 'Running extraction — {percent}% complete',
+  'dashboard.insight.queued': 'Queued for analysis',
+  'dashboard.insight.failed': 'Analysis did not complete',
+  'dashboard.queue.eta': 'ETA ~{minutes} min',
   'dashboard.queue.empty': 'The processing queue is empty.',
 
   'placeholder.eyebrow': 'Coming soon',
@@ -479,8 +496,7 @@ export const en = {
   'placeholder.audit.description': 'A full audit trail of who touched what, and when.',
   'placeholder.audit.unlock': LATER_RELEASE_NOTICE,
 
-  'contextBar.search.placeholder': 'Search documents, organizations…',
-  'contextBar.search.comingSoon': 'Search will be available once modules ship.',
+  'contextBar.search.unavailable': 'Search — coming later',
   'contextBar.orgSwitcher.label': 'Switch organization',
   'contextBar.notifications.empty': "You're all caught up.",
   'contextBar.profile.profile': 'Profile',

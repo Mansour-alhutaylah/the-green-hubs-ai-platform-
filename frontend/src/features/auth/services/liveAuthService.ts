@@ -4,7 +4,6 @@ import { ForbiddenError } from '@/lib/api/errors';
 import type { UserProfileResponse } from '@/lib/api/types';
 import type { Session } from '../types';
 import {
-  ChallengeExpiredError,
   InvalidCredentialsError,
   ProfileNotProvisionedError,
   RateLimitedError,
@@ -87,13 +86,6 @@ class LiveAuthService implements AuthService {
     }
     return { kind: 'authenticated', session };
   }
-
-  /** Never reached: a live `requestLogin` result is never `otpRequired`. */
-  async verifyOtp(): Promise<Session> {
-    throw new ChallengeExpiredError();
-  }
-
-  async resendOtp(): Promise<void> {}
 
   async logout(): Promise<void> {
     const supabase = getSupabaseClient();

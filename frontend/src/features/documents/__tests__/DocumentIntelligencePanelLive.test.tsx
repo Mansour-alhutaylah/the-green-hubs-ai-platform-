@@ -51,7 +51,7 @@ vi.mock('@/lib/api/endpoints/organizations', () => ({
   }),
 }));
 
-function buildSession(kind: 'live' | 'demo'): Session {
+function buildSession(kind: 'live' | 'preview'): Session {
   return {
     kind,
     user: { id: 'user-1', name: 'Reem Al-Harbi', email: 'reem@example.com', role: Role.Admin, orgIds: ['org-1'] },
@@ -61,17 +61,13 @@ function buildSession(kind: 'live' | 'demo'): Session {
   };
 }
 
-function buildAuthService(kind: 'live' | 'demo'): AuthService {
+function buildAuthService(kind: 'live' | 'preview'): AuthService {
   return {
     async requestLogin(): Promise<LoginResult> {
       throw new Error('unused');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('unused');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {},
-    getSession: () => (kind === 'demo' ? buildSession('demo') : null),
+    getSession: () => (kind === 'preview' ? buildSession('preview') : null),
     setActiveOrg: () => null,
     restoreSession: async () => buildSession(kind),
   };
@@ -82,7 +78,7 @@ function AnalysisRouteMarker() {
   return <div data-testid="analysis-run-route">{runId}</div>;
 }
 
-function renderDetail(documentId: string, kind: 'live' | 'demo' = 'live') {
+function renderDetail(documentId: string, kind: 'live' | 'preview' = 'live') {
   return render(
     <MemoryRouter initialEntries={[`/documents/${documentId}`]}>
       <LocaleProvider>
@@ -410,7 +406,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
   });
 
   it('demo mode renders the preview page and sends no embeddings or analysis request', async () => {
-    renderDetail('doc-1', 'demo');
+    renderDetail('doc-1', 'preview');
 
     expect(await screen.findByText(/local preview record/i, {}, { timeout: 5000 })).toBeVisible();
     expect(getDocument).not.toHaveBeenCalled();

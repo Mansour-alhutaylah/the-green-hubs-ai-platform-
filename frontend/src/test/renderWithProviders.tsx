@@ -3,24 +3,20 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import type { AuthService, LoginResult } from '@/features/auth/services/AuthService';
-import type { DemoUser, Session } from '@/features/auth/types';
+import type { AuthUser, Session } from '@/features/auth/types';
 import { WorkspaceProvider } from '@/features/organizations/workspace/WorkspaceProvider';
 import { LocaleProvider } from '@/lib/i18n/LocaleContext';
 import { TooltipProvider, ToastProvider } from '@/design-system';
 
 /** A no-real-login AuthService stub that just returns a pre-seeded session
  * — used by tests that want to render already-authenticated as a specific
- * demo user without driving the real login/OTP UI. */
+ * user without driving the sign-in UI. */
 function createSeededAuthService(session: Session | null): AuthService {
   let current = session;
   return {
     async requestLogin(): Promise<LoginResult> {
       throw new Error('not implemented in test stub');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('not implemented in test stub');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {
       current = null;
     },
@@ -33,9 +29,9 @@ function createSeededAuthService(session: Session | null): AuthService {
   };
 }
 
-export function buildTestSession(user: DemoUser): Session {
+export function buildTestSession(user: AuthUser): Session {
   return {
-    kind: 'demo',
+    kind: 'preview',
     user,
     token: 'test-token',
     expiresAt: Date.now() + 60 * 60 * 1000,

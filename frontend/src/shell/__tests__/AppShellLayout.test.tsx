@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderWithProviders, buildTestSession } from '@/test/renderWithProviders';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { Role } from '@/features/rbac/roles';
 import { AppShell } from '../AppShell';
 // Vite's `?raw` suffix imports the file as a plain string — no Node `fs`
@@ -35,7 +35,7 @@ describe('protected-page layout — CommandRail positioning', () => {
   });
 
   function renderShell() {
-    const owner = DEMO_USERS.find((user) => user.role === Role.Owner);
+    const owner = TEST_USERS.find((user) => user.role === Role.Owner);
     if (!owner) throw new Error('No Owner demo user seeded');
     return renderWithProviders(
       <Routes>

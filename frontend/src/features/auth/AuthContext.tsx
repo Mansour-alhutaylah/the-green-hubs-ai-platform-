@@ -4,13 +4,12 @@ import type { AuthService } from './services/AuthService';
 import { resolvedAuthService } from './services/resolvedAuthService';
 import type { AuthStatus, Session } from './types';
 import { AuthContext, type AuthContextValue } from './context';
-import { isDevAuthBypassEnabled } from './devAuthBypass';
 import { onUnauthorizedResponse } from '@/lib/api/sessionEvents';
 
-/** Injected so tests can seed a session without going through the mock
- * service's localStorage side effects. Production (`AppProviders.tsx`,
- * no override) uses `resolvedAuthService` — demo-aware and live-aware at
- * once, see its own docstring. */
+/** Injected so tests can seed a session without going through a real
+ * service's storage side effects. The app (`AppProviders.tsx`, no override)
+ * uses `resolvedAuthService`, which is the live service in a Live build and
+ * the Preview service in a Preview build — never both. */
 export function AuthProvider({
   children,
   service = resolvedAuthService,
@@ -34,9 +33,9 @@ export function AuthProvider({
       await Promise.resolve();
       if (cancelled) return;
 
-      const demoSession = service.getSession();
-      if (demoSession) {
-        setSession(demoSession);
+      const synchronousSession = service.getSession();
+      if (synchronousSession) {
+        setSession(synchronousSession);
         setStatus('authenticated');
         return;
       }
@@ -89,35 +88,23 @@ export function AuthProvider({
   const requestLogin = useCallback(
     async (email: string, password: string) => {
       const result = await service.requestLogin(email, password);
-      if (result.kind === 'authenticated') {
-        setSession(result.session);
-        setStatus('authenticated');
-        setSessionExpired(false);
-      }
+      setSession(result.session);
+      setStatus('authenticated');
+      setSessionExpired(false);
       return result;
     },
     [service],
   );
 
-  const verifyOtp = useCallback(
-    async (challengeId: string, code: string) => {
-      const nextSession = await service.verifyOtp(challengeId, code);
-      setSession(nextSession);
-      setStatus('authenticated');
-      setSessionExpired(false);
-    },
-    [service],
-  );
-
-  const resendOtp = useCallback((challengeId: string) => service.resendOtp(challengeId), [service]);
-
-  const enterDemoWorkspace = useMemo(() => {
-    if (!isDevAuthBypassEnabled() || !service.enterDemoWorkspace) return null;
+  // Present only when the active service implements it — i.e. only in a
+  // Preview build. In a Live build `resolvedAuthService` is the Supabase
+  // service, which has no such method, so this stays `null` and the entry
+  // point never renders.
+  const enterPreviewWorkspace = useMemo(() => {
+    const enter = service.enterPreviewWorkspace?.bind(service);
+    if (!enter) return null;
     return async () => {
-      if (!isDevAuthBypassEnabled() || !service.enterDemoWorkspace) {
-        throw new Error('Development authentication bypass is disabled.');
-      }
-      const nextSession = await service.enterDemoWorkspace();
+      const nextSession = await enter();
       setSession(nextSession);
       setStatus('authenticated');
       setSessionExpired(false);
@@ -139,11 +126,6 @@ export function AuthProvider({
     [service],
   );
 
-  const checkDevOtpCode = useCallback(
-    (code: string) => service.checkDevOtpCode?.(code) ?? false,
-    [service],
-  );
-
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -151,26 +133,18 @@ export function AuthProvider({
       activeOrgId: session?.activeOrgId ?? null,
       sessionKind: session?.kind ?? null,
       requestLogin,
-      verifyOtp,
-      resendOtp,
-      enterDemoWorkspace,
+      enterPreviewWorkspace,
       logout,
       setActiveOrg,
-      devOtpHint: service.getDevOtpHint?.() ?? null,
-      checkDevOtpCode,
       sessionExpired,
     }),
     [
       status,
       session,
       requestLogin,
-      verifyOtp,
-      resendOtp,
-      enterDemoWorkspace,
+      enterPreviewWorkspace,
       logout,
       setActiveOrg,
-      service,
-      checkDevOtpCode,
       sessionExpired,
     ],
   );

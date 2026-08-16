@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders, buildTestSession } from '@/test/renderWithProviders';
-import { DEMO_USERS } from '@/features/auth/services/demoUsers';
+import { TEST_USERS } from '@/test/testUsers';
 import { Role } from '@/features/rbac/roles';
 import { CommandRail } from '../CommandRail';
 
 function userWithRole(role: Role) {
-  const user = DEMO_USERS.find((demoUser) => demoUser.role === role);
+  const user = TEST_USERS.find((demoUser) => demoUser.role === role);
   if (!user) throw new Error(`No demo user seeded for role ${role}`);
   return user;
 }

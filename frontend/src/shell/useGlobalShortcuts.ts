@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { useHasMinTier } from '@/features/rbac/useHasMinTier';
 import { findNavItem } from '@/app/navigation/navConfig';
 import { ROUTES } from '@/app/navigation/routePaths';
-import { GLOBAL_SEARCH_INPUT_ID } from './ContextBar/GlobalSearch';
 
 const G_CHORD_TIMEOUT_MS = 800;
 
@@ -13,9 +12,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * §3.3: "/" focuses search; "g" then "d/o/u/r" jumps to
- * Dashboard/Organizations/Upload/Reports; Esc closing overlays is handled
- * per-overlay by Radix's own Escape handling, so it isn't duplicated here.
+ * §3.3: "g" then "d/o/u/r" jumps to Dashboard/Organizations/Upload/Reports;
+ * Esc closing overlays is handled per-overlay by Radix's own Escape
+ * handling, so it isn't duplicated here.
+ *
+ * The "/" shortcut is deliberately absent. It used to focus the Context
+ * Bar's search box, but nothing ever searched — the shortcut's only effect
+ * was to make a non-functional input look live. Global search returns with
+ * real Retrieval in F2, and the shortcut returns with it.
  */
 export function useGlobalShortcuts(): void {
   const navigate = useNavigate();
@@ -46,12 +50,6 @@ export function useGlobalShortcuts(): void {
           default:
             break;
         }
-        return;
-      }
-
-      if (event.key === '/') {
-        event.preventDefault();
-        document.getElementById(GLOBAL_SEARCH_INPUT_ID)?.focus();
         return;
       }
 

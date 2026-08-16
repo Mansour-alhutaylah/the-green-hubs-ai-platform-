@@ -45,10 +45,6 @@ function buildLiveAuthService(): AuthService {
     async requestLogin(): Promise<LoginResult> {
       throw new Error('unused');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('unused');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {},
     getSession: () => null,
     setActiveOrg: () => null,

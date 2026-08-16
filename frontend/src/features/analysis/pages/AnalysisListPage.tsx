@@ -7,6 +7,9 @@ import {
   LoadingSkeleton,
   Pagination,
   SectionCard,
+  Select,
+  TabPanel,
+  Tabs,
 } from '@/design-system';
 import { useAuth } from '@/features/auth/useAuth';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -44,6 +47,9 @@ const TAB_LABEL_KEY: Record<TabValue, StringKey> = {
 };
 
 const ORGANIZATIONS = Array.from(new Set(MOCK_ANALYSIS_RUNS.map((run) => run.orgName)));
+
+const TABS_ID = 'analysis-status-filter';
+const PANEL_ID = 'analysis-results';
 
 export function AnalysisListPage() {
   const { t } = useLocale();
@@ -158,23 +164,14 @@ function DemoAnalysisList() {
         contentClassName="p-0 sm:p-0"
       >
         <div className="flex flex-col gap-3 border-b border-line-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={t('analysis.table.title')}>
-            {TAB_VALUES.map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={tab === value}
-                onClick={() => updateFilter({ tab: value })}
-                className={cn(
-                  'rounded-m px-3 py-1.5 text-caption font-bold transition-colors',
-                  tab === value ? 'bg-forest-900 text-white' : 'text-gray-600 hover:bg-tint-100 hover:text-forest-900',
-                )}
-              >
-                {t(TAB_LABEL_KEY[value])}
-              </button>
-            ))}
-          </div>
+          <Tabs<TabValue>
+            id={TABS_ID}
+            panelId={PANEL_ID}
+            label={t('analysis.table.title')}
+            value={tab}
+            onChange={(value) => updateFilter({ tab: value })}
+            items={TAB_VALUES.map((value) => ({ value, label: t(TAB_LABEL_KEY[value]) }))}
+          />
 
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -192,29 +189,20 @@ function DemoAnalysisList() {
                 className="h-9 w-full rounded-m border border-line-300 bg-surface-0 ps-9 pe-3 text-meta text-ink-900 outline-none transition-colors placeholder:text-gray-400 focus:border-forest-900 sm:w-56"
               />
             </div>
-            <div className="relative">
-              <Icon
-                name="filter"
-                size={14}
-                className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <select
-                value={org}
-                onChange={(event) => updateFilter({ org: event.target.value })}
-                aria-label={t('analysis.filter.label')}
-                className="h-9 rounded-m border border-line-300 bg-surface-0 ps-8 pe-3 text-meta text-ink-900 outline-none transition-colors focus:border-forest-900"
-              >
-                <option value="ALL">{t('analysis.filter.allOrganizations')}</option>
-                {ORGANIZATIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              icon="filter"
+              value={org}
+              onChange={(event) => updateFilter({ org: event.target.value })}
+              aria-label={t('analysis.filter.label')}
+              options={[
+                { value: 'ALL', label: t('analysis.filter.allOrganizations') },
+                ...ORGANIZATIONS.map((value) => ({ value, label: value })),
+              ]}
+            />
           </div>
         </div>
 
+        <TabPanel id={PANEL_ID} tabsId={TABS_ID} value={tab}>
         {pageItems.length === 0 ? (
           <p className="px-5 py-8 text-center text-meta text-gray-600">{t('analysis.empty.noResults')}</p>
         ) : (
@@ -288,6 +276,7 @@ function DemoAnalysisList() {
           previousLabel={t('analysis.pagination.previous')}
           nextLabel={t('analysis.pagination.next')}
         />
+        </TabPanel>
       </SectionCard>
 
       <section className="mt-5" aria-labelledby="analysis-state-preview-heading">

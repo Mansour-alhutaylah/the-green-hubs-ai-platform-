@@ -32,3 +32,6 @@ export {
 export { DemoDataBadge } from './primitives/DemoDataBadge/DemoDataBadge';
 export { LoadingSkeleton } from './primitives/LoadingSkeleton/LoadingSkeleton';
 export { Pagination, type PaginationProps } from './primitives/Pagination/Pagination';
+export { Tabs, TabPanel, type TabsProps, type TabItem, type TabPanelProps } from './primitives/Tabs/Tabs';
+export { tabButtonId } from './primitives/Tabs/tabIds';
+export { Select, type SelectProps, type SelectOption } from './primitives/Select/Select';

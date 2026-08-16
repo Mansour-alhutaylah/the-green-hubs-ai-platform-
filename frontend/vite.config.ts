@@ -18,6 +18,23 @@ import tailwindcss from '@tailwindcss/vite';
 function warnAboutProductionEnv(env: Record<string, string>): void {
   const warn = (message: string) => console.warn(`[env-check] ${message}`);
 
+  // Preview is a separate build: it contacts nothing, so the Live service
+  // variables below are not required (and warning about them would be
+  // noise). The app resolves the mode itself in src/lib/data/source.ts;
+  // this only decides which warnings are worth printing.
+  const isPreviewBuild = env.VITE_APP_MODE === 'preview' && env.VITE_APP_ENVIRONMENT === 'preview';
+
+  if (env.VITE_APP_MODE && !isPreviewBuild) {
+    warn(
+      'VITE_APP_MODE is set but does not pair with VITE_APP_ENVIRONMENT=preview — this build resolves to Live mode.',
+    );
+  }
+
+  if (isPreviewBuild) {
+    warn('Building in PREVIEW mode: the app will render synthetic fixtures and contact no service.');
+    return;
+  }
+
   for (const key of ['VITE_API_BASE_URL', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']) {
     if (!env[key]) warn(`${key} is not set — the deployed app cannot sign in or call the API.`);
   }
@@ -33,13 +50,6 @@ function warnAboutProductionEnv(env: Record<string, string>): void {
     if (/\/api\/v1\/?$/.test(base)) {
       warn('VITE_API_BASE_URL ends with /api/v1 — it must be the backend origin only.');
     }
-  }
-
-  // Inert in a production build regardless (isDevAuthBypassEnabled() is
-  // gated on import.meta.env.DEV), but a `true` here signals that
-  // production is being configured from a development env file.
-  if (env.VITE_DEV_AUTH_BYPASS === 'true') {
-    warn('VITE_DEV_AUTH_BYPASS is "true" in a production build — it has no effect, but set it to false.');
   }
 }
 
@@ -64,6 +74,18 @@ export default defineConfig(({ command, mode }) => {
       setupFiles: ['./src/test/setupTests.ts'],
       globals: true,
       css: true,
+      /**
+       * Vitest's 5s default is not enough for this suite's slowest cases.
+       * Several tests mount the whole route tree in jsdom, which pulls in
+       * lazy route chunks, the design system, and both i18n dictionaries;
+       * under full parallelism on a modest machine that alone can exceed
+       * 5s, and the resulting failures are pure scheduling noise — the same
+       * tests pass in isolation and at a longer limit.
+       *
+       * This is a timeout, not a delay: a genuinely hanging test still
+       * fails, just less ambiguously.
+       */
+      testTimeout: 20_000,
     },
   };
 });

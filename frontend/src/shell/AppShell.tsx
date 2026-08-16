@@ -9,6 +9,7 @@ import { useRailPreference } from './CommandRail/useRailPreference';
 import { MobileDrawer } from './MobileDrawer/MobileDrawer';
 import { ContextBar } from './ContextBar/ContextBar';
 import { PageViewport } from './PageViewport';
+import { PreviewModeRibbon } from './PreviewModeRibbon';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { SkipLink } from './SkipLink';
 
@@ -59,6 +60,11 @@ export function AppShell() {
         }}
         className="relative z-10 flex min-h-screen flex-col transition-[margin] duration-[var(--motion-base)]"
       >
+        {/* Above the Context Bar and inside the shell's own column, so it
+            is the first thing on every protected screen and it re-renders
+            with the shell rather than with any single page. Renders null
+            in Live mode. */}
+        <PreviewModeRibbon />
         <ContextBar
           menuButton={
             isMobile ? (

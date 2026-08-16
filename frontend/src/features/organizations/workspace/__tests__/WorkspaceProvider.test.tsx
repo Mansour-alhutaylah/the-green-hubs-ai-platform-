@@ -35,7 +35,7 @@ function Probe() {
 
 function buildDemoSession(): Session {
   return {
-    kind: 'demo',
+    kind: 'preview',
     user: { id: 'user-admin', name: 'Mansour', email: 'admin@demo.greenhubs.sa', role: Role.Admin, orgIds: [DEMO_WORKSPACE_ORG_ID] },
     token: 'local-development-demo-session',
     expiresAt: Date.now() + 60 * 60 * 1000,
@@ -55,10 +55,6 @@ function buildLiveAuthService(activeOrgId: string | null): AuthService {
     async requestLogin(): Promise<LoginResult> {
       throw new Error('unused');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('unused');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {},
     getSession: () => null,
     setActiveOrg: () => null,
@@ -86,10 +82,6 @@ function buildDemoAuthService(): AuthService {
     async requestLogin(): Promise<LoginResult> {
       throw new Error('unused');
     },
-    async verifyOtp(): Promise<Session> {
-      throw new Error('unused');
-    },
-    async resendOtp(): Promise<void> {},
     async logout(): Promise<void> {},
     getSession: () => session,
     setActiveOrg: () => null,

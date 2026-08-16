@@ -2,7 +2,7 @@ import { DiamondGlyph, type DiamondVariant } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { cn } from '@/lib/utils/cn';
 import type { StringKey } from '@/lib/i18n/strings/en';
-import type { ComplianceState, DocumentStatus } from '../mockDashboardData';
+import type { ComplianceState, DocumentState } from '@/lib/data/contracts';
 
 type PipState = 'complete' | 'inProgress' | 'pending' | 'attention';
 
@@ -29,20 +29,22 @@ export function StatusPip({ state, labelKey }: { state: PipState; labelKey: Stri
   );
 }
 
-const DOCUMENT_STATUS_STATE: Record<DocumentStatus, PipState> = {
-  analyzed: 'complete',
+const DOCUMENT_STATE_PIP: Record<DocumentState, PipState> = {
+  processed: 'complete',
   processing: 'inProgress',
-  queued: 'pending',
+  pending: 'pending',
+  failed: 'attention',
 };
 
-const DOCUMENT_STATUS_LABEL_KEY: Record<DocumentStatus, StringKey> = {
-  analyzed: 'dashboard.status.analyzed',
+const DOCUMENT_STATE_LABEL_KEY: Record<DocumentState, StringKey> = {
+  processed: 'dashboard.status.analyzed',
   processing: 'dashboard.status.processing',
-  queued: 'dashboard.status.queued',
+  pending: 'dashboard.status.queued',
+  failed: 'dashboard.status.failed',
 };
 
-export function DocumentStatusPip({ status }: { status: DocumentStatus }) {
-  return <StatusPip state={DOCUMENT_STATUS_STATE[status]} labelKey={DOCUMENT_STATUS_LABEL_KEY[status]} />;
+export function DocumentStatusPip({ state }: { state: DocumentState }) {
+  return <StatusPip state={DOCUMENT_STATE_PIP[state]} labelKey={DOCUMENT_STATE_LABEL_KEY[state]} />;
 }
 
 const COMPLIANCE_STATE_PIP: Record<ComplianceState, PipState> = {
@@ -55,8 +57,8 @@ const COMPLIANCE_STATE_LABEL_KEY: Record<ComplianceState, StringKey> = {
   needsReview: 'dashboard.status.needsReview',
 };
 
-export function ComplianceStatusPip({ status }: { status: ComplianceState }) {
+export function ComplianceStatusPip({ state }: { state: ComplianceState }) {
   return (
-    <StatusPip state={COMPLIANCE_STATE_PIP[status]} labelKey={COMPLIANCE_STATE_LABEL_KEY[status]} />
+    <StatusPip state={COMPLIANCE_STATE_PIP[state]} labelKey={COMPLIANCE_STATE_LABEL_KEY[state]} />
   );
 }
