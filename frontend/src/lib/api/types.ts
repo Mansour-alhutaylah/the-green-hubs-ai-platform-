@@ -40,6 +40,34 @@ export interface EngagementListResponse {
   total: number;
 }
 
+/** backend/app/schemas/organization.py::OrganizationUpdateRequest — `name`
+ * is the only mutable field the contract exposes. */
+export interface OrganizationUpdateRequest {
+  name: string;
+}
+
+/**
+ * backend/app/schemas/engagement.py::EngagementCreateRequest.
+ *
+ * `organization_id` is required by the contract, and the service refuses a
+ * value that is not the caller's own organization (403). It is supplied
+ * from `GET /auth/me`, never from client-controlled input — see
+ * `endpoints/engagements.ts`.
+ */
+export interface EngagementCreateRequest {
+  organization_id: string;
+  title: string;
+  status?: string | null;
+}
+
+/** backend/app/schemas/engagement.py::EngagementUpdateRequest — every
+ * field optional; omitted fields are left unchanged. `organization_id` is
+ * intentionally not modelled here: the Frontend never reassigns tenancy. */
+export interface EngagementUpdateRequest {
+  title?: string;
+  status?: string | null;
+}
+
 /** backend/app/schemas/document.py::DocumentProcessingStatus */
 export type DocumentProcessingStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
 

@@ -21,6 +21,9 @@ export const ROUTES = {
   documentDetail: '/documents/:id',
   documentUpload: '/documents/upload',
 
+  engagements: '/engagements',
+  engagementDetail: '/engagements/:id',
+
   analysis: '/analysis',
   analysisRun: '/analysis/:runId',
 

@@ -7,6 +7,7 @@ import type { StringKey } from '@/lib/i18n/strings/en';
 import { cn } from '@/lib/utils/cn';
 import { formatDateTime } from '@/lib/utils/formatDate';
 import { useDashboardSnapshot } from '@/lib/data/hooks/useDashboardSnapshot';
+import { isPreviewMode } from '@/lib/data/source';
 import type {
   ActivityAction,
   DashboardAnalysisInsight,
@@ -18,6 +19,8 @@ import { AnalysisSummaryDonut } from '../components/AnalysisSummaryDonut';
 import { DashboardCard } from '../components/DashboardCard';
 import { DashboardHero } from '../components/DashboardHero';
 import { DashboardKpiCard } from '../components/DashboardKpiCard';
+import { DashboardLiveView } from '../components/DashboardLiveView';
+import { DashboardPreviewSupplement } from '../components/DashboardPreviewSupplement';
 import { DocumentStatusPip, ComplianceStatusPip } from '../components/StatusPip';
 import { CoachmarksSequence } from '../CoachmarksSequence';
 
@@ -38,36 +41,78 @@ const DOCUMENT_RAIL: Record<DocumentState, string> = {
 /**
  * The executive workspace.
  *
- * Where its figures come from is decided by `useDashboardSnapshot`, not by
- * this page: a Preview build renders deterministic Preview fixtures, and a
- * Live build renders whatever a real source returns. There is no dashboard
- * endpoint on the Backend yet, so Live resolves to `unavailable` and this
- * page says so plainly.
+ * Two dashboards, deliberately not one. They render different contracts
+ * because they can prove different things, and forcing them through a
+ * single component is how a synthetic figure ends up in a real card.
  *
- * The audit found the previous version showing a fabricated 128 documents,
- * an 86% compliance score, and a named activity feed to *every* signed-in
- * user, real ones included, above a line describing that as "some metrics".
- * None of those numbers can be reached in Live mode any more: the page has
- * no fixture import to fall back to.
+ * - **Preview** renders `DashboardSnapshot` (deterministic fixtures) plus
+ *   the F2A breakdowns — processing states, the evidence-review lifecycle,
+ *   an engagement roll-up, readiness — a complete demonstration workspace.
+ * - **Live** renders `DashboardLiveSummary`: exact `total` figures from
+ *   `GET /documents` and `GET /engagements`, the real five most recent
+ *   documents, the caller's real organization name, and compact,
+ *   specifically-named unavailable states for the four capabilities no
+ *   endpoint provides. It replaces the single large "metrics are not
+ *   connected" placeholder F1 shipped, which was truthful but told a real
+ *   user nothing they could use.
+ *
+ * The audit that produced F1 found this page showing a fabricated 128
+ * documents, an 86% compliance score, and a named activity feed to *every*
+ * signed-in user. None of that is reachable in Live: the Live branch's
+ * dependency graph contains no fixture module, so there is nothing
+ * synthetic for a failure to fall back to.
+ *
+ * The mode is a build-time constant, so the branch below is stable for the
+ * life of a build and the two branches never share hook state.
  */
 export function DashboardPage() {
   const { user } = useAuth();
-  const snapshot = useDashboardSnapshot();
-
-  const data = snapshot.status === 'ready' ? snapshot.data : null;
 
   return (
     <div>
-      <DashboardHero user={user} totals={data?.totals} />
-
-      {snapshot.status === 'ready' ? (
-        <DashboardSnapshotView snapshot={data!} isPartial={snapshot.coverage === 'partial'} />
-      ) : (
-        <DashboardStateNotice status={snapshot.status} />
-      )}
-
+      {isPreviewMode() ? <PreviewDashboard user={user} /> : <LiveDashboard user={user} />}
       <CoachmarksSequence />
     </div>
+  );
+}
+
+type DashboardUser = ReturnType<typeof useAuth>['user'];
+
+/**
+ * The Live branch. The hero renders without a counts strip: its totals
+ * belong to the Preview snapshot contract, and the Live figures are exact
+ * counts shown in their own cards, where a failed one can say
+ * "Unavailable" instead of "0".
+ */
+function LiveDashboard({ user }: { user: DashboardUser }) {
+  return (
+    <>
+      <DashboardHero user={user} />
+      <DashboardLiveView />
+    </>
+  );
+}
+
+function PreviewDashboard({ user }: { user: DashboardUser }) {
+  const snapshot = useDashboardSnapshot();
+  const data = snapshot.status === 'ready' ? snapshot.data : null;
+  const isPartial = snapshot.status === 'ready' && snapshot.coverage === 'partial';
+
+  return (
+    <>
+      <DashboardHero user={user} totals={data?.totals} />
+
+      {data ? (
+        <>
+          <DashboardSnapshotView snapshot={data} isPartial={isPartial} />
+          <DashboardPreviewSupplement />
+        </>
+      ) : (
+        <DashboardStateNotice
+          status={snapshot.status as 'loading' | 'empty' | 'error' | 'forbidden' | 'unavailable'}
+        />
+      )}
+    </>
   );
 }
 

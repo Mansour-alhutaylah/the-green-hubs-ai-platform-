@@ -105,7 +105,7 @@ describe('DocumentDetailPage — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    expect(await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' })).toBeVisible();
     expect(screen.getAllByText('Live Backend Engagement Alpha').length).toBeGreaterThan(0);
     expect(screen.getByText('Available')).toBeVisible();
     expect(screen.getByText('12')).toBeVisible();
@@ -117,7 +117,7 @@ describe('DocumentDetailPage — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' }, { timeout: 5000 });
+    await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' });
     expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
     expect(screen.queryByText(/traceback/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/openai/i)).not.toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('DocumentDetailPage — live mode', () => {
 
     renderDetail('doc-missing');
 
-    expect(await screen.findByRole('heading', { name: /this document could not be found/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /this document could not be found/i })).toBeVisible();
     expect(screen.getByRole('link', { name: /back to documents/i })).toHaveAttribute('href', '/documents');
   });
 
@@ -140,11 +140,11 @@ describe('DocumentDetailPage — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    expect(await screen.findByRole('heading', { name: /this document could not be loaded/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /this document could not be loaded/i })).toBeVisible();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /try again/i }));
 
-    expect(await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Live Backend Ledger Report.pdf' })).toBeVisible();
   });
 });

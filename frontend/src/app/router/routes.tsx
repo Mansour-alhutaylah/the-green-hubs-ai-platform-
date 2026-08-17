@@ -61,6 +61,16 @@ const DocumentUploadPage = lazy(() =>
     default: m.DocumentUploadPage,
   })),
 );
+const EngagementsListPage = lazy(() =>
+  import('@/features/engagements/pages/EngagementsListPage').then((m) => ({
+    default: m.EngagementsListPage,
+  })),
+);
+const EngagementDetailPage = lazy(() =>
+  import('@/features/engagements/pages/EngagementDetailPage').then((m) => ({
+    default: m.EngagementDetailPage,
+  })),
+);
 const AnalysisListPage = lazy(() =>
   import('@/features/analysis/pages/AnalysisListPage').then((m) => ({
     default: m.AnalysisListPage,
@@ -141,6 +151,8 @@ const PROTECTED_ELEMENTS: Record<ProtectedRouteKey, ReactElement> = {
   documents: <DocumentsListPage />,
   documentDetail: <DocumentDetailPage />,
   documentUpload: <DocumentUploadPage />,
+  engagements: <EngagementsListPage />,
+  engagementDetail: <EngagementDetailPage />,
   analysis: <AnalysisListPage />,
   analysisRun: <AnalysisRunPage />,
   hubZero: <HubZeroPage />,

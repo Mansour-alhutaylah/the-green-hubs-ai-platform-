@@ -58,7 +58,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
     renderWithProviders(<AppRoutes />, { initialEntries: ['/dashboard'], authService: service });
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
   });
 
@@ -69,7 +69,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
 
     renderWithProviders(<AppRoutes />, { initialEntries: ['/dashboard'], authService: service });
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
   });
 
   it('routes through the existing session-expired page after an out-of-band 401, not a bare logout redirect', async () => {
@@ -79,12 +79,12 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
 
     renderWithProviders(<AppRoutes />, { initialEntries: ['/documents'], authService: service });
 
-    expect(await screen.findByRole('heading', { name: /^documents$/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /^documents$/i })).toBeVisible();
 
     act(() => emitUnauthorizedResponse());
 
     expect(
-      await screen.findByRole('heading', { name: /session expired/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /session expired/i }),
     ).toBeVisible();
   });
 
@@ -97,7 +97,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
 
     renderWithProviders(<AppRoutes />, { initialEntries: ['/dashboard'], authService: service });
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
 
     const { default: userEvent } = await import('@testing-library/user-event');
@@ -105,7 +105,7 @@ describe('AuthProvider — live session bootstrap and expiry', () => {
     await user.click(await screen.findByRole('button', { name: /reem al-harbi, account menu/i }));
     await user.click(await screen.findByRole('button', { name: /sign out/i }));
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeVisible();
     expect(logout).toHaveBeenCalledTimes(1);
   });
 });

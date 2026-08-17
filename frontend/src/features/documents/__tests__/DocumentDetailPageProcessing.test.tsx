@@ -117,7 +117,7 @@ describe('DocumentDetailPage — processing (live mode)', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    const processButton = await screen.findByRole('button', { name: /process document/i }, { timeout: 5000 });
+    const processButton = await screen.findByRole('button', { name: /process document/i });
     await user.click(processButton);
 
     expect(processDocument).toHaveBeenCalledTimes(1);
@@ -126,7 +126,7 @@ describe('DocumentDetailPage — processing (live mode)', () => {
     // Status renders in more than one place at once (header badge, timeline
     // card badge, hero metric, timeline step label) by design — same as the
     // demo page — so this asserts on "at least one", not a single match.
-    await waitFor(() => expect(screen.getAllByText('Processed').length).toBeGreaterThan(0), { timeout: 5000 });
+    await waitFor(() => expect(screen.getAllByText('Processed').length).toBeGreaterThan(0));
     expect(screen.queryByRole('button', { name: /process document/i })).not.toBeInTheDocument();
     expect(getDocument).toHaveBeenCalledTimes(2);
   });
@@ -139,11 +139,11 @@ describe('DocumentDetailPage — processing (live mode)', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    const processButton = await screen.findByRole('button', { name: /process document/i }, { timeout: 5000 });
+    const processButton = await screen.findByRole('button', { name: /process document/i });
     await user.click(processButton);
 
-    expect(await screen.findByText('Extracted text is empty', {}, { timeout: 5000 })).toBeVisible();
-    expect(await screen.findAllByText('Failed', {}, { timeout: 5000 })).not.toHaveLength(0);
+    expect(await screen.findByText('Extracted text is empty', {})).toBeVisible();
+    expect(await screen.findAllByText('Failed', {})).not.toHaveLength(0);
     expect(screen.queryByRole('button', { name: /process document/i })).not.toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe('DocumentDetailPage — processing (live mode)', () => {
     getDocument.mockResolvedValue(buildDocument({ processing_status: 'PROCESSING' }));
     const view = renderDetail('doc-live-1');
 
-    await waitFor(() => expect(screen.getAllByText('Processing').length).toBeGreaterThan(0), { timeout: 5000 });
+    await waitFor(() => expect(screen.getAllByText('Processing').length).toBeGreaterThan(0));
     expect(screen.queryByRole('button', { name: /^process document$/i })).not.toBeInTheDocument();
     view.unmount();
   });
@@ -176,10 +176,10 @@ describe('DocumentDetailPage — processing (live mode)', () => {
 
       renderDetail('doc-live-1');
 
-      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(1), { timeout: 5000 });
-      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2), { timeout: 5000 });
-      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(3), { timeout: 5000 });
-      await waitFor(() => expect(screen.getAllByText('Processed').length).toBeGreaterThan(0), { timeout: 5000 });
+      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(screen.getAllByText('Processed').length).toBeGreaterThan(0));
 
       // Polling has stopped at the terminal state — wait past another full
       // interval and confirm no further request was issued.

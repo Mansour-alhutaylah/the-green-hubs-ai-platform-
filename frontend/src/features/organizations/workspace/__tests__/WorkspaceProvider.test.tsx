@@ -96,7 +96,7 @@ describe('WorkspaceProvider', () => {
   it('resolves the demo organization synchronously, with no backend request', async () => {
     renderProbe(buildDemoAuthService());
 
-    expect(await screen.findByText('ready', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('ready', {})).toBeInTheDocument();
     expect(screen.getByTestId('org-name')).toHaveTextContent('The Green Hubs Demo Workspace');
     expect(listOrganizations).not.toHaveBeenCalled();
   });
@@ -106,14 +106,14 @@ describe('WorkspaceProvider', () => {
 
     renderProbe(buildLiveAuthService('org-1'));
 
-    expect(await screen.findByText('ready', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('ready', {})).toBeInTheDocument();
     expect(screen.getByTestId('org-name')).toHaveTextContent('Al-Riyadh Industrial Group');
   });
 
   it('resolves "no-organization" for a live user with no organization_id, without calling the backend', async () => {
     renderProbe(buildLiveAuthService(null));
 
-    expect(await screen.findByText('no-organization', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('no-organization', {})).toBeInTheDocument();
     expect(listOrganizations).not.toHaveBeenCalled();
   });
 
@@ -123,13 +123,13 @@ describe('WorkspaceProvider', () => {
 
     renderProbe(buildLiveAuthService('org-1'));
 
-    expect(await screen.findByText('error', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('error', {})).toBeInTheDocument();
     expect(screen.getByTestId('error')).toHaveTextContent(/something went wrong/i);
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'retry' }));
 
-    expect(await screen.findByText('ready', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('ready', {})).toBeInTheDocument();
     expect(screen.getByTestId('org-name')).toHaveTextContent('Al-Riyadh Industrial Group');
   });
 });

@@ -33,12 +33,28 @@ describe('Dashboard truthfulness', () => {
   });
 
   describe('Live mode', () => {
-    it('states that dashboard metrics are not connected', async () => {
+    /* F2A replaced F1's single "metrics are not connected" placeholder with
+       real cards: exact `total` figures from endpoints that exist, plus
+       named unavailable states for the four capabilities that have none.
+       The placeholder copy is therefore gone — what must survive is the
+       rule it existed to enforce, asserted below and in
+       `DashboardLiveTruthfulness.test.tsx`. */
+    it('names the capabilities no endpoint provides instead of estimating them', async () => {
       renderWithProviders(<DashboardPage />, { session: buildTestSession(admin) });
 
-      expect(await screen.findByText(en['dashboard.unavailable.title'])).toBeVisible();
-      expect(screen.getByText(en['dashboard.unavailable.description'])).toBeVisible();
-      expect(screen.getByText(en['dashboard.unavailable.detail'])).toBeVisible();
+      // No local timeout override: the wait budget is the centralized
+      // `asyncUtilTimeout` in `src/test/setupTests.ts`, so there is one
+      // number to revisit rather than a stray literal here.
+      expect(await screen.findByText(en['dashboard.live.section.notConnected'])).toBeVisible();
+
+      for (const key of [
+        'dashboard.live.unavailable.evidenceReview',
+        'dashboard.live.unavailable.activity',
+        'dashboard.live.unavailable.readiness',
+        'dashboard.live.unavailable.processingQueue',
+      ] as const) {
+        expect(screen.getByText(en[key])).toBeVisible();
+      }
     });
 
     it('renders no Preview metric, document, actor, or organization', () => {

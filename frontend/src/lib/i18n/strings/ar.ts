@@ -5,10 +5,32 @@ import type { StringKey } from './en';
 const LATER_RELEASE_NOTICE =
   'هذه الإمكانية غير مشمولة في نطاق النسخة الأولية الحالية وسيتم تفعيلها في إصدار لاحق.';
 
-/** Arabic string anchors (Appendix B gives the approved anchors for a
+/**
+ * Arabic string anchors (Appendix B gives the approved anchors for a
  * subset; the rest follow the same institutional, declarative voice — no
- * exclamation marks, "هَب زيرو" kept as a proper noun). */
-export const ar: Record<StringKey, string> = {
+ * exclamation marks, "هَب زيرو" kept as a proper noun).
+ *
+ * Typed `Partial` deliberately. The MVP ships English only (see
+ * `i18n/availability.ts`) and Arabic is deferred to a dedicated later
+ * phase, so this dictionary is no longer required to be exhaustive — a key
+ * it does not carry falls back to the authoritative English text in
+ * `LocaleProvider`.
+ *
+ * That is what makes an incremental Arabic phase possible without ever
+ * shipping a half-blank screen. The cost is explicit: a missing key is no
+ * longer a compile error, so nothing currently fails when one goes
+ * untranslated. What keeps a half-translated screen out of the product is
+ * `AVAILABLE_LOCALES` excluding `ar` — a policy gate, not a parity check.
+ * This dictionary is *not* complete today: the four `settings.language.*`
+ * keys added by the English-only decision have no Arabic entry. Restoring
+ * an enforced completeness gate is step 2 of the four required to re-enable
+ * Arabic — see `i18n/availability.ts`.
+ *
+ * Nothing here is an English string wearing an Arabic label. An untranslated
+ * key is absent, and absence resolves to English — visibly English, rather
+ * than pretending to be a translation.
+ */
+export const ar: Partial<Record<StringKey, string>> = {
   'brand.mission': 'نظام التشغيل للاستدامة.',
   'brand.name': 'ذا جرين هبز',
   'shell.skipToContent': 'تخطَّ إلى المحتوى الرئيسي',
@@ -483,4 +505,280 @@ export const ar: Record<StringKey, string> = {
   'coachmarks.orgSwitcher': 'بدّل بين المؤسسات التي تنتمي إليها من هنا.',
   'coachmarks.insightLedger': 'سيوضح هَب زيرو أرقامك هنا بمجرد تفعيله في إصدار لاحق.',
   'coachmarks.uploadEntry': 'ارفع مستندات الاستدامة لبدء التحليل.',
+  /* ---------------------------------------------------------------- *
+   * F2A — صفحات التشغيل الأساسية                                      *
+   * ---------------------------------------------------------------- */
+
+  'nav.engagements': 'الارتباطات',
+  'title.engagement': 'ارتباط',
+
+  'workspace.state.loading': 'جارٍ التحميل',
+  'workspace.state.error.title': 'تعذّر تحميل هذا المحتوى',
+  'workspace.state.error.description':
+    'لم يكتمل الطلب. لا يُقدَّر أي رقم ولا يُستكمل أي حقل في هذه الشاشة أثناء غيابه.',
+  'workspace.state.retry': 'إعادة المحاولة',
+  'workspace.state.forbidden.title': 'لا تملك صلاحية الاطلاع على هذا',
+  'workspace.state.forbidden.description': 'راجع المسؤول إن كنت ترى أن هذا خطأ.',
+  'workspace.state.notFound.title': 'تعذّر العثور على هذا السجل',
+  'workspace.state.notFound.description': 'قد يكون قد أُزيل، أو قد يعود إلى مؤسسة أخرى.',
+  'workspace.state.partial':
+    'تعذّر تحميل جزء من مساحة العمل. كل ما هو معروض حقيقي؛ وما نقص يُعلَّم بأنه غير متاح بدل استكماله.',
+  'workspace.value.unavailable': 'غير متاح',
+  'workspace.value.unavailable.detail': 'تعذّر تحميل هذا الرقم. وهو ليس صفراً.',
+  'workspace.value.notRecorded': 'غير مسجّل',
+
+  'dashboard.live.eyebrow': 'نظرة عامة على مساحة العمل',
+  'dashboard.live.subtitle':
+    'أرقام دقيقة من مستندات مؤسستك وارتباطاتها. أما القدرات التي لا تسندها خدمة فتُذكر بالاسم ولا تُقدَّر.',
+  'dashboard.live.section.totals': 'إجماليات مساحة العمل',
+  'dashboard.live.section.processing': 'معالجة المستندات',
+  'dashboard.live.section.notConnected': 'غير متوفر عبر واجهة المنتج',
+  'dashboard.live.card.documentsTotal': 'المستندات',
+  'dashboard.live.card.documentsTotal.detail': 'الإجمالي الدقيق على مستوى مؤسستك',
+  'dashboard.live.card.engagementsTotal': 'الارتباطات',
+  'dashboard.live.card.engagementsTotal.detail': 'الإجمالي الدقيق على مستوى مؤسستك',
+  'dashboard.live.card.organization': 'المؤسسة',
+  'dashboard.live.card.organization.detail': 'مستنتجة من حسابك',
+  'dashboard.live.processing.description':
+    'كل عدد هو العدد الدقيق للمستندات في تلك الحالة، مقروءاً من خدمة المستندات.',
+  'dashboard.live.recentDocuments.title': 'أحدث المستندات',
+  'dashboard.live.recentDocuments.description': 'أحدث خمسة مستندات أُنشئت في مؤسستك.',
+  'dashboard.live.recentDocuments.empty': 'لم يُرفع أي مستند بعد.',
+  'dashboard.live.empty.title': 'لا تتضمن مساحة العمل هذه أي مستند بعد',
+  'dashboard.live.empty.description': 'ارفع مستنداً لبدء بناء مكتبة المصادر.',
+  'dashboard.live.error.title': 'تعذّر تحميل لوحة القيادة',
+  'dashboard.live.error.description':
+    'لا تُعرض أي أرقام، لأن تقديراً يحل محل قياس أسوأ من عدم العرض.',
+  'dashboard.live.unavailable.description':
+    'لا توفّر أي خدمة هذه البيانات بعد، لذا لا يُعرض عنها شيء. وهي ليست صفراً وليست فارغة.',
+  'dashboard.live.unavailable.evidenceReview': 'مراجعة الأدلة',
+  'dashboard.live.unavailable.activity': 'سجل النشاط',
+  'dashboard.live.unavailable.readiness': 'جاهزية الإفصاح',
+  'dashboard.live.unavailable.processingQueue': 'طابور المعالجة',
+  'dashboard.live.viewDocuments': 'عرض المستندات',
+  'dashboard.live.viewEngagements': 'عرض الارتباطات',
+
+  'dashboard.preview.section.documentStates': 'المستندات بحسب حالة المعالجة',
+  'dashboard.preview.section.evidenceReview': 'مراجعة الأدلة',
+  'dashboard.preview.section.engagements': 'الارتباطات',
+  'dashboard.preview.section.readiness': 'جاهزية الإفصاح',
+  'dashboard.preview.evidence.pendingReview': 'بانتظار المراجعة',
+  'dashboard.preview.evidence.approved': 'معتمدة',
+  'dashboard.preview.evidence.rejected': 'مرفوضة',
+  'dashboard.preview.evidence.withdrawn': 'مسحوبة',
+  'dashboard.preview.evidence.note':
+    'عرض توضيحي لحالات دورة المراجعة. لا يتوفر أي إجراء مراجعة في هذا الإصدار.',
+  'dashboard.preview.engagements.total': 'إجمالي الارتباطات',
+  'dashboard.preview.readiness.label': 'جاهزية توضيحية',
+  'dashboard.preview.readiness.detail': 'رقم اصطناعي — وليس تقييم امتثال.',
+
+  'organizations.eyebrow': 'الإدارة',
+  'organizations.subtitle': 'مؤسستك كما تعرضها واجهة المنتج.',
+  'organizations.preview.subtitle':
+    'مؤسسة اصطناعية، معروضة ليتسنى مراجعة حالات الشاشة دون خدمة خلفية.',
+  'organizations.table.caption': 'المؤسسات في مساحة عملك',
+  'organizations.table.column.name': 'المؤسسة',
+  'organizations.table.column.created': 'تاريخ الإنشاء',
+  'organizations.table.column.actions': 'التفاصيل',
+  'organizations.view': 'عرض {name}',
+  'organizations.open': 'فتح',
+  'organizations.empty.title': 'لا توجد مؤسسة مرتبطة بحسابك',
+  'organizations.empty.description':
+    'لم يُربط حسابك بمؤسسة بعد. يتولى المسؤول تهيئة ذلك خارج التطبيق.',
+  'organizations.error.title': 'تعذّر تحميل المؤسسات',
+  'organizations.create.unavailable.title': 'إنشاء مؤسسة غير متاح',
+  'organizations.create.unavailable.description':
+    'ترفض واجهة المنتج كل طلب لإنشاء مؤسسة في هذا الإصدار. تُهيَّأ المؤسسات خارج هذا التطبيق، لذا لا يوجد هنا زر يمكن أن ينجح.',
+  'organizations.delete.unavailable': 'حذف المؤسسة غير مدعوم في واجهة المنتج ولا يُعرض هنا.',
+  'organizations.preview.create.action': 'إضافة مؤسسة (وضع المعاينة فقط)',
+  'organizations.preview.create.notice':
+    'هذا عرض للنموذج فقط. لا يُحفظ شيء، ولا يغادر المتصفح شيء، ويختفي المدخل عند إعادة التحميل.',
+  'organizations.preview.create.label': 'اسم المؤسسة',
+  'organizations.preview.create.submit': 'إضافة إلى جلسة المعاينة هذه',
+  'organizations.preview.create.added': 'أُضيفت إلى جلسة المعاينة هذه فقط.',
+  'organizations.detail.eyebrow': 'المؤسسة',
+  'organizations.detail.back': 'العودة إلى المؤسسات',
+  'organizations.detail.profile.title': 'الملف',
+  'organizations.detail.profile.description':
+    'الحقول الثلاثة التي تعرضها واجهة المنتج للمؤسسة. لا يُعرض عدد أعضاء ولا عدد منشآت ولا قطاع، لأن لا خدمة تُبلّغ عنها.',
+  'organizations.detail.field.name': 'الاسم',
+  'organizations.detail.field.created': 'تاريخ الإنشاء',
+  'organizations.detail.rename.title': 'إعادة تسمية المؤسسة',
+  'organizations.detail.rename.description': 'الاسم هو الحقل الوحيد الذي تتيح هذه الواجهة تعديله.',
+  'organizations.detail.rename.label': 'اسم المؤسسة',
+  'organizations.detail.rename.submit': 'حفظ الاسم',
+  'organizations.detail.rename.submitting': 'جارٍ الحفظ…',
+  'organizations.detail.rename.success': 'تم تحديث اسم المؤسسة.',
+  'organizations.detail.rename.error': 'تعذّر تحديث اسم المؤسسة.',
+  'organizations.detail.rename.forbidden':
+    'تتطلب إعادة تسمية المؤسسة دور مسؤول. لا يُعرض هذا الإجراء لأن الطلب سيُرفض.',
+  'organizations.detail.rename.preview':
+    'في وضع المعاينة يتحقق هذا النموذج من المدخلات ثم يُعاد ضبطه. لا يُحفظ شيء ولا يُرسل أي طلب.',
+  'organizations.pagination.showing': 'عرض {start}–{end} من {total}',
+  'organizations.pagination.previous': 'الصفحة السابقة',
+  'organizations.pagination.next': 'الصفحة التالية',
+
+  'engagements.eyebrow': 'العمليات',
+  'engagements.subtitle': 'الارتباطات في مؤسستك، والأعمال المُجمَّعة تحتها.',
+  'engagements.preview.subtitle':
+    'ارتباطات اصطناعية، معروضة ليتسنى مراجعة حالات الشاشة دون خدمة خلفية.',
+  'engagements.table.caption': 'الارتباطات في مؤسستك',
+  'engagements.table.column.title': 'الارتباط',
+  'engagements.table.column.status': 'الحالة',
+  'engagements.table.column.created': 'تاريخ الإنشاء',
+  'engagements.view': 'عرض {name}',
+  'engagements.open': 'فتح',
+  'engagements.filter.label': 'تصفية الارتباطات',
+  'engagements.filter.status': 'الحالة',
+  'engagements.filter.allStatuses': 'كل الحالات',
+  'engagements.search.label': 'البحث في الارتباطات',
+  'engagements.search.placeholder': 'ابحث في الارتباطات…',
+  'engagements.status.active': 'نشط',
+  'engagements.status.draft': 'مسودة',
+  'engagements.status.closed': 'مغلق',
+  'engagements.status.archived': 'مؤرشف',
+  'engagements.status.none': 'بلا حالة',
+  'engagements.empty.title': 'لا توجد ارتباطات بعد',
+  'engagements.empty.description':
+    'تجمع الارتباطات مستندات دورة الإفصاح وتحليلاتها. أنشئ واحداً للبدء.',
+  'engagements.empty.noResults': 'لا توجد ارتباطات مطابقة لبحثك أو تصفيتك.',
+  'engagements.error.title': 'تعذّر تحميل الارتباطات',
+  'engagements.create.action': 'ارتباط جديد',
+  'engagements.create.title': 'إنشاء ارتباط',
+  'engagements.create.description':
+    'يُنشأ الارتباط في مؤسستك أنت. لا يوجد خيار لاختيار مؤسسة أخرى، والخدمة ترفض أي مؤسسة سواها.',
+  'engagements.create.field.title': 'العنوان',
+  'engagements.create.field.title.placeholder': 'إفصاح سنوي 2026',
+  'engagements.create.field.status': 'الحالة',
+  'engagements.create.field.status.default': 'استخدام الحالة الافتراضية للخدمة',
+  'engagements.create.field.status.hint':
+    'إن تُركت على الافتراضي، تُسند الخدمة حالة البداية الخاصة بها.',
+  'engagements.create.organization.label': 'المؤسسة',
+  'engagements.create.organization.hint':
+    'مأخوذة من حسابك بعد تسجيل الدخول، كما استنتجها الخادم. غير قابلة للتعديل ولا تُقرأ من شريط العنوان أبداً.',
+  'engagements.create.organization.missing':
+    'حسابك غير مرتبط بمؤسسة، لذا لا يمكن إنشاء ارتباط.',
+  'engagements.create.submit': 'إنشاء الارتباط',
+  'engagements.create.submitting': 'جارٍ الإنشاء…',
+  'engagements.create.cancel': 'إلغاء',
+  'engagements.create.success': 'تم إنشاء الارتباط.',
+  'engagements.create.error': 'تعذّر إنشاء الارتباط.',
+  'engagements.create.forbidden':
+    'يتطلب إنشاء ارتباط دور محرّر فأعلى. لا يُعرض هذا الإجراء لأن الطلب سيُرفض.',
+  'engagements.create.preview':
+    'في وضع المعاينة يتحقق هذا النموذج من المدخلات ثم يُعاد ضبطه. لا يُحفظ شيء ولا يُرسل أي طلب.',
+  'engagements.detail.eyebrow': 'الارتباط',
+  'engagements.detail.back': 'العودة إلى الارتباطات',
+  'engagements.detail.profile.title': 'التفاصيل',
+  'engagements.detail.profile.description': 'الحقول التي تعرضها واجهة المنتج للارتباط.',
+  'engagements.detail.field.title': 'العنوان',
+  'engagements.detail.field.status': 'الحالة',
+  'engagements.detail.field.created': 'تاريخ الإنشاء',
+  'engagements.detail.field.organization': 'المؤسسة',
+  'engagements.detail.edit.title': 'تعديل الارتباط',
+  'engagements.detail.edit.description':
+    'يمكن تغيير العنوان والحالة فقط. ولا يمكن نقل الارتباط إلى مؤسسة أخرى.',
+  'engagements.detail.edit.submit': 'حفظ التغييرات',
+  'engagements.detail.edit.submitting': 'جارٍ الحفظ…',
+  'engagements.detail.edit.success': 'تم تحديث الارتباط.',
+  'engagements.detail.edit.error': 'تعذّر تحديث الارتباط.',
+  'engagements.detail.edit.forbidden':
+    'يتطلب تعديل الارتباط دور محرّر فأعلى. لا يُعرض هذا الإجراء لأن الطلب سيُرفض.',
+  'engagements.detail.documents.title': 'المستندات',
+  'engagements.detail.documents.description':
+    'تُصفّى المستندات بحسب الارتباط في صفحة المستندات، وهي تعرض الإجمالي الدقيق لهذا الارتباط.',
+  'engagements.detail.documents.action': 'عرض مستندات هذا الارتباط',
+  'engagements.detail.delete.unavailable': 'حذف الارتباط غير مدعوم في واجهة المنتج ولا يُعرض هنا.',
+  'engagements.pagination.showing': 'عرض {start}–{end} من {total}',
+  'engagements.pagination.previous': 'الصفحة السابقة',
+  'engagements.pagination.next': 'الصفحة التالية',
+
+  'users.eyebrow': 'الإدارة',
+  'users.subtitle': 'حسابك والدور الذي يحتفظ به الخادم له.',
+  'users.preview.subtitle':
+    'دليل فريق اصطناعي يغطي كل مستويات الأدوار، معروض ليتسنى مراجعة الشاشة دون خدمة خلفية.',
+  'users.table.caption': 'الأشخاص في مساحة العمل هذه',
+  'users.table.column.name': 'الاسم',
+  'users.table.column.email': 'البريد الإلكتروني',
+  'users.table.column.role': 'الدور',
+  'users.role.unrecognized': 'دور غير معروف',
+  'users.role.unrecognized.detail':
+    'يحتفظ الخادم بقيمة دور لا تعرفها هذه الواجهة. وتُرفض معها كل الصلاحيات.',
+  'users.you': 'أنت',
+  'users.live.disclosure.title': 'هذا حسابك، وليس دليل فريق',
+  'users.live.disclosure.description':
+    'لا تعرض واجهة المنتج سوى ملف المستخدم الحالي. أما دليل الفريق والدعوات وتغيير الأدوار فتتطلب عقد إدارة مستخدمين لا تنفّذه الخدمة الخلفية، لذا لا يُعرض هنا أي إجراء من هذا النوع ولا يُدرج أي شخص آخر.',
+  'users.preview.disclosure.title': 'دليل اصطناعي',
+  'users.preview.disclosure.description':
+    'كل شخص مدرج هنا مُختلق لأغراض العرض. ولا تتوفر أي دعوة أو تغيير دور أو إزالة في أي وضع.',
+  'users.error.title': 'تعذّر تحميل حسابك',
+  'users.empty.title': 'لا تتوفر معلومات عن الحساب',
+  'users.empty.description': 'سجّل الدخول مرة أخرى لإعادة تحميل ملفك.',
+
+  'settings.eyebrow': 'الإدارة',
+  'settings.subtitle': 'حسابك، ومساحة العمل هذه، وما يتصل به هذا الإصدار.',
+  'settings.nav.label': 'أقسام الإعدادات',
+  'settings.section.general': 'عام',
+  'settings.section.language': 'اللغة',
+  'settings.section.residency': 'موقع حفظ البيانات',
+  'settings.section.security': 'الأمان',
+  'settings.section.integrations': 'التكاملات',
+  'settings.section.about': 'حول',
+  'settings.general.identity.title': 'حسابك',
+  'settings.general.identity.description': 'كما استنتجه الخادم لهذه الجلسة.',
+  'settings.general.field.name': 'الاسم',
+  'settings.general.field.email': 'البريد الإلكتروني',
+  'settings.general.field.role': 'الدور',
+  'settings.general.field.organization': 'المؤسسة',
+  'settings.general.organization.missing': 'غير مرتبط بمؤسسة',
+  'settings.general.mode.title': 'وضع التطبيق',
+  'settings.general.mode.live': 'مباشر',
+  'settings.general.mode.preview': 'معاينة',
+  'settings.general.mode.live.description':
+    'يتصل هذا الإصدار بخدمات حقيقية. وكل رقم يظهر في المنتج مصدره استجابة حقيقية.',
+  'settings.general.mode.preview.description':
+    'لا يتصل هذا الإصدار بأي خدمة. وكل ما يظهر في المنتج بيانات عرض اصطناعية.',
+  'settings.language.title': 'لغة الواجهة',
+  'settings.language.description': 'تغيّر لغة الواجهة واتجاه النص فوراً.',
+  'settings.language.label': 'اللغة',
+  'settings.language.english': 'English',
+  'settings.language.arabic': 'العربية',
+  'settings.language.note':
+    'يُحفظ هذا التفضيل في هذا المتصفح فقط. ولا يُحفظ في حسابك، لذا يبدأ أي متصفح أو جهاز آخر بالإنجليزية.',
+  'settings.residency.title': 'موقع حفظ البيانات',
+  'settings.residency.unavailable.title': 'لا تُنشر بيانات موقع الحفظ',
+  'settings.residency.unavailable.description':
+    'لا تعرض واجهة المنتج أي معلومات عن موقع حفظ البيانات، لذا لا يُعرض شيء. ولن تذكر هذه الشاشة منطقة أو مزوّداً أو موقع استضافة لا تستطيع التحقق منه.',
+  'settings.security.title': 'الأمان',
+  'settings.security.session.title': 'الجلسة',
+  'settings.security.session.signedInAs': 'مسجّل الدخول باسم',
+  'settings.security.session.method': 'طريقة تسجيل الدخول',
+  'settings.security.session.method.password': 'البريد الإلكتروني وكلمة المرور',
+  'settings.security.session.method.preview': 'جلسة معاينة محلية — لا تُستخدم أي بيانات اعتماد',
+  'settings.security.session.expiry':
+    'تنتهي جلستك بعد فترة من عدم النشاط، وقبل ذلك إن جرى إبطالها.',
+  'settings.security.mfa.title': 'المصادقة متعددة العوامل',
+  'settings.security.mfa.description':
+    'إدارة المصادقة متعددة العوامل غير منفّذة. لا يسجّل هذا التطبيق عاملاً ثانياً ولا يتحقق منه، ولا توجد شاشة هنا يمكنها تفعيله.',
+  'settings.security.signOut': 'تسجيل الخروج',
+  'settings.integrations.title': 'التكاملات',
+  'settings.integrations.description':
+    'القدرات التي يوفّرها هذا المنتج. لا يُعرض لأي منها مزوّد أو عنوان أو حساب أو اسم مفتاح أو بيانات اعتماد، ولا يمكن ضبط أي منها من هذا التطبيق.',
+  'settings.integrations.documentStorage': 'تخزين المستندات',
+  'settings.integrations.documentAnalysis': 'تحليل المستندات',
+  'settings.integrations.authentication': 'المصادقة',
+  'settings.integrations.state.notConfigurable': 'غير قابل للضبط هنا',
+  'settings.about.title': 'حول',
+  'settings.about.appName': 'التطبيق',
+  'settings.about.version': 'الإصدار',
+  'settings.about.version.unstamped': 'لا يحمل هذا الإصدار وسم نسخة',
+  'settings.about.mode': 'الوضع',
+  'settings.about.environment': 'تصنيف البناء',
+  'settings.about.environment.unstamped': 'غير مُعلَن في هذا البناء',
+  'settings.about.api': 'واجهة الخدمة الخلفية',
+  'settings.about.auth': 'خدمة المصادقة',
+  'settings.about.configured': 'مُهيّأ',
+  'settings.about.notConfigured': 'غير مُهيّأ',
+  'settings.about.claims': 'لا تُقدَّم في هذه الشاشة أي ادعاءات شهادات أو جاهزية أو توافر أو امتثال.',
+
 };

@@ -15,6 +15,7 @@ type Branded<Name extends string> = string & { readonly [idBrand]: Name };
 
 export type OrganizationId = Branded<'OrganizationId'>;
 export type EngagementId = Branded<'EngagementId'>;
+export type UserId = Branded<'UserId'>;
 export type DocumentId = Branded<'DocumentId'>;
 export type AnalysisRunId = Branded<'AnalysisRunId'>;
 export type ActivityId = Branded<'ActivityId'>;
@@ -35,6 +36,7 @@ export const organizationId = (value: string): OrganizationId =>
   brand<OrganizationId>(value, 'OrganizationId');
 export const engagementId = (value: string): EngagementId =>
   brand<EngagementId>(value, 'EngagementId');
+export const userId = (value: string): UserId => brand<UserId>(value, 'UserId');
 export const documentId = (value: string): DocumentId => brand<DocumentId>(value, 'DocumentId');
 export const analysisRunId = (value: string): AnalysisRunId =>
   brand<AnalysisRunId>(value, 'AnalysisRunId');

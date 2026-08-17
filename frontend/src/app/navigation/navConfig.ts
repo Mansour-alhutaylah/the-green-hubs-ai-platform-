@@ -81,6 +81,26 @@ export const NAV_ITEMS: NavItem[] = [
     domain: 'operations',
     minTier: Role.Viewer,
   },
+  /**
+   * Viewer, because `GET /api/v1/engagements` and
+   * `GET /api/v1/engagements/{id}` require only `get_current_user`: any
+   * authenticated member may read them, and the backend scopes the query
+   * to their own organization regardless of what the client asks for.
+   *
+   * Creating and updating an engagement require the `engagement.manage`
+   * permission, which the backend's `ROLE_PERMISSIONS` grants to editor
+   * and above. That is enforced on the *actions*, with `RequireTier`,
+   * rather than on the route — gating the route at Editor would hide a
+   * listing a Viewer is entitled to read.
+   */
+  {
+    id: 'engagements',
+    path: ROUTES.engagements,
+    labelKey: 'nav.engagements',
+    icon: 'engagements',
+    domain: 'operations',
+    minTier: Role.Viewer,
+  },
 
   {
     id: 'hub-zero',

@@ -21,29 +21,30 @@ describe('manager preview clarity', () => {
     window.dispatchEvent(new Event('resize'));
   });
 
-  /* The Dashboard's disclosure changed shape in F1: a Live build shows no
-     metrics at all (there is no endpoint to supply them), so there is
-     nothing to label as "sample". The old assertion — a page-level notice
-     saying "some metrics are sample data" while every metric on screen was
-     synthetic — is exactly what the audit flagged. */
-  it('tells a Live user that dashboard metrics are not connected, instead of showing invented ones', async () => {
+  /* F2A replaced the Dashboard placeholder with real cards. What a Live
+     user must still never see is an invented figure; what they must see is
+     each unbacked capability named. Both are asserted here, and in full in
+     `DashboardTruthfulness.test.tsx`. */
+  it('names the Live dashboard capabilities that have no service, instead of inventing figures', async () => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/dashboard'],
       session: buildTestSession(admin),
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
 
-    expect(screen.getByText(en['dashboard.unavailable.title'])).toBeVisible();
-    expect(screen.getByText(en['dashboard.unavailable.description'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.live.section.notConnected'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.live.unavailable.evidenceReview'])).toBeVisible();
   });
 
+  /* Reports and Notifications are still Phase-2 placeholders and must keep
+     the shared Coming Soon treatment. Organizations, Users, Settings, and
+     the Dashboard are no longer placeholders — F2A implemented them — so
+     they are asserted below on what they now say instead. */
   it.each([
     ['/reports', /^reports$/i],
-    ['/organizations', /^organizations$/i],
-    ['/users', /users & roles/i],
     ['/notifications', /^notifications$/i],
   ])('gives %s the same Coming Soon treatment as the placeholder hubs', async (path, heading) => {
     renderWithProviders(<AppRoutes />, {
@@ -51,22 +52,60 @@ describe('manager preview clarity', () => {
       session: buildTestSession(admin),
     });
 
-    expect(await screen.findByRole('heading', { name: heading }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
     expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
     expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   });
 
-  it('renders the not-yet-implemented Settings sections without throwing', async () => {
+  it('tells a Live user that organization creation is refused by the product API', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/organizations'],
+      session: buildTestSession(admin),
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /^organizations$/i }),
+    ).toBeVisible();
+    expect(screen.getByText(en['organizations.create.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['organizations.create.unavailable.description'])).toBeVisible();
+    // A control that could only ever produce a 403 is not offered at all.
+    expect(screen.queryByRole('button', { name: /create organization/i })).toBeNull();
+  });
+
+  it('tells a Live user that the team directory needs a contract the backend lacks', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/users'],
+      session: buildTestSession(admin),
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /users & roles/i }),
+    ).toBeVisible();
+    expect(screen.getByText(en['users.live.disclosure.title'])).toBeVisible();
+    expect(screen.getByText(en['users.live.disclosure.description'])).toBeVisible();
+    for (const pattern of [/invite/i, /remove user/i, /change role/i]) {
+      expect(screen.queryByRole('button', { name: pattern })).toBeNull();
+    }
+  });
+
+  it('renders the implemented Settings sections with truthful unavailable states', async () => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/settings'],
       session: buildTestSession(admin),
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^settings$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^settings$/i }),
     ).toBeVisible();
-    expect(screen.getAllByText(en['stub.laterPhase']).length).toBeGreaterThan(0);
+
+    // Residency and MFA have no product API; both say so precisely rather
+    // than sharing the generic placeholder notice.
+    expect(screen.getByText(en['settings.residency.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['settings.residency.unavailable.description'])).toBeVisible();
+    expect(screen.getByText(en['settings.security.mfa.description'])).toBeVisible();
+    expect(screen.getByText(en['settings.about.claims'])).toBeVisible();
+    expect(screen.queryByText(en['stub.laterPhase'])).toBeNull();
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   });
 
@@ -87,7 +126,7 @@ describe('manager preview clarity', () => {
       });
 
       expect(
-        await screen.findByRole('heading', { name: /^reports$/i }, { timeout: 5000 }),
+        await screen.findByRole('heading', { name: /^reports$/i }),
       ).toBeVisible();
       expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
       expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);

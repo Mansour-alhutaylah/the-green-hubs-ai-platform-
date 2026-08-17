@@ -48,9 +48,13 @@ describe('DocumentTitle', () => {
     expect(titleAt('/')).toBe('The Green Hubs');
   });
 
-  it('follows the active locale', () => {
+  /* The title follows the active locale, and the MVP's active locale is
+     always English: a stored Arabic preference resolves to English rather
+     than putting a language this release does not finish into the browser
+     title, the tab strip, and session restore. */
+  it('resolves a stored Arabic preference to the English title', () => {
     window.localStorage.setItem('ghp:locale', 'ar');
-    expect(titleAt('/dashboard')).toBe('لوحة القيادة | ذا جرين هبز');
+    expect(titleAt('/dashboard')).toBe('Dashboard | The Green Hubs');
   });
 
   it('is mounted by the router, so a real navigation sets the title', async () => {

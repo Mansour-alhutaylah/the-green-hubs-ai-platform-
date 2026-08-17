@@ -1,10 +1,32 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { LocaleContext, type LocaleContextValue } from '@/lib/i18n/context';
+import { en } from '@/lib/i18n/strings/en';
 import { Tabs, TabPanel } from '../Tabs';
 import { tabButtonId } from '../tabIds';
+
+/**
+ * Renders inside a right-to-left locale context.
+ *
+ * The MVP ships English only, so `LocaleProvider` fails closed to LTR and
+ * cannot be driven into RTL by a stored preference. The RTL foundation
+ * itself is preserved for a future Arabic phase, and this is how it stays
+ * under test in the meantime: supply the context value directly, exactly
+ * as a real second locale would.
+ */
+function renderWithRtlLocale(ui: ReactElement) {
+  const value: LocaleContextValue = {
+    locale: 'ar',
+    dir: 'rtl',
+    setLocale: () => {},
+    toggleLocale: () => {},
+    t: (key) => en[key],
+  };
+  return render(<LocaleContext.Provider value={value}>{ui}</LocaleContext.Provider>);
+}
 
 type Value = 'all' | 'open' | 'closed' | 'archived';
 
@@ -127,10 +149,14 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'Closed' })).toHaveAttribute('aria-selected', 'false');
   });
 
+  /* The MVP ships English only, so `LocaleProvider` can no longer be driven
+     into RTL through a stored preference. The primitive's RTL behaviour is
+     part of the preserved right-to-left foundation, so it is exercised by
+     supplying an RTL locale context directly — which is what a future
+     Arabic phase will do for real. */
   it('reverses the arrow directions in RTL', async () => {
     const user = userEvent.setup();
-    window.localStorage.setItem('ghp:locale', 'ar');
-    renderWithProviders(<Harness />);
+    renderWithRtlLocale(<Harness />);
 
     await user.tab();
     // Laid out right-to-left, ArrowLeft moves to the next tab.
