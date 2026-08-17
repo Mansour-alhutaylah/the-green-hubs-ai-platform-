@@ -506,6 +506,12 @@ export const en = {
   'coachmarks.orgSwitcher': 'Switch between the organizations you belong to here.',
   'coachmarks.insightLedger': 'Hub Zero will annotate your numbers here once it is activated in a later release.',
   'coachmarks.uploadEntry': 'Upload sustainability documents to begin analysis.',
+  /* Compact-viewport presentation only. Above 480px the tips appear on
+     arrival and need no trigger, heading, or close control. */
+  'coachmarks.trigger': 'Getting started',
+  'coachmarks.title': 'Getting started',
+  'coachmarks.close': 'Close getting started tips',
+  'coachmarks.dismiss': 'Got it, do not show again',
   /* ---------------------------------------------------------------- *
    * F2A — core operating pages                                        *
    * ---------------------------------------------------------------- */
