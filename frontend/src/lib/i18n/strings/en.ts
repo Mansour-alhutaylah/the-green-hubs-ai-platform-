@@ -806,6 +806,209 @@ export const en = {
   'settings.about.claims':
     'No certification, uptime, availability, or compliance claim is made on this screen.',
 
+  /* ---------------------------------------------------------------- *
+   * Executive command centre                                          *
+   * ---------------------------------------------------------------- */
+
+  'dashboard.executive.title': 'Evidence command centre',
+  'dashboard.executive.subtitle':
+    'The condition of your evidence workspace, what needs attention, and what is ready to report.',
+  'dashboard.executive.period': 'Reporting period',
+  'dashboard.executive.generated': 'Figures as of',
+  'dashboard.executive.reviewEvidence': 'Review evidence',
+  'dashboard.executive.openReports': 'Open reports',
+  'dashboard.executive.uploadSource': 'Upload source',
+
+  'dashboard.kpi.definition': 'What this figure measures: {label}',
+  'dashboard.kpi.evidenceReadiness': 'Evidence readiness',
+  'dashboard.kpi.evidenceReadiness.definition':
+    'The share of source documents that have reached a report-ready state. This describes your evidence, not your regulatory position, and it is not a compliance score.',
+  'dashboard.kpi.evidenceReadiness.context': '{ready} of {total} documents report-ready',
+  'dashboard.kpi.sourceDocuments': 'Source documents',
+  'dashboard.kpi.sourceDocuments.definition':
+    'Every document uploaded to this workspace, whatever stage it has reached.',
+  'dashboard.kpi.sourceDocuments.context': 'Uploaded for {period}',
+  'dashboard.kpi.awaitingReview': 'Awaiting review',
+  'dashboard.kpi.awaitingReview.definition':
+    'Documents that have been analyzed but not yet verified by a reviewer.',
+  'dashboard.kpi.awaitingReview.context': 'Analyzed, not yet verified',
+  'dashboard.kpi.processingHealth': 'Processing health',
+  'dashboard.kpi.processingHealth.definition':
+    'The share of processing attempts that completed without failing. A failure means the document could not be extracted, not that its contents were rejected.',
+  'dashboard.kpi.processingHealth.context': '{failures} failed extractions',
+
+  'dashboard.throughput.title': 'Evidence throughput',
+  'dashboard.throughput.description': 'Documents reaching verified and report-ready, by month.',
+  'dashboard.throughput.empty': 'No throughput has been recorded for this period yet.',
+  'dashboard.throughput.summary':
+    'Across {months} months of {period}, from {first} to {last}, {verified} documents were verified and {reportReady} reached report-ready.',
+  'dashboard.throughput.series.verified': 'Verified',
+  'dashboard.throughput.series.reportReady': 'Report-ready',
+  'dashboard.throughput.unit': 'Documents per month',
+  'dashboard.throughput.axis.month': 'Month',
+
+  'dashboard.action.title': 'Action centre',
+  'dashboard.action.description': 'What needs attention, most urgent first.',
+  'dashboard.action.empty': 'Nothing needs attention in this workspace.',
+  'dashboard.action.severity.critical': 'Critical',
+  'dashboard.action.severity.attention': 'Attention',
+  'dashboard.action.severity.scheduled': 'Scheduled',
+  'dashboard.action.failedExtraction.title': 'Failed extractions need a retry',
+  'dashboard.action.failedExtraction.detail':
+    'These documents could not be read. Open Documents to retry them.',
+  'dashboard.action.awaitingReview.title': 'Evidence awaiting review',
+  'dashboard.action.awaitingReview.detail':
+    'Analyzed documents that no reviewer has verified yet.',
+  'dashboard.action.insufficientEvidence.title': 'Analyses with insufficient evidence',
+  'dashboard.action.insufficientEvidence.detail':
+    'These runs finished without enough supporting documents to draw on.',
+  'dashboard.action.engagementDeadline.title': 'Engagement approaching its reporting date',
+  'dashboard.action.engagementDeadline.detail':
+    'Review the engagement scope before the reporting period closes.',
+
+  'dashboard.pipeline.title': 'Evidence pipeline',
+  'dashboard.pipeline.description':
+    'Where documents sit in the lifecycle, and how many have not carried through.',
+  'dashboard.pipeline.uploaded': 'Uploaded',
+  'dashboard.pipeline.extracted': 'Extracted',
+  'dashboard.pipeline.analyzed': 'Analyzed',
+  'dashboard.pipeline.verified': 'Verified',
+  'dashboard.pipeline.reportReady': 'Report-ready',
+  'dashboard.pipeline.dropOff': '{count} did not carry through',
+
+  'dashboard.framework.title': 'Framework evidence coverage',
+  'dashboard.framework.description':
+    'How much of each framework has supporting evidence attached.',
+  'dashboard.framework.empty': 'No framework has been assessed in this workspace yet.',
+  'dashboard.framework.covered': '{covered} of {total} disclosures',
+  'dashboard.framework.disclaimer':
+    'Sample evidence coverage only. This states how many disclosures have a verified document attached in this demonstration workspace. It is not a compliance assessment, an assurance opinion, or a certification.',
+
+  /* ---------------------------------------------------------------- *
+   * Reports                                                           *
+   * ---------------------------------------------------------------- */
+
+  'reports.eyebrow': 'Reporting',
+  'reports.preview.subtitle':
+    'A demonstration reporting workspace. Every report below is sample data, and nothing here is filed, exported, or sent anywhere.',
+  'reports.live.subtitle': 'Reporting for this workspace.',
+
+  'reports.table.caption': 'Reports',
+  'reports.table.description': 'Reports for {period}.',
+  'reports.table.column.name': 'Report',
+  'reports.table.column.framework': 'Framework',
+  'reports.table.column.status': 'Status',
+  'reports.table.column.readiness': 'Readiness',
+  'reports.table.column.owner': 'Owner',
+  'reports.table.column.updated': 'Last updated',
+
+  'reports.filter.label': 'Filter reports',
+  'reports.filter.framework': 'Filter by framework',
+  'reports.filter.status': 'Filter by status',
+  'reports.filter.allFrameworks': 'All frameworks',
+  'reports.filter.allStatuses': 'All statuses',
+  'reports.search.label': 'Search reports',
+  'reports.search.placeholder': 'Report or owner',
+
+  'reports.framework.gri': 'GRI',
+  'reports.framework.csrd': 'CSRD',
+  'reports.framework.issb': 'ISSB',
+  'reports.framework.internal': 'Internal',
+
+  'reports.status.draft': 'Draft',
+  'reports.status.inReview': 'In review',
+  'reports.status.readyToPublish': 'Ready to publish',
+  'reports.status.published': 'Published',
+
+  'reports.total.all': 'Reports',
+  'reports.total.readyToPublish': 'Ready to publish',
+  'reports.total.inReview': 'In review',
+  'reports.total.averageReadiness': 'Average readiness',
+
+  'reports.empty.title': 'No reports yet',
+  'reports.empty.description':
+    'Reports appear here once evidence has been gathered against a framework.',
+  'reports.empty.noMatches': 'No report matches these filters.',
+  'reports.unavailable.title': 'Reporting is not connected',
+  'reports.unavailable.description':
+    'This product exposes no reporting service yet, so there is nothing to list. This is not an empty workspace: the product cannot tell how many reports exist.',
+
+  'reports.templates.title': 'Report templates',
+  'reports.templates.description':
+    'Starting points for a new report. Selecting one in this demonstration creates nothing.',
+  'reports.templates.sections': '{count} sections',
+  'reports.template.gri.name': 'GRI Core disclosure set',
+  'reports.template.gri.description':
+    'Universal and topic-specific disclosures for an annual sustainability statement.',
+  'reports.template.csrd.name': 'CSRD ESRS reporting set',
+  'reports.template.csrd.description':
+    'European Sustainability Reporting Standards structure, environment through governance.',
+  'reports.template.issb.name': 'ISSB S2 climate set',
+  'reports.template.issb.description':
+    'Governance, strategy, risk management, and metrics for climate-related disclosure.',
+  'reports.template.internal.name': 'Internal quarterly review',
+  'reports.template.internal.description':
+    'A short internal summary of site performance for a single quarter.',
+
+  'reports.generate.action': 'Generate preview',
+  'reports.generate.notice':
+    'Demonstration only. No report was generated, nothing was saved, and no request was sent. This notice clears when the page reloads.',
+  'reports.export.action': 'Export',
+  'reports.export.notice':
+    'Demonstration only. No file was created and nothing was downloaded. Export needs a reporting service, which this product does not have yet.',
+
+  'reports.detail.eyebrow': 'Report',
+  'reports.detail.subtitle': 'A single report and the evidence behind it.',
+  'reports.detail.backToList': 'All reports',
+  'reports.detail.profile.title': 'Report profile',
+  'reports.detail.profile.description': 'What this report covers and who owns it.',
+  'reports.detail.field.period': 'Reporting period',
+  'reports.detail.sections.title': 'Sections and evidence',
+  'reports.detail.sections.description':
+    'How much supporting evidence each section has, and which sections are still short.',
+  'reports.detail.sections.evidence': '{count} evidence documents',
+  'reports.detail.sections.complete': 'Evidence attached',
+  'reports.detail.sections.incomplete': 'Needs evidence',
+  'reports.detail.actions.title': 'Actions',
+  'reports.detail.actions.description':
+    'Demonstration actions. Neither writes a file nor sends a request.',
+
+  /* ---------------------------------------------------------------- *
+   * Settings workspace                                                *
+   * ---------------------------------------------------------------- */
+
+  'settings.nav.select': 'Settings section',
+  'settings.section.overview': 'Overview',
+  'settings.section.account': 'Account',
+  'settings.section.workspace': 'Workspace',
+  'settings.overview.title': 'Settings overview',
+  'settings.overview.description':
+    'The current state of this account and workspace. Open a section for detail.',
+  'settings.overview.open': 'Open',
+  'settings.overview.notImplemented': 'Not implemented',
+  'settings.overview.notReported': 'Not reported',
+  'settings.demoOnly': 'Demo only - not saved',
+
+  'settings.workspace.title': 'Workspace',
+  'settings.workspace.description': 'The organization this account belongs to.',
+  'settings.workspace.period.label': 'Default reporting period',
+  'settings.workspace.period.hint':
+    'Changes the period shown on this device only. It is not sent anywhere and does not survive a reload.',
+  'settings.workspace.period.reset': 'Reset',
+  'settings.workspace.preferences.unavailable':
+    'Workspace preferences are not available. This product exposes no preferences service, so a saved choice could not be stored or applied.',
+
+  /* ---------------------------------------------------------------- *
+   * Preview navigator search                                          *
+   * ---------------------------------------------------------------- */
+
+  'contextBar.search.preview.label': 'Search sections',
+  'contextBar.search.preview.placeholder': 'Jump to a section',
+  'contextBar.search.preview.results': 'Matching sections',
+  'contextBar.search.preview.noResults': 'No section matches that.',
+  'contextBar.search.preview.scope':
+    'Searches sections you can open. Document and report search needs a service this product does not have yet.',
+
 } as const;
 
 export type StringKey = keyof typeof en;

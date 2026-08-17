@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { buildLiveAuthService, LIVE_USER_EMAIL, LIVE_USER_NAME } from '@/test/liveSession';
 import { en } from '@/lib/i18n/strings/en';
@@ -58,24 +59,58 @@ function renderSettings() {
   return renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
 }
 
+/**
+ * Settings now renders one section at a time, so a disclosure assertion
+ * has to open the section it is about. Every section label, in the order
+ * the rail lists them.
+ */
+const SECTION_LABELS = [
+  en['settings.section.overview'],
+  en['settings.section.account'],
+  en['settings.section.workspace'],
+  en['settings.section.language'],
+  en['settings.section.security'],
+  en['settings.section.residency'],
+  en['settings.section.integrations'],
+  en['settings.section.about'],
+] as const;
+
+async function openSection(user: ReturnType<typeof userEvent.setup>, label: string) {
+  const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
+  await user.click(within(nav).getByRole('button', { name: label }));
+}
+
 describe('Settings exposes no infrastructure identifier', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('renders none of the configured hosts, projects, or keys', async () => {
+  /* Stronger than the version this replaced. The page used to render every
+     section at once, so one snapshot covered all of them; now that only
+     one panel is mounted at a time, the sweep opens all eight in turn and
+     checks each. A leak confined to a single section can no longer hide
+     behind a section that happens to be closed. */
+  it('renders none of the configured hosts, projects, or keys, in any section', async () => {
+    const user = userEvent.setup();
     const { container } = renderSettings();
-    await screen.findByRole('heading', { name: en['settings.about.title'] });
+    await screen.findByRole('navigation', { name: en['settings.nav.label'] });
 
-    const markup = container.innerHTML;
-    for (const fragment of FORBIDDEN_FRAGMENTS) {
-      expect(markup, `Settings must not render "${fragment}"`).not.toContain(fragment);
+    for (const label of SECTION_LABELS) {
+      await openSection(user, label);
+      const markup = container.innerHTML;
+      for (const fragment of FORBIDDEN_FRAGMENTS) {
+        expect(
+          markup,
+          `Settings section "${label}" must not render "${fragment}"`,
+        ).not.toContain(fragment);
+      }
     }
   });
 
   it('reports configuration as a boolean rather than a value', async () => {
+    const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole('heading', { name: en['settings.about.title'] });
+    await openSection(user, en['settings.section.about']);
 
     expect(screen.getByText(en['settings.about.api'])).toBeVisible();
     expect(screen.getByText(en['settings.about.auth'])).toBeVisible();
@@ -84,7 +119,9 @@ describe('Settings exposes no infrastructure identifier', () => {
   });
 
   it('states that residency metadata is not published, rather than naming a region', async () => {
+    const user = userEvent.setup();
     renderSettings();
+    await openSection(user, en['settings.section.residency']);
 
     expect(await screen.findByText(en['settings.residency.unavailable.title'])).toBeVisible();
     expect(screen.getByText(en['settings.residency.unavailable.description'])).toBeVisible();
@@ -96,7 +133,9 @@ describe('Settings exposes no infrastructure identifier', () => {
   });
 
   it('states plainly that multi-factor authentication is not implemented, with no control', async () => {
+    const user = userEvent.setup();
     renderSettings();
+    await openSection(user, en['settings.section.security']);
 
     expect(await screen.findByText(en['settings.security.mfa.description'])).toBeVisible();
 
@@ -107,15 +146,21 @@ describe('Settings exposes no infrastructure identifier', () => {
   });
 
   it('shows the real authenticated identity and the existing sign-out action', async () => {
+    const user = userEvent.setup();
     renderSettings();
 
+    await openSection(user, en['settings.section.account']);
     expect(await screen.findByText(LIVE_USER_NAME, undefined)).toBeVisible();
     expect(screen.getAllByText(LIVE_USER_EMAIL).length).toBeGreaterThan(0);
+
+    await openSection(user, en['settings.section.security']);
     expect(screen.getByRole('button', { name: en['settings.security.signOut'] })).toBeVisible();
   });
 
   it('describes integrations as capabilities, with nothing configurable and no provider named', async () => {
+    const user = userEvent.setup();
     renderSettings();
+    await openSection(user, en['settings.section.integrations']);
 
     expect(
       await screen.findByRole(
@@ -135,8 +180,9 @@ describe('Settings exposes no infrastructure identifier', () => {
   });
 
   it('makes no certification, uptime, or compliance claim', async () => {
+    const user = userEvent.setup();
     renderSettings();
-    await screen.findByRole('heading', { name: en['settings.about.title'] });
+    await openSection(user, en['settings.section.about']);
 
     expect(screen.getByText(en['settings.about.claims'])).toBeVisible();
     // `/uptime/i` alone would match the disclaimer itself, which denies the
@@ -154,7 +200,9 @@ describe('Settings exposes no infrastructure identifier', () => {
   });
 
   it('states that the build carries no version stamp rather than inventing one', async () => {
+    const user = userEvent.setup();
     renderSettings();
+    await openSection(user, en['settings.section.about']);
 
     expect(await screen.findByText(en['settings.about.version.unstamped'])).toBeVisible();
   });

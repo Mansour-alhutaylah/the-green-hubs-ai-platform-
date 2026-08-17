@@ -77,3 +77,27 @@ export type {
   MetricKey,
   MetricTone,
 } from './dashboard';
+
+export {
+  ACTION_SEVERITIES,
+  EVIDENCE_STAGES,
+} from './executive';
+export type {
+  ActionSeverity,
+  EvidenceAction,
+  EvidencePipelineStage,
+  EvidenceStage,
+  EvidenceThroughputPoint,
+  ExecutiveSummary,
+  FrameworkCoverage,
+} from './executive';
+
+export { REPORT_FRAMEWORKS, REPORT_STATUSES } from './reports';
+export type {
+  ReportFramework,
+  ReportSection,
+  ReportStatus,
+  ReportSummary,
+  ReportTemplate,
+  ReportsWorkspace,
+} from './reports';

@@ -48,7 +48,13 @@ export function CoachmarksSequence() {
   ];
 
   return (
-    <output className="fixed bottom-6 end-6 z-[var(--z-overlay)] block w-80 rounded-m bg-forest-900 p-5 text-white shadow-float">
+    // Capped to the viewport's safe area so the panel cannot sit on top of
+    // a table, a chart label, or the last card in a column.
+    // `max-w-[calc(100vw-2rem)]` keeps it inside a 360px screen, where the
+    // old fixed `w-80` (320px) plus a 24px inset came within a few pixels
+    // of the edge. The dashboard reserves matching bottom padding, so the
+    // panel overlays empty space rather than content.
+    <output className="fixed bottom-4 end-4 z-[var(--z-overlay)] block w-80 max-w-[calc(100vw-2rem)] rounded-m bg-forest-900 p-4 text-white shadow-float sm:bottom-6 sm:end-6">
       <ul className="flex flex-col gap-3">
         {steps.map((step) => (
           <li key={step} className="flex items-start gap-2 text-meta">

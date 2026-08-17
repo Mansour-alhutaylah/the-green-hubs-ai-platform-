@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '@/app/router/routes';
 import { Role } from '@/features/rbac/roles';
 import { TEST_USERS } from '@/test/testUsers';
@@ -39,24 +40,25 @@ describe('manager preview clarity', () => {
     expect(screen.getByText(en['dashboard.live.unavailable.evidenceReview'])).toBeVisible();
   });
 
-  /* Reports and Notifications are still Phase-2 placeholders and must keep
-     the shared Coming Soon treatment. Organizations, Users, Settings, and
-     the Dashboard are no longer placeholders — F2A implemented them — so
-     they are asserted below on what they now say instead. */
-  it.each([
-    ['/reports', /^reports$/i],
-    ['/notifications', /^notifications$/i],
-  ])('gives %s the same Coming Soon treatment as the placeholder hubs', async (path, heading) => {
+  /* Notifications is still a Phase-2 placeholder and must keep the shared
+     Coming Soon treatment. Reports left this list when it was implemented
+     as a full Preview surface; it is asserted below on what it now shows.
+     Organizations, Users, Settings, and the Dashboard are likewise no
+     longer placeholders. */
+  it.each([['/notifications', /^notifications$/i]])(
+    'gives %s the same Coming Soon treatment as the placeholder hubs',
+    async (path, heading) => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: [path],
       session: buildTestSession(admin),
     });
 
-    expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
-    expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
-    expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
-  });
+      expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
+      expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
+      expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+    },
+  );
 
   it('tells a Live user that organization creation is refused by the product API', async () => {
     renderWithProviders(<AppRoutes />, {
@@ -89,22 +91,32 @@ describe('manager preview clarity', () => {
     }
   });
 
+  /* Settings is a section workspace now, so each truthful absence is
+     asserted in the section that owns it. The claims themselves are
+     unchanged: residency and MFA have no product API and both say so
+     precisely, rather than sharing the generic placeholder notice. */
   it('renders the implemented Settings sections with truthful unavailable states', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/settings'],
       session: buildTestSession(admin),
     });
 
-    expect(
-      await screen.findByRole('heading', { name: /^settings$/i }),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /^settings$/i })).toBeVisible();
 
-    // Residency and MFA have no product API; both say so precisely rather
-    // than sharing the generic placeholder notice.
+    const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
+    const open = (label: string) => user.click(within(nav).getByRole('button', { name: label }));
+
+    await open(en['settings.section.residency']);
     expect(screen.getByText(en['settings.residency.unavailable.title'])).toBeVisible();
     expect(screen.getByText(en['settings.residency.unavailable.description'])).toBeVisible();
+
+    await open(en['settings.section.security']);
     expect(screen.getByText(en['settings.security.mfa.description'])).toBeVisible();
+
+    await open(en['settings.section.about']);
     expect(screen.getByText(en['settings.about.claims'])).toBeVisible();
+
     expect(screen.queryByText(en['stub.laterPhase'])).toBeNull();
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   });
@@ -121,17 +133,35 @@ describe('manager preview clarity', () => {
       window.dispatchEvent(new Event('resize'));
 
       renderWithProviders(<AppRoutes />, {
-        initialEntries: ['/reports'],
+        initialEntries: ['/notifications'],
         session: buildTestSession(admin),
       });
 
       expect(
-        await screen.findByRole('heading', { name: /^reports$/i }),
+        await screen.findByRole('heading', { name: /^notifications$/i }),
       ).toBeVisible();
       expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
       expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
     },
   );
+
+  /* Reports is no longer a placeholder. In a Live session it must still
+     refuse to invent reports: no reporting endpoint exists, so it states
+     that rather than rendering an empty table, which would claim the
+     workspace has none. */
+  it('tells a Live user that reporting is not connected, rather than showing none', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/reports'],
+      session: buildTestSession(admin),
+    });
+
+    expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeVisible();
+    expect(screen.getByText(en['reports.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['reports.unavailable.description'])).toBeVisible();
+    expect(screen.queryByText(en['stub.laterPhase'])).toBeNull();
+    // Not a single synthetic report leaks into a real session.
+    expect(screen.queryByText(/GRI Sustainability Statement/i)).toBeNull();
+  });
 
   it('states that analysis starts from a processed document, without inventing history', () => {
     // The live-session branch of /analysis is the one a manager sees.

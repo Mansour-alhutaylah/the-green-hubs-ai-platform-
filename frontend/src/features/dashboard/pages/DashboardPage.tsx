@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import { Avatar, EmptyState, Icon, SectionCard, StatusBadge } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
-import { useAuth } from '@/features/auth/useAuth';
 import { ROUTES } from '@/app/navigation/routePaths';
 import type { StringKey } from '@/lib/i18n/strings/en';
 import { cn } from '@/lib/utils/cn';
@@ -14,13 +13,13 @@ import type {
   DashboardSnapshot,
   DocumentState,
 } from '@/lib/data/contracts';
+import { useExecutiveSummary } from '@/lib/data/hooks/useExecutiveData';
 import { AnalysisActivityChart } from '../components/AnalysisActivityChart';
 import { AnalysisSummaryDonut } from '../components/AnalysisSummaryDonut';
 import { DashboardCard } from '../components/DashboardCard';
-import { DashboardHero } from '../components/DashboardHero';
-import { DashboardKpiCard } from '../components/DashboardKpiCard';
+import { DashboardExecutiveView } from '../components/DashboardExecutiveView';
 import { DashboardLiveView } from '../components/DashboardLiveView';
-import { DashboardPreviewSupplement } from '../components/DashboardPreviewSupplement';
+import { ExecutiveHeader } from '../components/ExecutiveHeader';
 import { DocumentStatusPip, ComplianceStatusPip } from '../components/StatusPip';
 import { CoachmarksSequence } from '../CoachmarksSequence';
 
@@ -66,47 +65,57 @@ const DOCUMENT_RAIL: Record<DocumentState, string> = {
  * life of a build and the two branches never share hook state.
  */
 export function DashboardPage() {
-  const { user } = useAuth();
-
   return (
-    <div>
-      {isPreviewMode() ? <PreviewDashboard user={user} /> : <LiveDashboard user={user} />}
+    // The bottom padding is the safe area for the coachmarks panel, which
+    // is `position: fixed` over the bottom-end corner. Without it the panel
+    // covers the last card in the final column on a short viewport.
+    <div className="pb-28 sm:pb-32">
+      {isPreviewMode() ? <PreviewDashboard /> : <LiveDashboard />}
       <CoachmarksSequence />
     </div>
   );
 }
 
-type DashboardUser = ReturnType<typeof useAuth>['user'];
-
 /**
- * The Live branch. The hero renders without a counts strip: its totals
- * belong to the Preview snapshot contract, and the Live figures are exact
- * counts shown in their own cards, where a failed one can say
+ * The Live branch. The header carries no reporting period and no
+ * generated-at timestamp: neither has an endpoint, so those chips are
+ * omitted rather than filled with a plausible value. The figures below
+ * are exact `total` counts in their own cards, where a failed one says
  * "Unavailable" instead of "0".
  */
-function LiveDashboard({ user }: { user: DashboardUser }) {
+function LiveDashboard() {
   return (
     <>
-      <DashboardHero user={user} />
+      <ExecutiveHeader />
       <DashboardLiveView />
     </>
   );
 }
 
-function PreviewDashboard({ user }: { user: DashboardUser }) {
+function PreviewDashboard() {
   const snapshot = useDashboardSnapshot();
+  const executive = useExecutiveSummary();
+
   const data = snapshot.status === 'ready' ? snapshot.data : null;
   const isPartial = snapshot.status === 'ready' && snapshot.coverage === 'partial';
+  const summary = executive.status === 'ready' ? executive.data : null;
 
   return (
     <>
-      <DashboardHero user={user} totals={data?.totals} />
+      <ExecutiveHeader
+        reportingPeriod={summary?.reportingPeriod}
+        generatedAt={summary?.generatedAt}
+      />
+
+      {summary && (
+        <DashboardExecutiveView
+          summary={summary}
+          isPartial={executive.status === 'ready' && executive.coverage === 'partial'}
+        />
+      )}
 
       {data ? (
-        <>
-          <DashboardSnapshotView snapshot={data} isPartial={isPartial} />
-          <DashboardPreviewSupplement />
-        </>
+        <DashboardSnapshotView snapshot={data} isPartial={isPartial} />
       ) : (
         <DashboardStateNotice
           status={snapshot.status as 'loading' | 'empty' | 'error' | 'forbidden' | 'unavailable'}
@@ -180,18 +189,16 @@ function DashboardSnapshotView({
         <p className="mt-4 text-meta font-semibold text-gray-600">{t('dashboard.state.partial')}</p>
       )}
 
-      {snapshot.metrics.length > 0 && (
-        <section className="mt-4 sm:mt-5" aria-labelledby="workspace-overview-heading">
-          <h2 id="workspace-overview-heading" className="sr-only">
-            {t('dashboard.hero.workspace')}
-          </h2>
-          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 min-[1440px]:grid-cols-4">
-            {snapshot.metrics.map((metric) => (
-              <DashboardKpiCard key={metric.id} metric={metric} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* The snapshot KPI strip that used to sit here is gone. It has been
+          superseded by the executive KPI row above, which leads the page,
+          and keeping both meant four headline figures appearing twice in
+          one screenful.
+
+          One of its four cards was also labelled "Compliance score" over a
+          percentage. No backend computes a regulatory judgement, so the
+          product cannot make one; that figure is now "Evidence readiness",
+          which describes documents rather than law. `DashboardKpiCard` and
+          its metric contract are untouched and still used elsewhere. */}
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:mt-6 xl:grid-cols-3 xl:gap-6">
         <div className="xl:col-span-2">

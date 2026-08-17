@@ -35,8 +35,12 @@ describe('routed page content', () => {
     const main = screen.getByRole('main');
     expect(main).not.toBeEmptyDOMElement();
     expect(main).toHaveClass('py-4', 'md:py-5', 'xl:py-6');
+    // The dashboard heading now sits in the executive `<header>` band
+    // rather than a `<section>`; the property being pinned is unchanged,
+    // that the page shell does not apply the panel entrance animation to
+    // the dashboard's own header.
     expect(
-      screen.getByRole('heading', { name: /^dashboard$/i }).closest('section'),
+      screen.getByRole('heading', { name: /^dashboard$/i }).closest('header'),
     ).not.toHaveClass('panel-enter');
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(window.history.scrollRestoration).toBe('manual');
@@ -63,7 +67,7 @@ describe('routed page content', () => {
 
     const user = userEvent.setup();
     vi.mocked(window.scrollTo).mockClear();
-    await user.click(screen.getByRole('link', { name: /review documents/i }));
+    await user.click(screen.getByRole('link', { name: /review evidence/i }));
     expect(
       await screen.findByRole('heading', { name: /^documents$/i }),
     ).toBeVisible();

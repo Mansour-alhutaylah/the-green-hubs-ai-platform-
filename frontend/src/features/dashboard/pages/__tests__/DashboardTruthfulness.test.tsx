@@ -83,10 +83,18 @@ describe('Dashboard truthfulness', () => {
 
       renderWithProviders(<DashboardPage />, { session: buildTestSession(admin) });
 
-      expect(await screen.findByText(en['dashboard.kpi.documentsAnalyzed'])).toBeVisible();
-      expect(screen.getAllByText('128').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('86%').length).toBeGreaterThan(0);
+      /* The snapshot KPI strip this used to read (documents analyzed, and
+         an "86%" labelled Compliance score) was replaced by the executive
+         KPI row. The property being pinned is the same: Preview renders
+         its authored figures, exactly, and never the Live unavailable
+         notice. */
+      expect(await screen.findByText(en['dashboard.kpi.evidenceReadiness'])).toBeVisible();
+      // Authored in `previewExecutive.ts`: 65% readiness over 104 documents.
+      expect(screen.getAllByText('65%').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('104').length).toBeGreaterThan(0);
       expect(screen.queryByText(en['dashboard.unavailable.title'])).toBeNull();
+      // The figure that carried a regulatory claim is gone for good.
+      expect(screen.queryByText(en['dashboard.kpi.complianceScore'])).toBeNull();
     });
 
     it('is deterministic across renders', () => {

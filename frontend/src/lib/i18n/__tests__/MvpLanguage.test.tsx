@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { buildLiveAuthService } from '@/test/liveSession';
@@ -14,6 +14,16 @@ import {
 } from '../availability';
 import { SettingsPage } from '@/features/settings/pages/SettingsPage';
 import { EngagementsListPage } from '@/features/engagements/pages/EngagementsListPage';
+
+/**
+ * Settings renders one section at a time now, so the language assertions
+ * open the Language section first. Everything they check is unchanged.
+ */
+async function openLanguageSection() {
+  const user = userEvent.setup();
+  const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
+  await user.click(within(nav).getByRole('button', { name: en['settings.section.language'] }));
+}
 
 /**
  * The MVP ships English only.
@@ -98,6 +108,7 @@ describe('Arabic cannot be activated through any channel', () => {
     window.localStorage.setItem('ghp:locale', 'ar');
 
     renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
+    await openLanguageSection();
 
     expect(await screen.findByText(en['settings.language.title'])).toBeVisible();
     expect(document.documentElement).toHaveAttribute('lang', 'en');
@@ -108,6 +119,7 @@ describe('Arabic cannot be activated through any channel', () => {
     window.localStorage.setItem('ghp:locale', 'ar');
 
     renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
+    await openLanguageSection();
     await screen.findByText(en['settings.language.title']);
 
     // The provider resolved it to English; the next read must not find
@@ -129,17 +141,28 @@ describe('Arabic cannot be activated through any channel', () => {
 
   it('offers no language control in Settings, only a truthful statement', async () => {
     renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
+    await openLanguageSection();
 
     expect(await screen.findByText(en['settings.language.title'])).toBeVisible();
     expect(screen.getByText(en['settings.language.onlyOption'])).toBeVisible();
     expect(screen.getByText(en['settings.language.future.title'])).toBeVisible();
     expect(screen.getByText(en['settings.language.future.description'])).toBeVisible();
 
-    // No control of any kind is bound to language.
-    expect(screen.queryByRole('combobox')).toBeNull();
+    // No control of any kind is bound to *language*. The assertion is by
+    // accessible name rather than by role, because the page now has an
+    // unrelated `<select>` for choosing a settings section, and a blanket
+    // "no combobox anywhere" check would pass or fail for reasons that
+    // have nothing to do with language.
+    expect(screen.queryByLabelText(en['settings.language.label'])).toBeNull();
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.queryByRole('button', { name: 'العربية' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'العربية' })).toBeNull();
+
+    // And no option anywhere on the page selects a language.
+    for (const option of screen.queryAllByRole('option')) {
+      expect(option.textContent ?? '').not.toMatch(/[؀-ۿ]/);
+    }
   });
 
   it('renders no Arabic script anywhere on an F2A page', async () => {
@@ -155,6 +178,7 @@ describe('Arabic cannot be activated through any channel', () => {
   it('hides the shell and auth language toggles rather than disabling them', async () => {
     const user = userEvent.setup();
     renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
+    await openLanguageSection();
     await screen.findByText(en['settings.language.title']);
 
     const toggle = screen.queryByRole('button', { name: /AR ?\/ ?EN|EN ?\/ ?AR/i });
@@ -217,6 +241,7 @@ describe('the localization system and RTL foundation are preserved', () => {
     // English/LTR; adding `'ar'` to `AVAILABLE_LOCALES` is the only change
     // needed to bring RTL back.
     renderWithProviders(<SettingsPage />, { authService: buildLiveAuthService() });
+    await openLanguageSection();
     await screen.findByText(en['settings.language.title']);
 
     expect(document.documentElement.dir).toBe('ltr');

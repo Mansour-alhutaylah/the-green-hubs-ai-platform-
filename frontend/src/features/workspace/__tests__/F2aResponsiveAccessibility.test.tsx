@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { buildTestSession, renderWithProviders } from '@/test/renderWithProviders';
 import { TEST_USERS } from '@/test/testUsers';
 import { Role } from '@/features/rbac/roles';
@@ -247,16 +248,41 @@ describe('Settings navigation is reachable at every width', () => {
     vi.unstubAllEnvs();
   });
 
-  it.each(WIDTHS)('exposes all six section anchors at %ipx', async (width) => {
+  /**
+   * Settings became a section workspace: a rail of buttons beside one
+   * active panel, rather than eight anchor links scrolling one long page.
+   *
+   * Both controls are in the DOM at every width by design. The rail is the
+   * `lg` presentation and the `<select>` is the presentation below it, and
+   * which one is *visible* is a CSS media query jsdom does not evaluate.
+   * What this asserts is the property that matters and that jsdom can
+   * prove: all eight sections are reachable through a named control at
+   * every width, so no section can become unreachable on a phone.
+   */
+  it.each(WIDTHS)('exposes all eight settings sections at %ipx', async (width) => {
     setViewport(width);
     renderPreview(<SettingsPage />);
 
     const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
-    const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(6);
-    for (const link of links) {
-      expect(link.getAttribute('href')?.startsWith('#')).toBe(true);
-      expect(link.textContent?.trim().length).toBeGreaterThan(0);
+    const buttons = within(nav).getAllByRole('button');
+    expect(buttons).toHaveLength(8);
+    for (const button of buttons) {
+      expect(button.textContent?.trim().length).toBeGreaterThan(0);
     }
+
+    // The same eight are options on the small-viewport selector.
+    const selector = screen.getByLabelText(en['settings.nav.select']);
+    expect(within(selector).getAllByRole('option')).toHaveLength(8);
+  });
+
+  it.each(WIDTHS)('opens a chosen settings section at %ipx', async (width) => {
+    const user = userEvent.setup();
+    setViewport(width);
+    renderPreview(<SettingsPage />);
+
+    const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
+    await user.click(within(nav).getByRole('button', { name: en['settings.section.about'] }));
+
+    expect(await screen.findByText(en['settings.about.claims'])).toBeVisible();
   });
 });
