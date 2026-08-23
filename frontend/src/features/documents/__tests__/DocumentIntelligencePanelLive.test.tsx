@@ -111,6 +111,13 @@ function buildDocument(overrides: Partial<DocumentReadResponse> = {}): DocumentR
     chunk_count: 12,
     embedding_summary: { total_chunks: 0, processing: 0, completed: 0, failed: 0, is_complete: false },
     latest_analysis_summary: null,
+    // Slice 4 evidence fields, at the column default: no decision has
+    // been recorded, so there is no reviewer, timestamp or reason.
+    evidence_status: 'PENDING_REVIEW',
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    superseded_by_document_id: null,
     ...overrides,
   };
 }

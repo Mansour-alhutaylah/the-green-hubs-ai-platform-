@@ -13,6 +13,8 @@ import type { StringKey } from '@/lib/i18n/strings/en';
 import { MOCK_DOCUMENTS, type DocumentProcessingStatus } from '../mockDocuments';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
 import { DocumentIntelligencePanel } from '../components/DocumentIntelligencePanel';
+import { EvidenceReviewPanel } from '../evidence/EvidenceReviewPanel';
+import { EvidencePreviewNotice } from '../evidence/EvidencePreviewNotice';
 import { useDocumentQuery } from '../useDocumentQuery';
 import { useDocumentProcessingPoll } from '../useDocumentProcessingPoll';
 
@@ -320,6 +322,8 @@ export function DocumentDetailPage() {
             </dl>
           </SectionCard>
 
+          <EvidenceReviewPanel document={document} onRefresh={refreshDocument} />
+
           <DocumentIntelligencePanel document={document} onRefresh={refreshDocument} />
         </div>
       </div>
@@ -477,6 +481,8 @@ function DemoDocumentDetail({ id }: { id: string | undefined }) {
               ))}
             </dl>
           </SectionCard>
+
+          <EvidencePreviewNotice />
 
           <section className="rounded-xl border border-leaf-300 bg-mist-50 p-5 shadow-card">
             <span className="flex h-10 w-10 items-center justify-center rounded-l bg-forest-900 text-leaf-300">

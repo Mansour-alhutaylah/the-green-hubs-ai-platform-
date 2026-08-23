@@ -54,7 +54,9 @@ function buildLiveAuthService(): AuthService {
   };
 }
 
-function buildDocument(overrides: Partial<DocumentListResponse['items'][number]> = {}) {
+function buildDocument(
+  overrides: Partial<DocumentListResponse['items'][number]> = {},
+): DocumentListResponse['items'][number] {
   return {
     id: 'doc-live-1',
     engagement_id: LIVE_ENGAGEMENT.id,
@@ -66,6 +68,13 @@ function buildDocument(overrides: Partial<DocumentListResponse['items'][number]>
     chunk_count: 12,
     embedding_summary: { total_chunks: 12, processing: 0, completed: 12, failed: 0, is_complete: true },
     latest_analysis_summary: null,
+    // Slice 4 evidence fields, at the column default: no decision has
+    // been recorded, so there is no reviewer, timestamp or reason.
+    evidence_status: 'PENDING_REVIEW',
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    superseded_by_document_id: null,
     ...overrides,
   };
 }

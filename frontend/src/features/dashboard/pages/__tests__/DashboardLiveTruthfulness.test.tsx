@@ -63,6 +63,13 @@ function buildDocument(id: string, filename = RECENT_FILENAME): DocumentReadResp
       is_complete: true,
     },
     latest_analysis_summary: null,
+    // Slice 4 evidence fields, at the column default: no decision has
+    // been recorded, so there is no reviewer, timestamp or reason.
+    evidence_status: 'PENDING_REVIEW',
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    superseded_by_document_id: null,
   };
 }
 

@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listDocuments } from '@/lib/api/endpoints/documents';
-import type { DocumentProcessingStatus, DocumentReadResponse } from '@/lib/api/types';
+import type { DocumentProcessingStatus, DocumentReadResponse, EvidenceStatus } from '@/lib/api/types';
 import { ApiError, RequestAbortedError } from '@/lib/api/errors';
 
 export interface DocumentsQueryParams {
   engagementId?: string;
   processingStatus?: DocumentProcessingStatus;
+  /** Server-side evidence filter. The backend applies it inside the same
+   * tenant-scoped query that produces `total`, so the returned `total` is a
+   * real count of matching documents rather than the length of this page. */
+  evidenceStatus?: EvidenceStatus;
   limit: number;
   offset: number;
 }
@@ -46,6 +50,7 @@ export function useDocumentsQuery(enabled: boolean, params: DocumentsQueryParams
       {
         engagement_id: params.engagementId,
         processing_status: params.processingStatus,
+        evidence_status: params.evidenceStatus,
         limit: params.limit,
         offset: params.offset,
       },
@@ -67,7 +72,15 @@ export function useDocumentsQuery(enabled: boolean, params: DocumentsQueryParams
       });
 
     return () => controller.abort();
-  }, [enabled, params.engagementId, params.processingStatus, params.limit, params.offset, retryToken]);
+  }, [
+    enabled,
+    params.engagementId,
+    params.processingStatus,
+    params.evidenceStatus,
+    params.limit,
+    params.offset,
+    retryToken,
+  ]);
 
   const retry = useCallback(() => setRetryToken((token) => token + 1), []);
 

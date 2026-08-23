@@ -19,6 +19,7 @@ import { PageHeader } from '@/shell/PageHeader';
 import { ROUTES } from '@/app/navigation/routePaths';
 import { cn } from '@/lib/utils/cn';
 import type { StringKey } from '@/lib/i18n/strings/en';
+import type { EvidenceStatus } from '@/lib/api/types';
 import { MOCK_DOCUMENTS, type DocumentProcessingStatus } from '../mockDocuments';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
 import { DocumentCollectionState, type DocumentCollectionView } from '../components/DocumentCollectionState';
@@ -61,6 +62,34 @@ const TAB_LABEL_KEY: Record<TabValue, StringKey> = {
   FAILED: 'documents.status.failed',
 };
 
+/** The evidence-review work queue. `ALL` is the absence of a filter, not
+ * a sixth status, so it is kept out of `EvidenceStatus` and mapped to an
+ * omitted query parameter.
+ *
+ * Live only: the filter is applied by the backend inside the same
+ * tenant-scoped query that produces `total`, so both the rows and the
+ * count describe the same filtered set. There is no client-side evidence
+ * filtering anywhere — a page that filtered rows locally would be showing
+ * a count that no longer matched them. */
+const EVIDENCE_FILTER_VALUES = [
+  'ALL',
+  'PENDING_REVIEW',
+  'VERIFIED',
+  'REJECTED',
+  'RESTRICTED',
+  'SUPERSEDED',
+] as const;
+type EvidenceFilterValue = (typeof EVIDENCE_FILTER_VALUES)[number];
+
+const EVIDENCE_FILTER_LABEL_KEY: Record<EvidenceFilterValue, StringKey> = {
+  ALL: 'evidence.filter.all',
+  PENDING_REVIEW: 'evidence.status.PENDING_REVIEW',
+  VERIFIED: 'evidence.status.VERIFIED',
+  REJECTED: 'evidence.status.REJECTED',
+  RESTRICTED: 'evidence.status.RESTRICTED',
+  SUPERSEDED: 'evidence.status.SUPERSEDED',
+};
+
 const DEMO_ENGAGEMENT_NAMES = Array.from(new Set(MOCK_DOCUMENTS.map((document) => document.engagement)));
 
 const TABS_ID = 'documents-status-filter';
@@ -96,6 +125,7 @@ export function DocumentsListPage() {
   const [engagementFilter, setEngagementFilter] = useState<string>(
     () => searchParams.get('engagement') ?? 'ALL',
   );
+  const [evidenceFilter, setEvidenceFilter] = useState<EvidenceFilterValue>('ALL');
   const [page, setPage] = useState(1);
 
   const engagementsState = useEngagements();
@@ -107,14 +137,23 @@ export function DocumentsListPage() {
   const documentsQuery = useDocumentsQuery(isLive, {
     engagementId: engagementFilter !== 'ALL' ? engagementFilter : undefined,
     processingStatus: tab !== 'ALL' ? tab : undefined,
+    evidenceStatus: evidenceFilter !== 'ALL' ? (evidenceFilter as EvidenceStatus) : undefined,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   });
 
-  function updateFilter(next: Partial<{ tab: TabValue; engagement: string; search: string }>) {
+  function updateFilter(
+    next: Partial<{
+      tab: TabValue;
+      engagement: string;
+      search: string;
+      evidence: EvidenceFilterValue;
+    }>,
+  ) {
     if (next.tab !== undefined) setTab(next.tab);
     if (next.engagement !== undefined) setEngagementFilter(next.engagement);
     if (next.search !== undefined) setSearch(next.search);
+    if (next.evidence !== undefined) setEvidenceFilter(next.evidence);
     setPage(1);
   }
 
@@ -333,6 +372,22 @@ export function DocumentsListPage() {
                   ...engagementOptions,
                 ]}
               />
+              {/* Live only: Preview has no evidence decisions to filter by,
+                  and offering the control there would imply it does. */}
+              {isLive && (
+                <Select
+                  icon="filter"
+                  value={evidenceFilter}
+                  onChange={(event) =>
+                    updateFilter({ evidence: event.target.value as EvidenceFilterValue })
+                  }
+                  aria-label={t('evidence.filter.label')}
+                  options={EVIDENCE_FILTER_VALUES.map((value) => ({
+                    value,
+                    label: t(EVIDENCE_FILTER_LABEL_KEY[value]),
+                  }))}
+                />
+              )}
             </div>
           </div>
 

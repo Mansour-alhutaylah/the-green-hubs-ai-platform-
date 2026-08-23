@@ -1015,6 +1015,147 @@ export const en = {
   'contextBar.search.preview.scope':
     'Searches sections you can open. Document and report search needs a service this product does not have yet.',
 
+  /* ---------------------------------------------------------------- *
+   * Evidence review (Live)                                            *
+   *                                                                   *
+   * The five states are five distinct business outcomes, never a       *
+   * pipeline. Each label states the outcome and each description       *
+   * states its consequence for retrieval, because "restricted" and     *
+   * "superseded" mean nothing to a reader who is not told what they    *
+   * change.                                                           *
+   * ---------------------------------------------------------------- */
+
+  'evidence.section.title': 'Evidence review',
+  'evidence.section.description':
+    'The recorded decision on whether this document may be used as approved evidence.',
+
+  'evidence.status.label': 'Evidence status',
+  'evidence.status.PENDING_REVIEW': 'Pending review',
+  'evidence.status.VERIFIED': 'Verified',
+  'evidence.status.REJECTED': 'Rejected',
+  'evidence.status.RESTRICTED': 'Restricted',
+  'evidence.status.SUPERSEDED': 'Superseded',
+
+  'evidence.status.detail.PENDING_REVIEW':
+    'No decision has been recorded. This document is not used as approved evidence until a reviewer verifies it.',
+  'evidence.status.detail.VERIFIED':
+    'Approved as evidence and eligible for retrieval.',
+  'evidence.status.detail.REJECTED':
+    'Refused as approved evidence and excluded from retrieval.',
+  'evidence.status.detail.RESTRICTED':
+    'Deliberately excluded from retrieval. This is an eligibility decision, not a classification.',
+  'evidence.status.detail.SUPERSEDED':
+    'No longer the current evidence source and excluded from retrieval.',
+
+  'evidence.retrieval.eligible': 'Eligible for retrieval',
+  'evidence.retrieval.ineligible': 'Not eligible for retrieval',
+
+  'evidence.provenance.reviewedBy': 'Decided by',
+  'evidence.provenance.reviewedAt': 'Decided on',
+  'evidence.provenance.reason': 'Recorded reason',
+  'evidence.provenance.successor': 'Replaced by',
+  'evidence.provenance.processingStatus': 'Processing state',
+  'evidence.provenance.none':
+    'No reviewer, timestamp or reason is recorded, because no decision has been made yet.',
+  'evidence.provenance.noReason': 'No reason was recorded with this decision.',
+  'evidence.provenance.noSuccessor': 'No replacement document was recorded.',
+
+  'evidence.actions.label': 'Evidence decisions',
+  'evidence.action.verify': 'Verify',
+  'evidence.action.reject': 'Reject',
+  'evidence.action.restrict': 'Restrict',
+  'evidence.action.supersede': 'Supersede',
+
+  'evidence.action.verify.description':
+    'Approve this document as evidence eligible for retrieval.',
+  'evidence.action.reject.description':
+    'Refuse this document as approved evidence.',
+  'evidence.action.restrict.description':
+    'Exclude this document from retrieval without rejecting it.',
+  'evidence.action.supersede.description':
+    'Mark this document obsolete, optionally naming the document that replaces it.',
+
+  /* Why a decision is not offered. Stated rather than left to a disabled
+     button, so the interface never looks arbitrary. */
+  'evidence.blocked.already-in-state': 'This document already holds this decision.',
+  'evidence.blocked.decision-recorded':
+    'A decision has already been recorded for this document and cannot be replaced.',
+  'evidence.blocked.not-processed':
+    'A document can only be verified once processing has completed, because there is no extracted content to approve until then.',
+  'evidence.settled.title': 'No further decision is available',
+  'evidence.settled.description':
+    'This document carries a recorded decision. Reversing it is not part of the current review model.',
+
+  /* Confirmation dialogs. Every state-changing command is confirmed; none
+     is applied straight from the list. */
+  'evidence.confirm.verify.title': 'Verify this document as evidence',
+  'evidence.confirm.reject.title': 'Reject this document as evidence',
+  'evidence.confirm.restrict.title': 'Restrict this document from retrieval',
+  'evidence.confirm.supersede.title': 'Mark this document superseded',
+
+  'evidence.confirm.verify.description':
+    'This records you as the reviewer who approved this document as evidence eligible for retrieval.',
+  'evidence.confirm.reject.description':
+    'This records you as the reviewer who refused this document as approved evidence. It cannot be re-decided afterwards.',
+  'evidence.confirm.restrict.description':
+    'This records you as the reviewer who excluded this document from retrieval. It cannot be re-decided afterwards.',
+  'evidence.confirm.supersede.description':
+    'This records you as the reviewer who marked this document obsolete. It cannot be re-decided afterwards.',
+
+  'evidence.confirm.document': 'Document',
+  'evidence.confirm.submit': 'Record decision',
+  'evidence.confirm.submitting': 'Recording decision',
+  'evidence.confirm.cancel': 'Cancel',
+
+  'evidence.reason.label.required': 'Reason for this decision',
+  'evidence.reason.label.optional': 'Note (optional)',
+  'evidence.reason.hint.required':
+    'Required. A refusal, restriction or supersession is not interpretable without a stated reason.',
+  'evidence.reason.hint.optional':
+    'Optional. An approval is recorded whether or not a note is added.',
+  'evidence.reason.error.required': 'Enter a reason for this decision.',
+  'evidence.reason.error.tooLong':
+    'A reason may be at most {max} characters. Shorten it and try again.',
+  'evidence.reason.counter': '{count} of {max} characters',
+
+  'evidence.successor.label': 'Replacement document (optional)',
+  'evidence.successor.hint':
+    'The document that replaces this one. Naming a replacement does not approve it; it stays in whatever state it already holds.',
+  'evidence.successor.none': 'No replacement',
+  'evidence.successor.empty':
+    'No other document in this engagement is available to name as a replacement.',
+  'evidence.successor.loading': 'Loading documents',
+
+  /* Failures. Every one of these is the server's answer rendered
+     truthfully; none is a guess, and none exposes internals. */
+  'evidence.error.title': 'The decision was not recorded',
+  'evidence.error.conflict.title': 'This document changed before your decision was recorded',
+  'evidence.error.conflict.description':
+    'Someone else recorded a decision, or the document changed state, after this page loaded. Nothing was overwritten. Refresh to see the current decision before deciding again.',
+  'evidence.error.conflict.refresh': 'Refresh and review again',
+  'evidence.error.forbidden':
+    'Your role does not permit evidence decisions. Nothing was changed.',
+  'evidence.error.generic': 'The decision could not be recorded. Nothing was changed.',
+  'evidence.error.retry': 'Try again',
+
+  /* Denied roles. Truthful about the reason, and never a disabled control
+     dressed up as a temporary condition. */
+  'evidence.denied.title': 'Your role cannot record evidence decisions',
+  'evidence.denied.description':
+    'Evidence decisions are made by approvers, administrators and owners. You can see the recorded decision and its reason, but not change it.',
+
+  /* Preview. Deliberately no controls at all, rather than controls that
+     would have to pretend. */
+  'evidence.preview.title': 'Evidence review requires a live workspace',
+  'evidence.preview.description':
+    'Preview runs entirely in this browser against local sample records, with no backend and no stored data. An evidence decision is a recorded, attributable act, so there is nothing here it could be recorded against.',
+
+  /* The review queue on the documents list. */
+  'evidence.filter.label': 'Filter by evidence status',
+  'evidence.filter.all': 'Any evidence status',
+  'evidence.queue.description':
+    'Documents awaiting an evidence decision, filtered by the server.',
+
 } as const;
 
 export type StringKey = keyof typeof en;
