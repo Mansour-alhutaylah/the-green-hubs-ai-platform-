@@ -5,7 +5,12 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import type { AuthService, LoginResult } from '@/features/auth/services/AuthService';
 import type { Session } from '@/features/auth/types';
 import { Role } from '@/features/rbac/roles';
-import type { DocumentListResponse, EngagementListResponse, ListDocumentsParams } from '@/lib/api/types';
+import type {
+  DocumentListResponse,
+  DocumentReadResponse,
+  EngagementListResponse,
+  ListDocumentsParams,
+} from '@/lib/api/types';
 import { DocumentsListPage } from '../pages/DocumentsListPage';
 
 const listDocuments = vi.fn<(params: ListDocumentsParams) => Promise<DocumentListResponse>>();
@@ -65,7 +70,7 @@ function buildLiveAuthService(): AuthService {
   };
 }
 
-function buildDocument(index: number) {
+function buildDocument(index: number): DocumentReadResponse {
   return {
     id: `doc-live-${index}`,
     engagement_id: ENGAGEMENT.id,
@@ -77,6 +82,13 @@ function buildDocument(index: number) {
     chunk_count: 12,
     embedding_summary: { total_chunks: 12, processing: 0, completed: 12, failed: 0, is_complete: true },
     latest_analysis_summary: null,
+    // Slice 4 evidence fields, at the column default: no decision has
+    // been recorded, so there is no reviewer, timestamp or reason.
+    evidence_status: 'PENDING_REVIEW',
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    superseded_by_document_id: null,
   };
 }
 

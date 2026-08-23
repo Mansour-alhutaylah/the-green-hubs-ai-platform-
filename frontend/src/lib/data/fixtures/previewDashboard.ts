@@ -46,6 +46,17 @@ function previewDocument(input: {
       is_complete: input.chunkCount > 0,
     },
     latest_analysis_summary: null,
+    // The initial, un-decided evidence state, with no provenance at all.
+    // These are synthetic documents nobody has reviewed, so anything else
+    // would be fabricating a reviewer, a timestamp and a decision. Preview
+    // renders no evidence controls (see `EvidencePreviewNotice`); the
+    // fields exist here only because this fixture is authored in the real
+    // wire shape.
+    evidence_status: 'PENDING_REVIEW',
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    superseded_by_document_id: null,
   };
 }
 

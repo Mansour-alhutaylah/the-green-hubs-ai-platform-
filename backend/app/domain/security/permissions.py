@@ -82,16 +82,24 @@ _ADMIN_PERMISSIONS: frozenset[Permission] = _WRITE_PERMISSIONS | {
 #: MVP Slice 4 (Evidence Review Lifecycle). Held as its own set, not
 #: folded into ``_WRITE_PERMISSIONS``, precisely because *who may approve
 #: evidence* is the question **M-4** exists to answer and backlog risk
-#: R-1 forbids engineering from answering on its own.
+#: R-1 forbade engineering from answering on its own.
 #:
-#: Until M-4 is recorded this grants exactly what the existing policy
-#: already grants every write-capable role, and no more: it closes the
-#: property that actually matters today -- a ``viewer`` cannot approve
-#: evidence, cannot withdraw an approval, and cannot make a document
-#: retrievable -- without inventing an approver/editor split that no
-#: approved source states. Narrowing it to approver-class roles when M-4
-#: lands is a single edit: remove this set from ``Role.EDITOR``'s value
-#: below. Nothing outside this module needs to change.
+#: **M-4 is now recorded**, and it draws the approver/editor line that the
+#: interim policy deliberately declined to invent: evidence review is an
+#: *approval* authority, not a write authority. Producing content and
+#: approving it as evidence are separate duties, so the role that uploads
+#: and processes a document is not the role that may declare it verified
+#: evidence -- that separation is the whole point of a review step, and an
+#: editor who could approve their own upload would make the step
+#: decorative.
+#:
+#: The recorded matrix is therefore: ``viewer`` denied, ``editor`` denied,
+#: ``approver``/``admin``/``owner`` allowed, and a missing or unrecognized
+#: role denied by ``permissions_for_role``'s deny-by-default lookup.
+#:
+#: This set is still held separately rather than merged into the
+#: approver-class values, so the roles that hold evidence review remain
+#: greppable from one place and a future re-widening stays a single edit.
 _EVIDENCE_REVIEW_PERMISSIONS: frozenset[Permission] = frozenset(
     {Permission.EVIDENCE_REVIEW}
 )
@@ -105,12 +113,13 @@ ROLE_PERMISSIONS: Mapping[Role, frozenset[Permission]] = MappingProxyType(
         # Read-only. Holds no write permission at all -- this is the exact
         # bypass the audit recorded (a viewer calling POST /documents).
         Role.VIEWER: frozenset(),
-        Role.EDITOR: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
-        # Same as editor until M-4 defines approval authority. Slice 4
-        # added the first route an approver would plausibly own
-        # (evidence review), but the authority to *restrict* it to this
-        # role is still M-4's to grant -- see
-        # ``_EVIDENCE_REVIEW_PERMISSIONS``.
+        # Writes, but does not approve. M-4 separates producing evidence
+        # from approving it, so the editor keeps every upload, processing,
+        # analysis and engagement permission and holds no evidence-review
+        # authority. This is the only role whose set M-4 changed.
+        Role.EDITOR: _WRITE_PERMISSIONS,
+        # The first role M-4 grants approval authority to: the same write
+        # permissions as an editor, plus the authority to decide evidence.
         Role.APPROVER: _WRITE_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
         Role.ADMIN: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,
         Role.OWNER: _ADMIN_PERMISSIONS | _EVIDENCE_REVIEW_PERMISSIONS,

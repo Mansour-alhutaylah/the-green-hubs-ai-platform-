@@ -98,6 +98,21 @@ export interface AnalysisSummaryResponse {
   overall_confidence: number | null;
 }
 
+/** The five evidence-review states
+ * (backend/app/domain/evidence/lifecycle.py::EvidenceStatus).
+ *
+ * They are five distinct business outcomes, not a sequence: nothing here
+ * may be treated as "later" than anything else. `VERIFIED` is the only
+ * retrieval-eligible state; every other state — including the initial
+ * `PENDING_REVIEW` — is ineligible, so an unrecognized value must fail
+ * closed rather than be assumed approved. */
+export type EvidenceStatus =
+  | 'PENDING_REVIEW'
+  | 'VERIFIED'
+  | 'REJECTED'
+  | 'RESTRICTED'
+  | 'SUPERSEDED';
+
 /** Response shape of GET /documents (list items) and GET /documents/{id}. */
 export interface DocumentReadResponse {
   id: string;
@@ -110,6 +125,11 @@ export interface DocumentReadResponse {
   chunk_count: number;
   embedding_summary: EmbeddingSummaryResponse;
   latest_analysis_summary: AnalysisSummaryResponse | null;
+  evidence_status: EvidenceStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_reason: string | null;
+  superseded_by_document_id: string | null;
 }
 
 export interface DocumentListResponse {
@@ -122,8 +142,50 @@ export interface DocumentListResponse {
 export interface ListDocumentsParams {
   engagement_id?: string;
   processing_status?: DocumentProcessingStatus;
+  /** Server-side evidence filter. The backend applies it inside the same
+   * tenant-scoped query that produces `total`, so a filtered `total` is a
+   * real count of matching documents — never a page length. */
+  evidence_status?: EvidenceStatus;
   limit?: number;
   offset?: number;
+}
+
+/** backend/app/schemas/document.py::DocumentEvidenceResponse — the
+ * document's current evidence decision after a review command. Returned by
+ * all four review routes, including the idempotent-repeat case, where it
+ * carries the *original* reviewer and timestamp rather than the retrying
+ * caller's. */
+export interface DocumentEvidenceResponse {
+  id: string;
+  engagement_id: string;
+  evidence_status: EvidenceStatus;
+  processing_status: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_reason: string | null;
+  superseded_by_document_id: string | null;
+  updated_at: string;
+}
+
+/** Body of POST /documents/{id}/evidence/verify. Wholly optional — the
+ * route accepts no body at all. `reason` is a note, not a justification. */
+export interface EvidenceVerifyRequest {
+  reason?: string | null;
+}
+
+/** Body of POST /documents/{id}/evidence/reject and /restrict. The reason
+ * is mandatory and may not be blank; the backend rejects `""` and
+ * whitespace-only input with 422. */
+export interface EvidenceReasonRequest {
+  reason: string;
+}
+
+/** Body of POST /documents/{id}/evidence/supersede: the same mandatory
+ * reason, plus an optional successor. The successor must be a document in
+ * the caller's own organization and must not be the document itself —
+ * both enforced server-side. */
+export interface EvidenceSupersedeRequest extends EvidenceReasonRequest {
+  superseded_by_document_id?: string | null;
 }
 
 /** backend/app/schemas/embedding.py::EmbeddingGenerationSummaryResponse —

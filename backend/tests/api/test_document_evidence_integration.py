@@ -1387,3 +1387,252 @@ async def test_an_unknown_evidence_status_filter_is_422(
     )
 
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# M-4 authorization, proved against the real database
+#
+# The API-level module already proves the status codes with a stubbed
+# service. What only a real database can prove is the property that
+# actually matters after a denial: that the refused command wrote
+# *nothing* -- no status change, no reviewer, no timestamp, no reason.
+# A 403 returned by a route that had already committed a row would look
+# identical to the client.
+# ---------------------------------------------------------------------------
+
+
+def _roles_denied_evidence_review() -> list[str]:
+    """The roles the live policy refuses evidence review, in policy order.
+
+    Derived, never written out: when M-4 (or any later decision) moves a
+    role across the line, these tests follow the policy instead of
+    asserting a stale role name."""
+
+    return [role.value for role in Role if not has_permission(role, Permission.EVIDENCE_REVIEW)]
+
+
+def _roles_allowed_evidence_review() -> list[str]:
+    return [role.value for role in Role if has_permission(role, Permission.EVIDENCE_REVIEW)]
+
+
+async def _add_user_with_role(
+    ids: Ids,
+    private_key,
+    real_verifier: SupabaseJWTVerifier,
+    *,
+    organization_id: uuid.UUID,
+    role: str,
+) -> dict[str, str]:
+    """A real authenticated identity holding exactly ``role``.
+
+    ``_add_reviewer`` selects a role *by* the permissions it needs, which
+    cannot express "a role that holds none of them". These tests need the
+    denied side, so the role is passed in -- still never hardcoded at the
+    call site, always taken from the derivation helpers above."""
+
+    user_id = uuid.uuid4()
+    async with AsyncSessionLocal() as session:
+        session.add(
+            UserModel(
+                id=user_id,
+                organization_id=organization_id,
+                full_name=f"M4 {role} User",
+                email=f"m4-{role}-{user_id}@example.com",
+                role=role,
+            )
+        )
+        await session.commit()
+    ids.users.append(user_id)
+
+    token = _make_token(
+        private_key,
+        kid="integration-test-kid",
+        overrides={
+            "sub": str(user_id),
+            "iss": real_verifier.issuer,
+            "aud": real_verifier.audience,
+        },
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_the_m4_role_split_is_real_and_non_vacuous() -> None:
+    """Both sides of the matrix must be populated, or every parametrized
+    test below would prove nothing while still passing."""
+
+    denied = _roles_denied_evidence_review()
+    allowed = _roles_allowed_evidence_review()
+
+    assert denied, "no role is denied evidence review -- denial is untested"
+    assert allowed, "no role holds evidence review -- the routes are unreachable"
+    assert set(denied).isdisjoint(allowed)
+    # M-4's substance: the write-capable-but-not-approving role is denied.
+    assert Role.VIEWER.value in denied
+    assert Role.EDITOR.value in denied
+    assert Role.APPROVER.value in allowed
+
+
+@pytest.mark.parametrize("role", _roles_denied_evidence_review())
+@pytest.mark.parametrize("command", COMMANDS)
+async def test_a_denied_role_is_403_and_changes_nothing_in_the_database(
+    client: AsyncClient,
+    ids: Ids,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    tenant: Tenant,
+    role: str,
+    command: str,
+) -> None:
+    """The closure property of M-4: refused *and* inert.
+
+    The document is PROCESSED, so nothing but authorization is standing
+    between this caller and a successful transition -- a 403 produced
+    after the write would still leave a changed row here."""
+
+    private_key, _public = keypair
+    headers = await _add_user_with_role(
+        ids, private_key, real_verifier, organization_id=tenant.organization_id, role=role
+    )
+    document_id = await _create_document(ids, tenant, processing_status="PROCESSED")
+    before = await _stored_evidence(document_id)
+
+    response = await client.post(
+        _url(document_id, command), headers=headers, json=_body(command)
+    )
+
+    assert response.status_code == 403
+    assert await _stored_evidence(document_id) == before
+    assert before["evidence_status"] == EvidenceStatus.PENDING_REVIEW.value
+    assert before["reviewed_by"] is None
+    assert before["reviewed_at"] is None
+
+
+@pytest.mark.parametrize("role", _roles_denied_evidence_review())
+async def test_a_denied_role_cannot_withdraw_an_existing_approval(
+    client: AsyncClient,
+    ids: Ids,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    tenant: Tenant,
+    role: str,
+) -> None:
+    """Denial protects a recorded decision, not just the initial state:
+    a role without the permission may not undo an approval either."""
+
+    private_key, _public = keypair
+    headers = await _add_user_with_role(
+        ids, private_key, real_verifier, organization_id=tenant.organization_id, role=role
+    )
+    document_id = await _create_document(ids, tenant, processing_status="PROCESSED")
+    assert (await _review(client, tenant, document_id, "verify")).status_code == 200
+    approved = await _stored_evidence(document_id)
+    assert approved["evidence_status"] == EvidenceStatus.VERIFIED.value
+
+    response = await client.post(
+        _url(document_id, "reject"), headers=headers, json=_body("reject")
+    )
+
+    assert response.status_code == 403
+    assert await _stored_evidence(document_id) == approved
+
+
+@pytest.mark.parametrize("role", _roles_denied_evidence_review())
+@pytest.mark.parametrize("command", COMMANDS)
+async def test_a_denied_role_leaks_nothing_in_its_refusal(
+    client: AsyncClient,
+    ids: Ids,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    tenant: Tenant,
+    role: str,
+    command: str,
+) -> None:
+    """The 403 body carries a safe message only -- no SQL, no driver
+    text, no token, no stack frame, and no role name that would tell a
+    caller which role to acquire."""
+
+    private_key, _public = keypair
+    headers = await _add_user_with_role(
+        ids, private_key, real_verifier, organization_id=tenant.organization_id, role=role
+    )
+    document_id = await _create_document(ids, tenant, processing_status="PROCESSED")
+
+    response = await client.post(
+        _url(document_id, command), headers=headers, json=_body(command)
+    )
+
+    assert response.status_code == 403
+    body = response.json()
+    assert set(body) == {"detail"}
+    detail = body["detail"].lower()
+    for forbidden in (
+        "select ",
+        "insert ",
+        "traceback",
+        "asyncpg",
+        "sqlalchemy",
+        "bearer",
+        "postgres",
+        role.lower(),
+    ):
+        assert forbidden not in detail
+
+
+@pytest.mark.parametrize("role", _roles_allowed_evidence_review())
+async def test_every_allowed_role_can_actually_record_a_decision(
+    client: AsyncClient,
+    ids: Ids,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    tenant: Tenant,
+    role: str,
+) -> None:
+    """The other half of the matrix, proved positively against the real
+    database: each allowed role's decision is persisted and attributed
+    to that identity."""
+
+    private_key, _public = keypair
+    headers = await _add_user_with_role(
+        ids, private_key, real_verifier, organization_id=tenant.organization_id, role=role
+    )
+    document_id = await _create_document(ids, tenant, processing_status="PROCESSED")
+
+    response = await client.post(_url(document_id, "verify"), headers=headers, json={})
+
+    assert response.status_code == 200
+    stored = await _stored_evidence(document_id)
+    assert stored["evidence_status"] == EvidenceStatus.VERIFIED.value
+    assert stored["reviewed_by"] is not None
+    assert stored["reviewed_at"] is not None
+
+
+@pytest.mark.parametrize("command", COMMANDS)
+async def test_an_unknown_role_string_is_denied_and_changes_nothing(
+    client: AsyncClient,
+    ids: Ids,
+    keypair,
+    real_verifier: SupabaseJWTVerifier,
+    tenant: Tenant,
+    command: str,
+) -> None:
+    """A ``users.role`` value outside the catalog fails closed. The
+    column is free-form ``varchar``, so this is a state the database can
+    genuinely hold."""
+
+    private_key, _public = keypair
+    headers = await _add_user_with_role(
+        ids,
+        private_key,
+        real_verifier,
+        organization_id=tenant.organization_id,
+        role="evidence_superuser",
+    )
+    document_id = await _create_document(ids, tenant, processing_status="PROCESSED")
+    before = await _stored_evidence(document_id)
+
+    response = await client.post(
+        _url(document_id, command), headers=headers, json=_body(command)
+    )
+
+    assert response.status_code == 403
+    assert await _stored_evidence(document_id) == before

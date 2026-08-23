@@ -40,7 +40,23 @@ EXPECTED_ALEMBIC_HEAD = "b7d41e0c9a52"
 # constraints/index the migration creates). The existing suites gained no
 # cases -- their retrieval fixtures were re-pointed at approved evidence
 # rather than multiplied.
-EXPECTED_EXISTING_INTEGRATION_CASES = 271
+#
+# **M-4 (Evidence Review authorization)** adds 26 for 297, all in
+# tests/api/test_document_evidence_integration.py and all derived from
+# ROLE_PERMISSIONS rather than from written-out role names:
+#
+#   1  the split is real and non-vacuous (both sides populated)
+#   8  each denied role x each command is 403 and changes no stored row
+#   2  each denied role cannot withdraw an existing approval
+#   8  each denied role x each command leaks nothing in its refusal
+#   3  each allowed role can actually record a decision
+#   4  an unknown role string is denied, and changes nothing, per command
+#
+# The parametrized counts follow the policy: 2 denied roles (viewer,
+# editor) and 3 allowed (approver, admin, owner). If M-4 is ever revised,
+# these counts move with it and this constant must be reconciled again --
+# which is precisely what the gate exists to force.
+EXPECTED_EXISTING_INTEGRATION_CASES = 297
 REQUIRED_DATABASE_SUFFIX = "_test"
 
 LOCAL_TEST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "test-postgres"})
