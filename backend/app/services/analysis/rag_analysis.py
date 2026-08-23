@@ -48,6 +48,7 @@ from pydantic import ValidationError as PydanticValidationError
 from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
 from app.domain.entities.analysis_run import AnalysisRun
 from app.domain.entities.analysis_source_reference import AnalysisSourceReference
+from app.domain.entities.document import Document
 from app.domain.entities.user import User
 from app.domain.entities.vector_search_result import VectorSearchResult
 from app.domain.llm_gateway import LLMGateway, LLMGatewayError
@@ -71,6 +72,14 @@ _SAFE_LLM_ERROR_MESSAGES = {
     "LLMMalformedResponseError": "Analysis provider returned an unexpected response",
     "LLMValidationError": "Analysis request was invalid",
 }
+
+
+def _evidence_revision(documents: Sequence[Document]) -> str:
+    """Stable identity for the current document/evidence revisions."""
+    return "|".join(
+        f"{document.id}:{document.updated_at.isoformat()}"
+        for document in sorted(documents, key=lambda item: item.id.hex)
+    )
 
 
 def _safe_llm_error_message(exc: LLMGatewayError) -> str:
@@ -192,6 +201,7 @@ class RagAnalysisService:
             organization_id=organization_id,
             engagement_id=document.engagement_id,
             document_id=document_id,
+            evidence_revision=_evidence_revision((document,)),
             analysis_type=analysis_type,
             query_text=query_text,
         )
@@ -209,11 +219,16 @@ class RagAnalysisService:
         if engagement is None:
             raise NotFoundError(f"Engagement {engagement_id} not found")
 
+        documents = await self._document_repository.get_by_engagement(
+            engagement_id, organization_id=organization_id
+        )
+
         return await self._run(
             current_user,
             organization_id=organization_id,
             engagement_id=engagement_id,
             document_id=None,
+            evidence_revision=_evidence_revision(documents),
             analysis_type=analysis_type,
             query_text=query_text,
         )
@@ -236,6 +251,7 @@ class RagAnalysisService:
         organization_id: UUID,
         engagement_id: UUID,
         document_id: UUID | None,
+        evidence_revision: str,
         analysis_type: str,
         query_text: str,
     ) -> AnalysisResultView:
@@ -253,6 +269,7 @@ class RagAnalysisService:
             organization_id=organization_id,
             engagement_id=engagement_id,
             document_id=document_id,
+            evidence_revision=evidence_revision,
             analysis_type=analysis_type,
             query_text=normalized_query,
             provider=self._provider,

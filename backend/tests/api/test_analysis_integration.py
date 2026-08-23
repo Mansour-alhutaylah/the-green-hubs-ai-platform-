@@ -436,7 +436,7 @@ async def test_identical_request_same_tenant_is_idempotent_end_to_end(
     cleanup_ids: dict[str, list[uuid.UUID]], fake_llm_gateway: FakeLLMGateway,
 ) -> None:
     private_key, _public_key = keypair
-    _org, engagement_id, profile_id, _doc = await _make_org_engagement_document_with_embedded_chunks(
+    _org, engagement_id, profile_id, document_id = await _make_org_engagement_document_with_embedded_chunks(
         cleanup_ids, chunk_contents=["Scope 1 emissions decreased."]
     )
     token = _token_for(private_key, real_verifier, profile_id)
@@ -555,10 +555,13 @@ async def test_stale_processing_run_is_reclaimed_end_to_end(
     async with AsyncSessionLocal() as session:
         organization = await session.get(OrganizationModel, _org)
         assert organization is not None
+        document = await session.get(DocumentModel, document_id)
+        assert document is not None
         request_hash = compute_request_hash(
             organization_id=_org,
             engagement_id=engagement_id,
             document_id=None,
+            evidence_revision=f"{document.id}:{document.updated_at.isoformat()}",
             analysis_type="sustainability_summary",
             query_text="Scope 1 emissions decreased.",
             provider="openai",

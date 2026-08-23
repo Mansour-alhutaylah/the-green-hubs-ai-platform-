@@ -14,6 +14,7 @@ def _base_kwargs(**overrides: object) -> dict:
         organization_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
         engagement_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
         document_id=uuid.UUID("33333333-3333-3333-3333-333333333333"),
+        evidence_revision="33333333-3333-3333-3333-333333333333:2026-01-01T00:00:00+00:00",
         analysis_type="sustainability_summary",
         query_text="scope 1 emissions",
         provider="openai",
@@ -62,6 +63,12 @@ def test_different_organization_id_changes_hash() -> None:
 def test_different_document_id_changes_hash() -> None:
     a = compute_request_hash(**_base_kwargs())
     b = compute_request_hash(**_base_kwargs(document_id=uuid.uuid4()))
+    assert a != b
+
+
+def test_different_evidence_revision_changes_hash() -> None:
+    a = compute_request_hash(**_base_kwargs(evidence_revision="revision-1"))
+    b = compute_request_hash(**_base_kwargs(evidence_revision="revision-2"))
     assert a != b
 
 
