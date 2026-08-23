@@ -541,7 +541,7 @@ async def test_stale_processing_run_is_reclaimed_end_to_end(
     already past the staleness threshold, then proving the real endpoint
     reclaims and completes it rather than treating it as still in flight."""
     private_key, _public_key = keypair
-    _org, engagement_id, profile_id, _doc = await _make_org_engagement_document_with_embedded_chunks(
+    _org, engagement_id, profile_id, document_id = await _make_org_engagement_document_with_embedded_chunks(
         cleanup_ids, chunk_contents=["Scope 1 emissions decreased."]
     )
     token = _token_for(private_key, real_verifier, profile_id)
@@ -640,3 +640,148 @@ async def test_no_relevant_evidence_marks_insufficient_evidence_without_calling_
     await _track_run_from_response(cleanup_ids, body)
     assert body["status"] == "INSUFFICIENT_EVIDENCE"
     assert fake_llm_gateway.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Evidence-state idempotency (fix 58136b7)
+# ---------------------------------------------------------------------------
+
+
+async def test_evidence_verification_creates_new_run_after_insufficient_evidence_end_to_end(
+    client: AsyncClient, keypair, real_verifier: SupabaseJWTVerifier,
+    cleanup_ids: dict[str, list[uuid.UUID]], fake_llm_gateway: FakeLLMGateway,
+) -> None:
+    """Full real-database lifecycle proof for the evidence-revision
+    idempotency fix: a PENDING_REVIEW document contributes nothing to the
+    real verified-only retrieval path, so analyzing it is
+    INSUFFICIENT_EVIDENCE without ever calling the LLM. Verifying the
+    document through the real evidence-review endpoint/service/
+    authorization changes its evidence revision, so the identical
+    request now computes a different request hash, creates a new run,
+    and reaches the LLM -- while the earlier terminal run is preserved
+    untouched. A third, unchanged-revision repeat reuses that new run
+    rather than creating a third one."""
+    from sqlalchemy import select
+
+    private_key, _public_key = keypair
+    org_id, engagement_id, profile_id, document_id = (
+        await _make_org_engagement_document_with_embedded_chunks(
+            cleanup_ids,
+            chunk_contents=["Scope 1 emissions decreased year over year."],
+            evidence_status="PENDING_REVIEW",
+        )
+    )
+    user_headers = {
+        "Authorization": f"Bearer {_token_for(private_key, real_verifier, profile_id)}"
+    }
+
+    async with AsyncSessionLocal() as session:
+        reviewer = (
+            await session.execute(
+                select(UserModel).where(
+                    UserModel.organization_id == org_id, UserModel.role == "approver"
+                )
+            )
+        ).scalar_one()
+        reviewer_id = reviewer.id
+    reviewer_headers = {
+        "Authorization": f"Bearer {_token_for(private_key, real_verifier, reviewer_id)}"
+    }
+
+    analyze_body = {
+        "analysis_type": "sustainability_summary",
+        "query_text": "Scope 1 emissions decreased.",
+    }
+
+    # 1. Analyze before verification: the real retrieval path excludes an
+    #    unverified document, so this is INSUFFICIENT_EVIDENCE and the LLM
+    #    is never called.
+    before = await client.post(
+        f"/api/v1/analysis/engagements/{engagement_id}/analyze",
+        headers=user_headers, json=analyze_body,
+    )
+    assert before.status_code == 200
+    before_body = before.json()
+    await _track_run_from_response(cleanup_ids, before_body)
+    assert before_body["status"] == "INSUFFICIENT_EVIDENCE"
+    assert before_body["citations"] == []
+    assert fake_llm_gateway.call_count == 0
+
+    async with AsyncSessionLocal() as session:
+        pre_verification_document = await session.get(DocumentModel, document_id)
+        assert pre_verification_document is not None
+        pre_verification_updated_at = pre_verification_document.updated_at
+        before_run = await session.get(
+            AnalysisRunModel, uuid.UUID(before_body["analysis_run_id"])
+        )
+        assert before_run is not None
+        assert before_run.organization_id == org_id
+        pre_verification_hash = before_run.request_hash
+
+    # 2. Verify the document as evidence through the real endpoint, real
+    #    service, and real approver-permission authorization -- not a
+    #    direct database write.
+    verify_response = await client.post(
+        f"/api/v1/documents/{document_id}/evidence/verify",
+        headers=reviewer_headers, json={},
+    )
+    assert verify_response.status_code == 200
+    assert verify_response.json()["evidence_status"] == "VERIFIED"
+
+    async with AsyncSessionLocal() as session:
+        verified_document = await session.get(DocumentModel, document_id)
+        assert verified_document is not None
+        assert verified_document.evidence_status == "VERIFIED"
+        assert verified_document.updated_at != pre_verification_updated_at
+
+    # 3. Analyze again with the identical request: the now-verified
+    #    document reaches the real verified-only retrieval path, so the
+    #    request hash differs, a *new* run is created, and the fake LLM
+    #    is called exactly once -- the earlier terminal run is not reused.
+    fake_llm_gateway._responses = [VALID_STRUCTURED_OUTPUT]
+    after = await client.post(
+        f"/api/v1/analysis/engagements/{engagement_id}/analyze",
+        headers=user_headers, json=analyze_body,
+    )
+    assert after.status_code == 200
+    after_body = after.json()
+    await _track_run_from_response(cleanup_ids, after_body)
+    assert after_body["status"] == "COMPLETED"
+    assert after_body["analysis_run_id"] != before_body["analysis_run_id"]
+    assert len(after_body["citations"]) > 0
+    assert fake_llm_gateway.call_count == 1
+
+    async with AsyncSessionLocal() as session:
+        after_run = await session.get(AnalysisRunModel, uuid.UUID(after_body["analysis_run_id"]))
+        assert after_run is not None
+        assert after_run.organization_id == org_id
+        assert after_run.request_hash != pre_verification_hash
+
+        preserved_before_run = await session.get(
+            AnalysisRunModel, uuid.UUID(before_body["analysis_run_id"])
+        )
+        assert preserved_before_run is not None
+        assert preserved_before_run.status == "INSUFFICIENT_EVIDENCE"
+        assert preserved_before_run.organization_id == org_id
+
+    # 4. Repeating the identical request with no further document
+    #    revision reuses the second run: no third run is created and the
+    #    LLM is still only called once in total.
+    repeat = await client.post(
+        f"/api/v1/analysis/engagements/{engagement_id}/analyze",
+        headers=user_headers, json=analyze_body,
+    )
+    assert repeat.status_code == 200
+    repeat_body = repeat.json()
+    assert repeat_body["analysis_run_id"] == after_body["analysis_run_id"]
+    assert repeat_body["status"] == "COMPLETED"
+    assert fake_llm_gateway.call_count == 1
+
+    async with AsyncSessionLocal() as session:
+        organization_runs = (
+            await session.execute(
+                select(AnalysisRunModel).where(AnalysisRunModel.organization_id == org_id)
+            )
+        ).scalars().all()
+        assert len(organization_runs) == 2
+        assert {run.organization_id for run in organization_runs} == {org_id}
