@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { buildLiveAuthService, LIVE_ORGANIZATION_NAME } from '@/test/liveSession';
 import { en } from '@/lib/i18n/strings/en';
@@ -209,7 +209,22 @@ describe('Live dashboard truthfulness', () => {
     renderLiveDashboard();
 
     expect(await screen.findByText(RECENT_FILENAME)).toBeVisible();
-    expect(screen.getByText(LIVE_ORGANIZATION_NAME)).toBeVisible();
+
+    // The organization name legitimately appears in more than one place — the
+    // workspace shell names it too — so the assertion that matters is where it
+    // appears: on the Live dashboard's own organization card, inside the
+    // workspace totals section.
+    const totalsSection = screen
+      .getByRole('heading', { name: en['dashboard.live.section.totals'] })
+      .closest('section');
+
+    expect(totalsSection).not.toBeNull();
+
+    if (!totalsSection) {
+      throw new Error('Live dashboard totals section was not rendered.');
+    }
+
+    expect(within(totalsSection).getByText(LIVE_ORGANIZATION_NAME)).toBeVisible();
 
     // The Preview dashboard's own figures and names, none of which may
     // appear in a Live render.
