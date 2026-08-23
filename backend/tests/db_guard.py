@@ -19,7 +19,7 @@ from sqlalchemy.pool import NullPool
 
 TEST_DATABASE_MARKER = "GH_SIP_DISPOSABLE_TEST_DB_DO_NOT_CREATE_ELSEWHERE"
 TEST_DATABASE_MARKER_TABLE = "gh_disposable_test_database"
-EXPECTED_ALEMBIC_HEAD = "b7d41e0c9a52"
+EXPECTED_ALEMBIC_HEAD = "c3e8a1f5d047"
 # Raised from 144 by MVP Slice 3 (Organization Data Isolation): 23 cases in
 # tests/api/test_organization_data_isolation_integration.py plus 7 added to
 # the existing repository suites, all cross-tenant negatives -- 174.
@@ -40,7 +40,17 @@ EXPECTED_ALEMBIC_HEAD = "b7d41e0c9a52"
 # constraints/index the migration creates). The existing suites gained no
 # cases -- their retrieval fixtures were re-pointed at approved evidence
 # rather than multiplied.
-EXPECTED_EXISTING_INTEGRATION_CASES = 271
+#
+# Phase 1A Slice 3 (audit spine) adds 10 for 281, all in
+# tests/integration/test_audit_events_integration.py: the persisted
+# round-trip and its server-assigned fields, the no-commit-on-append
+# property, three tenant-scope cases (own-organization only, the
+# null-organization event that belongs to no tenant, ordering and
+# pagination), three database CHECK constraints, the structural
+# absence of an update/delete path, and the EV-AUD-03b privilege
+# finding that records what the application role can actually do to a
+# written row.
+EXPECTED_EXISTING_INTEGRATION_CASES = 281
 REQUIRED_DATABASE_SUFFIX = "_test"
 
 LOCAL_TEST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "test-postgres"})
@@ -66,6 +76,7 @@ EXPECTED_APPLICATION_TABLES = frozenset(
         "document_chunk_embeddings",
         "analysis_runs",
         "analysis_source_references",
+        "audit_events",
     }
 )
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
