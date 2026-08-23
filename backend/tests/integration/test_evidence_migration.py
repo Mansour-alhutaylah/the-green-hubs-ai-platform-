@@ -162,9 +162,20 @@ def test_the_slice_4_migration_declares_the_expected_predecessor() -> None:
     assert f'down_revision: Union[str, None] = \'{PREDECESSOR_REVISION}\'' in source
 
 
-async def test_the_database_is_at_the_slice_4_head() -> None:
-    assert EXPECTED_ALEMBIC_HEAD == SLICE_4_REVISION
-    assert await _current_revision() == SLICE_4_REVISION
+async def test_the_database_has_slice_4_applied_and_is_at_the_expected_head() -> None:
+    """Slice 4 is applied, and the chain is where the guard expects it.
+
+    These were one assertion while Slice 4 *was* the head. Phase 1A Slice
+    3 (``c3e8a1f5d047``, audit events) added a later revision, so the two
+    facts are now genuinely separate and are asserted separately:
+    ``EXPECTED_ALEMBIC_HEAD`` tracks the newest migration, while this
+    module's subject is Slice 4 specifically. Slice 4's application is
+    proven by its columns existing rather than by a revision string,
+    which is the property the rest of this module actually depends on.
+    """
+
+    assert await _current_revision() == EXPECTED_ALEMBIC_HEAD
+    assert EVIDENCE_COLUMNS <= await _documents_columns()
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +288,10 @@ async def test_the_migration_is_reversible_and_reappliable(restored_to_head) -> 
     assert (await _documents_columns()).isdisjoint(EVIDENCE_COLUMNS)
 
     _alembic("upgrade", "head")
-    assert await _current_revision() == SLICE_4_REVISION
+    # "head" is no longer Slice 4 -- Slice 3 of Phase 1A sits after it --
+    # so this asserts the chain returned to its newest revision, and that
+    # Slice 4's own columns came back with it.
+    assert await _current_revision() == EXPECTED_ALEMBIC_HEAD
     assert EVIDENCE_COLUMNS <= await _documents_columns()
 
 

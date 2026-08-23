@@ -104,6 +104,12 @@ TENANT_SCOPED_REPOSITORY_METHODS: Final[frozenset[str]] = frozenset(
         "mark_insufficient_evidence",
         "add_citations",
         "get_citations",
+        # AuditEvent (Phase 1A Slice 3). No route reads audit events yet,
+        # so these have no call site to police today; they are listed now
+        # so that the endpoint which eventually exposes them cannot be
+        # written without the tenant predicate. Registering the method
+        # before its first caller is the cheap half of that guarantee.
+        "list_for_organization",
     }
 )
 
