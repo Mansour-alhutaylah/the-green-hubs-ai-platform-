@@ -105,7 +105,7 @@ describe('DocumentUploadPage — live mode', () => {
     renderUpload();
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/uploading to live backend engagement alpha/i, {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText(/uploading to live backend engagement alpha/i, {})).toBeVisible();
 
     const input = screen.getByLabelText(/select a pdf document/i);
     await user.upload(input, pdfFile());
@@ -123,7 +123,7 @@ describe('DocumentUploadPage — live mode', () => {
     listEngagements.mockResolvedValue({ items: [SINGLE_ENGAGEMENT], page: 1, page_size: 100, total: 1 });
     renderUpload();
     const user = userEvent.setup();
-    await screen.findByText(/uploading to live backend engagement alpha/i, {}, { timeout: 5000 });
+    await screen.findByText(/uploading to live backend engagement alpha/i, {});
 
     const input = screen.getByLabelText(/select a pdf document/i);
     // Named with a `.pdf` extension (so @testing-library/user-event's own
@@ -142,7 +142,7 @@ describe('DocumentUploadPage — live mode', () => {
     renderUpload();
     const user = userEvent.setup();
 
-    const select = await screen.findByLabelText(/^engagement$/i, {}, { timeout: 5000 });
+    const select = await screen.findByLabelText(/^engagement$/i, {});
     expect(select).toHaveValue('');
 
     const input = screen.getByLabelText(/select a pdf document/i);
@@ -159,7 +159,7 @@ describe('DocumentUploadPage — live mode', () => {
     listEngagements.mockResolvedValue({ items: [], page: 1, page_size: 100, total: 0 });
     renderUpload();
 
-    expect(await screen.findByRole('heading', { name: /no engagements yet/i }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /no engagements yet/i })).toBeVisible();
     expect(screen.queryByLabelText(/select a pdf document/i)).not.toBeInTheDocument();
   });
 
@@ -175,7 +175,7 @@ describe('DocumentUploadPage — live mode', () => {
 
     renderUpload();
     const user = userEvent.setup();
-    await screen.findByText(/uploading to live backend engagement alpha/i, {}, { timeout: 5000 });
+    await screen.findByText(/uploading to live backend engagement alpha/i, {});
 
     const input = screen.getByLabelText(/select a pdf document/i);
     await user.upload(input, pdfFile());
@@ -202,7 +202,7 @@ describe('DocumentUploadPage — live mode', () => {
 
     renderUpload();
     const user = userEvent.setup();
-    await screen.findByText(/uploading to live backend engagement alpha/i, {}, { timeout: 5000 });
+    await screen.findByText(/uploading to live backend engagement alpha/i, {});
 
     const input = screen.getByLabelText(/select a pdf document/i);
     await user.upload(input, pdfFile());

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 
@@ -26,28 +25,26 @@ describe('Login hero copy — single active locale only', () => {
     expect(await screen.findByRole('heading', { name: /^welcome back$/i })).toBeInTheDocument();
   });
 
-  it('shows only Arabic hero copy when the Arabic locale is active', async () => {
+  /* The MVP ships English only. These two tests previously asserted that
+     Arabic *could* be activated, from storage and from the toggle; they now
+     assert the opposite, which is the product decision: neither route may
+     put the interface into a language this release does not finish. */
+  it('renders English for a stored Arabic locale, rather than activating Arabic', async () => {
     window.localStorage.setItem('ghp:locale', 'ar');
 
     renderWithProviders(<LoginPage />, { initialEntries: ['/login'] });
 
-    expect(await screen.findByText(AR_HERO_HEADING)).toBeInTheDocument();
-    expect(screen.getByText(AR_HERO_SUPPORTING)).toBeInTheDocument();
-    expect(screen.queryByText(EN_HERO_HEADING)).not.toBeInTheDocument();
-    expect(screen.queryByText(EN_HERO_SUPPORTING)).not.toBeInTheDocument();
-    expect(document.documentElement).toHaveAttribute('dir', 'rtl');
+    expect(await screen.findByText(EN_HERO_HEADING)).toBeInTheDocument();
+    expect(screen.getByText(EN_HERO_SUPPORTING)).toBeInTheDocument();
+    expect(screen.queryByText(AR_HERO_HEADING)).not.toBeInTheDocument();
+    expect(screen.queryByText(AR_HERO_SUPPORTING)).not.toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute('dir', 'ltr');
   });
 
-  it('swaps the visible hero copy when the locale toggle is clicked', async () => {
-    const user = userEvent.setup();
+  it('offers no language toggle while a single language ships', async () => {
     renderWithProviders(<LoginPage />, { initialEntries: ['/login'] });
 
     expect(await screen.findByText(EN_HERO_HEADING)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'العربية' }));
-
-    expect(await screen.findByText(AR_HERO_HEADING)).toBeInTheDocument();
-    expect(screen.queryByText(EN_HERO_HEADING)).not.toBeInTheDocument();
-    expect(document.documentElement).toHaveAttribute('dir', 'rtl');
+    expect(screen.queryByRole('button', { name: 'العربية' })).not.toBeInTheDocument();
   });
 });

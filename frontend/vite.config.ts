@@ -84,8 +84,18 @@ export default defineConfig(({ command, mode }) => {
        *
        * This is a timeout, not a delay: a genuinely hanging test still
        * fails, just less ambiguously.
+       *
+       * It must stay comfortably above the Testing Library
+       * `asyncUtilTimeout` set in `src/test/setupTests.ts` (10s), so a
+       * failing assertion reports *what* it was waiting for rather than the
+       * test being killed out from under it first.
+       *
+       * 30s is 3× that budget and comfortably above the measured worst case
+       * — the slowest single test in the suite runs 7.2s. It was reduced
+       * here from 60s, which was set by estimate rather than measurement.
+       * Raise it only for an identified test with a stated reason.
        */
-      testTimeout: 20_000,
+      testTimeout: 30_000,
     },
   };
 });

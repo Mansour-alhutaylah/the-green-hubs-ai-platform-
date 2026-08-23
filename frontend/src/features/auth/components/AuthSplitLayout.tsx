@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { BrandLogo, Icon } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
+import { hasSelectableLocales } from '@/lib/i18n/availability';
 import { en } from '@/lib/i18n/strings/en';
 import { ar } from '@/lib/i18n/strings/ar';
 import { cn } from '@/lib/utils/cn';
@@ -103,14 +104,19 @@ export function AuthSplitLayout({
       </aside>
 
       <main className="auth-form-panel relative flex min-w-0 flex-1 items-center justify-center px-3 py-12 sm:px-6 sm:py-16 lg:px-10">
-        <button
-          type="button"
-          onClick={toggleLocale}
-          aria-label={t('auth.localeToggle')}
-          className="absolute end-4 top-4 inline-flex min-h-12 items-center rounded-l border border-leaf-300 bg-surface-0/85 px-4 text-meta font-semibold text-leaf-700 shadow-raise backdrop-blur-sm transition-all duration-[var(--motion-base)] hover:bg-leaf-100 hover:shadow-float sm:end-8 sm:top-8"
-        >
-          {t('auth.localeToggle')}
-        </button>
+        {/* Hidden for the MVP, which ships English only. The control, the
+            `dir` switch behind it, and the RTL layout are all kept intact
+            and return when `AVAILABLE_LOCALES` gains a second entry. */}
+        {hasSelectableLocales() && (
+          <button
+            type="button"
+            onClick={toggleLocale}
+            aria-label={t('auth.localeToggle')}
+            className="absolute end-4 top-4 inline-flex min-h-12 items-center rounded-l border border-leaf-300 bg-surface-0/85 px-4 text-meta font-semibold text-leaf-700 shadow-raise backdrop-blur-sm transition-all duration-[var(--motion-base)] hover:bg-leaf-100 hover:shadow-float sm:end-8 sm:top-8"
+          >
+            {t('auth.localeToggle')}
+          </button>
+        )}
         <div className="auth-card panel-enter w-full max-w-115 rounded-[20px] border border-white/90 p-3 min-[390px]:p-5 sm:p-7 lg:p-8">
           {children}
         </div>

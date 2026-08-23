@@ -44,7 +44,7 @@ describe('routing and deep links', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^profile$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^profile$/i }),
     ).toBeVisible();
     expect(screen.queryByRole('heading', { name: /^dashboard$/i })).toBeNull();
   });
@@ -68,7 +68,7 @@ describe('routing and deep links', () => {
     await user.click(screen.getByRole('button', { name: en['auth.signin.submit'] }));
 
     expect(
-      await screen.findByRole('heading', { name: /^profile$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^profile$/i }),
     ).toBeVisible();
   });
 

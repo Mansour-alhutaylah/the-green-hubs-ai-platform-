@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AppRoutes } from '@/app/router/routes';
 import { Role } from '@/features/rbac/roles';
 import { TEST_USERS } from '@/test/testUsers';
@@ -21,52 +22,102 @@ describe('manager preview clarity', () => {
     window.dispatchEvent(new Event('resize'));
   });
 
-  /* The Dashboard's disclosure changed shape in F1: a Live build shows no
-     metrics at all (there is no endpoint to supply them), so there is
-     nothing to label as "sample". The old assertion — a page-level notice
-     saying "some metrics are sample data" while every metric on screen was
-     synthetic — is exactly what the audit flagged. */
-  it('tells a Live user that dashboard metrics are not connected, instead of showing invented ones', async () => {
+  /* F2A replaced the Dashboard placeholder with real cards. What a Live
+     user must still never see is an invented figure; what they must see is
+     each unbacked capability named. Both are asserted here, and in full in
+     `DashboardTruthfulness.test.tsx`. */
+  it('names the Live dashboard capabilities that have no service, instead of inventing figures', async () => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/dashboard'],
       session: buildTestSession(admin),
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
 
-    expect(screen.getByText(en['dashboard.unavailable.title'])).toBeVisible();
-    expect(screen.getByText(en['dashboard.unavailable.description'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.live.section.notConnected'])).toBeVisible();
+    expect(screen.getByText(en['dashboard.live.unavailable.evidenceReview'])).toBeVisible();
   });
 
-  it.each([
-    ['/reports', /^reports$/i],
-    ['/organizations', /^organizations$/i],
-    ['/users', /users & roles/i],
-    ['/notifications', /^notifications$/i],
-  ])('gives %s the same Coming Soon treatment as the placeholder hubs', async (path, heading) => {
+  /* Notifications is still a Phase-2 placeholder and must keep the shared
+     Coming Soon treatment. Reports left this list when it was implemented
+     as a full Preview surface; it is asserted below on what it now shows.
+     Organizations, Users, Settings, and the Dashboard are likewise no
+     longer placeholders. */
+  it.each([['/notifications', /^notifications$/i]])(
+    'gives %s the same Coming Soon treatment as the placeholder hubs',
+    async (path, heading) => {
     renderWithProviders(<AppRoutes />, {
       initialEntries: [path],
       session: buildTestSession(admin),
     });
 
-    expect(await screen.findByRole('heading', { name: heading }, { timeout: 5000 })).toBeVisible();
-    expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
-    expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+      expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
+      expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
+      expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
+    },
+  );
+
+  it('tells a Live user that organization creation is refused by the product API', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/organizations'],
+      session: buildTestSession(admin),
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /^organizations$/i }),
+    ).toBeVisible();
+    expect(screen.getByText(en['organizations.create.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['organizations.create.unavailable.description'])).toBeVisible();
+    // A control that could only ever produce a 403 is not offered at all.
+    expect(screen.queryByRole('button', { name: /create organization/i })).toBeNull();
   });
 
-  it('renders the not-yet-implemented Settings sections without throwing', async () => {
+  it('tells a Live user that the team directory needs a contract the backend lacks', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/users'],
+      session: buildTestSession(admin),
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /users & roles/i }),
+    ).toBeVisible();
+    expect(screen.getByText(en['users.live.disclosure.title'])).toBeVisible();
+    expect(screen.getByText(en['users.live.disclosure.description'])).toBeVisible();
+    for (const pattern of [/invite/i, /remove user/i, /change role/i]) {
+      expect(screen.queryByRole('button', { name: pattern })).toBeNull();
+    }
+  });
+
+  /* Settings is a section workspace now, so each truthful absence is
+     asserted in the section that owns it. The claims themselves are
+     unchanged: residency and MFA have no product API and both say so
+     precisely, rather than sharing the generic placeholder notice. */
+  it('renders the implemented Settings sections with truthful unavailable states', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<AppRoutes />, {
       initialEntries: ['/settings'],
       session: buildTestSession(admin),
     });
 
-    expect(
-      await screen.findByRole('heading', { name: /^settings$/i }, { timeout: 5000 }),
-    ).toBeVisible();
-    expect(screen.getAllByText(en['stub.laterPhase']).length).toBeGreaterThan(0);
+    expect(await screen.findByRole('heading', { name: /^settings$/i })).toBeVisible();
+
+    const nav = await screen.findByRole('navigation', { name: en['settings.nav.label'] });
+    const open = (label: string) => user.click(within(nav).getByRole('button', { name: label }));
+
+    await open(en['settings.section.residency']);
+    expect(screen.getByText(en['settings.residency.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['settings.residency.unavailable.description'])).toBeVisible();
+
+    await open(en['settings.section.security']);
+    expect(screen.getByText(en['settings.security.mfa.description'])).toBeVisible();
+
+    await open(en['settings.section.about']);
+    expect(screen.getByText(en['settings.about.claims'])).toBeVisible();
+
+    expect(screen.queryByText(en['stub.laterPhase'])).toBeNull();
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   });
 
@@ -82,17 +133,35 @@ describe('manager preview clarity', () => {
       window.dispatchEvent(new Event('resize'));
 
       renderWithProviders(<AppRoutes />, {
-        initialEntries: ['/reports'],
+        initialEntries: ['/notifications'],
         session: buildTestSession(admin),
       });
 
       expect(
-        await screen.findByRole('heading', { name: /^reports$/i }, { timeout: 5000 }),
+        await screen.findByRole('heading', { name: /^notifications$/i }),
       ).toBeVisible();
       expect(screen.getByText(en['stub.laterPhase'])).toBeVisible();
       expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
     },
   );
+
+  /* Reports is no longer a placeholder. In a Live session it must still
+     refuse to invent reports: no reporting endpoint exists, so it states
+     that rather than rendering an empty table, which would claim the
+     workspace has none. */
+  it('tells a Live user that reporting is not connected, rather than showing none', async () => {
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ['/reports'],
+      session: buildTestSession(admin),
+    });
+
+    expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeVisible();
+    expect(screen.getByText(en['reports.unavailable.title'])).toBeVisible();
+    expect(screen.getByText(en['reports.unavailable.description'])).toBeVisible();
+    expect(screen.queryByText(en['stub.laterPhase'])).toBeNull();
+    // Not a single synthetic report leaks into a real session.
+    expect(screen.queryByText(/GRI Sustainability Statement/i)).toBeNull();
+  });
 
   it('states that analysis starts from a processed document, without inventing history', () => {
     // The live-session branch of /analysis is the one a manager sees.

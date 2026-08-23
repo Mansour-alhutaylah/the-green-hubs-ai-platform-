@@ -71,7 +71,7 @@ describe('AnalysisListPage — live mode', () => {
     renderList();
 
     expect(
-      await screen.findByText('Analysis history is not available yet', {}, { timeout: 5000 }),
+      await screen.findByText('Analysis history is not available yet', {}),
     ).toBeVisible();
     expect(screen.getByRole('link', { name: /go to documents/i })).toHaveAttribute('href', '/documents');
   });
@@ -79,7 +79,7 @@ describe('AnalysisListPage — live mode', () => {
   it('never shows demo analysis rows or sample badges in live mode', async () => {
     renderList();
 
-    await screen.findByText('Analysis history is not available yet', {}, { timeout: 5000 });
+    await screen.findByText('Analysis history is not available yet', {});
     for (const run of MOCK_ANALYSIS_RUNS) {
       expect(screen.queryByText(run.documentName)).not.toBeInTheDocument();
       expect(screen.queryByText(run.analysisName)).not.toBeInTheDocument();

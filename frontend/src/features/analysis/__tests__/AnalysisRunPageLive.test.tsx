@@ -163,7 +163,6 @@ describe('AnalysisRunPage — live mode', () => {
       await screen.findByText(
         'The report presents verified emissions figures for the 2025 fiscal year.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
     expect(getAnalysisRun).toHaveBeenCalledWith('run-live-1', expect.anything());
@@ -214,7 +213,7 @@ describe('AnalysisRunPage — live mode', () => {
     renderRun('run-live-1');
     const user = userEvent.setup();
 
-    await screen.findByText('Source 1', {}, { timeout: 5000 });
+    await screen.findByText('Source 1', {});
 
     const snippet = screen.getByText('Scope 1 emissions were 12,500 tCO2e in FY2025.');
     expect(snippet).not.toBeVisible();
@@ -239,7 +238,7 @@ describe('AnalysisRunPage — live mode', () => {
     renderRun('run-live-1');
 
     expect(
-      await screen.findByText('Only a summary was stored for this older run.', {}, { timeout: 5000 }),
+      await screen.findByText('Only a summary was stored for this older run.', {}),
     ).toBeVisible();
     expect(screen.getByText('No metrics were reported in this analysis.')).toBeVisible();
     expect(screen.getByText('No findings were produced by this analysis.')).toBeVisible();
@@ -264,7 +263,6 @@ describe('AnalysisRunPage — live mode', () => {
       await screen.findByText(
         'The report presents verified emissions figures for the 2025 fiscal year.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
   });
@@ -274,7 +272,7 @@ describe('AnalysisRunPage — live mode', () => {
 
     renderRun('run-live-1');
 
-    expect(await screen.findByText('Result data unavailable', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Result data unavailable', {})).toBeVisible();
   });
 
   it('renders INSUFFICIENT_EVIDENCE as a distinct valid outcome, not a failure or zeroed result', async () => {
@@ -290,7 +288,7 @@ describe('AnalysisRunPage — live mode', () => {
 
     renderRun('run-live-1');
 
-    expect(await screen.findByText('Not enough supporting evidence', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Not enough supporting evidence', {})).toBeVisible();
     expect(screen.getByText('No sufficiently relevant content was found for this request.')).toBeVisible();
     expect(screen.getAllByText('Insufficient evidence').length).toBeGreaterThan(0);
     expect(screen.queryByText('The analysis could not be completed')).not.toBeInTheDocument();
@@ -315,7 +313,7 @@ describe('AnalysisRunPage — live mode', () => {
     renderRun('run-live-1');
     const user = userEvent.setup();
 
-    expect(await screen.findByText('The analysis could not be completed', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('The analysis could not be completed', {})).toBeVisible();
     expect(screen.getByText('Analysis provider timed out')).toBeVisible();
     expect(screen.queryByText('Not enough supporting evidence')).not.toBeInTheDocument();
     expect(screen.queryByText(/traceback/i)).not.toBeInTheDocument();
@@ -330,7 +328,6 @@ describe('AnalysisRunPage — live mode', () => {
       await screen.findByText(
         'The report presents verified emissions figures for the 2025 fiscal year.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
   });
@@ -351,14 +348,13 @@ describe('AnalysisRunPage — live mode', () => {
 
       renderRun('run-live-1');
 
-      expect(await screen.findByText('Analysis in progress', {}, { timeout: 5000 })).toBeVisible();
-      await waitFor(() => expect(getAnalysisRun).toHaveBeenCalledTimes(2), { timeout: 5000 });
-      await waitFor(() => expect(getAnalysisRun).toHaveBeenCalledTimes(3), { timeout: 5000 });
+      expect(await screen.findByText('Analysis in progress', {})).toBeVisible();
+      await waitFor(() => expect(getAnalysisRun).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(getAnalysisRun).toHaveBeenCalledTimes(3));
       expect(
         await screen.findByText(
           'The report presents verified emissions figures for the 2025 fiscal year.',
           {},
-          { timeout: 5000 },
         ),
       ).toBeVisible();
 
@@ -378,7 +374,7 @@ describe('AnalysisRunPage — live mode', () => {
       );
 
       const view = renderRun('run-live-1');
-      expect(await screen.findByText('Analysis in progress', {}, { timeout: 5000 })).toBeVisible();
+      expect(await screen.findByText('Analysis in progress', {})).toBeVisible();
       const callsBeforeUnmount = getAnalysisRun.mock.calls.length;
       view.unmount();
 
@@ -398,7 +394,7 @@ describe('AnalysisRunPage — live mode', () => {
     renderRun('run-missing');
 
     expect(
-      await screen.findByText('This analysis run could not be found', {}, { timeout: 5000 }),
+      await screen.findByText('This analysis run could not be found', {}),
     ).toBeVisible();
     expect(screen.getByRole('link', { name: /back to documents/i })).toHaveAttribute('href', '/documents');
   });
@@ -411,7 +407,7 @@ describe('AnalysisRunPage — live mode', () => {
     const user = userEvent.setup();
 
     expect(
-      await screen.findByText('This analysis run could not be loaded', {}, { timeout: 5000 }),
+      await screen.findByText('This analysis run could not be loaded', {}),
     ).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: /try again/i }));
@@ -420,7 +416,6 @@ describe('AnalysisRunPage — live mode', () => {
       await screen.findByText(
         'The report presents verified emissions figures for the 2025 fiscal year.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
   });
@@ -432,7 +427,7 @@ describe('AnalysisRunPage — live mode', () => {
 
     renderRun('run-live-1');
 
-    expect(await screen.findByText('Unrecognized run state', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Unrecognized run state', {})).toBeVisible();
     expect(screen.getByRole('button', { name: /refresh status/i })).toBeVisible();
   });
 });

@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpen,
+  Briefcase,
   Building2,
   Check,
   ChevronDown,
@@ -48,6 +49,7 @@ export const ICON_REGISTRY = {
   documents: Folder,
   upload: Upload,
   analysis: ScanSearch,
+  engagements: Briefcase,
   carbon: Leaf,
   telemetry: RadioTower,
   organizations: Building2,

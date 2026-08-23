@@ -119,7 +119,7 @@ describe('DocumentsListPage — live pagination', () => {
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
 
-    expect(await screen.findByText('Live Backend Report 1.pdf', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Live Backend Report 1.pdf', {})).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: '3' }));
 
@@ -128,7 +128,6 @@ describe('DocumentsListPage — live pagination', () => {
       () => {
         expect(screen.getByText('Live Backend Report 6.pdf')).toBeVisible();
       },
-      { timeout: 5000 },
     );
 
     const lastOffset = listDocuments.mock.calls.at(-1)![0].offset ?? 0;
@@ -151,10 +150,10 @@ describe('DocumentsListPage — live pagination', () => {
     });
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
-    expect(await screen.findByText('Live Backend Report 1.pdf', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Live Backend Report 1.pdf', {})).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: '3' }));
-    expect(await screen.findByText('Live Backend Report 11.pdf', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Live Backend Report 11.pdf', {})).toBeVisible();
 
     await user.click(screen.getByRole('tab', { name: /^processed$/i }));
 
@@ -162,7 +161,6 @@ describe('DocumentsListPage — live pagination', () => {
       () => {
         expect(listDocuments.mock.calls.at(-1)![0].offset).toBe(0);
       },
-      { timeout: 5000 },
     );
   });
 
@@ -178,7 +176,7 @@ describe('DocumentsListPage — live pagination', () => {
     });
 
     renderWithProviders(<DocumentsListPage />, { authService: buildLiveAuthService() });
-    expect(await screen.findByText('Live Backend Report 1.pdf', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Live Backend Report 1.pdf', {})).toBeVisible();
 
     const callsAfterSettle = listDocuments.mock.calls.length;
     await new Promise((resolve) => setTimeout(resolve, 50));

@@ -37,6 +37,9 @@ const TITLED_ROUTES: ReadonlyArray<{ path: string; key: StringKey }> = [
   { path: ROUTES.documents, key: 'nav.documents' },
   { path: ROUTES.documentDetail, key: 'title.document' },
 
+  { path: ROUTES.engagements, key: 'nav.engagements' },
+  { path: ROUTES.engagementDetail, key: 'title.engagement' },
+
   { path: ROUTES.analysis, key: 'nav.analysis' },
   { path: ROUTES.analysisRun, key: 'title.analysisRun' },
 

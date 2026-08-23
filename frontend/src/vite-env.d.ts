@@ -10,6 +10,11 @@ interface ImportMetaEnv {
    * Preview mode requires `preview` here as well, so a single mistyped
    * variable can never put a Production build into Preview. */
   readonly VITE_APP_ENVIRONMENT?: string;
+  /** Version this build is stamped with, e.g. `1.4.0` — read only by
+   * Settings → About. Absent when the build stamped none, which About
+   * states plainly rather than showing an invented number. Never a commit
+   * SHA, a build host, or anything else identifying infrastructure. */
+  readonly VITE_APP_VERSION?: string;
   /** Preview-only: which state the Preview fixtures render —
    * `populated` (default) | `empty` | `loading` | `error` | `forbidden` |
    * `partial`. Ignored entirely in Live mode. */

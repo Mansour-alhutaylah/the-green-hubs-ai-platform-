@@ -164,7 +164,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 });
+    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i });
     expect(embedButton).toBeDisabled();
     expect(screen.getByText('Process the document before generating embeddings.')).toBeVisible();
 
@@ -179,7 +179,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 });
+    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i });
     expect(embedButton).toBeDisabled();
     expect(screen.getByRole('button', { name: /run ai analysis/i })).toBeDisabled();
   });
@@ -202,7 +202,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 });
+    const embedButton = await screen.findByRole('button', { name: /generate embeddings/i });
     await user.click(embedButton);
     await user.click(embedButton);
     expect(generateEmbeddings).toHaveBeenCalledTimes(1);
@@ -210,13 +210,13 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     resolveGeneration(buildEmbeddingSummary());
 
-    expect(await screen.findByText('Latest generation result', {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText('Latest generation result', {})).toBeVisible();
     const result = screen.getByText('Latest generation result').closest('div') as HTMLElement;
     expect(within(result).getByText('Total chunks')).toBeVisible();
     expect(within(result).getByText('Newly completed')).toBeVisible();
     // Detail was re-fetched after success and now reflects completion.
-    await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2), { timeout: 5000 });
-    expect(await screen.findByText('12 of 12 chunk embeddings completed', {}, { timeout: 5000 })).toBeVisible();
+    await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('12 of 12 chunk embeddings completed', {})).toBeVisible();
     // Aggregate counts only — never raw vectors or provider payloads.
     expect(screen.queryByText(/\[\s*-?0\.\d+/)).not.toBeInTheDocument();
   });
@@ -234,10 +234,10 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }));
 
     expect(
-      await screen.findByText('Embeddings were already complete for these chunks.', {}, { timeout: 5000 }),
+      await screen.findByText('Embeddings were already complete for these chunks.', {}),
     ).toBeVisible();
     expect(screen.queryByText('Unable to generate embeddings.')).not.toBeInTheDocument();
   });
@@ -256,16 +256,15 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }));
 
     expect(
       await screen.findByText(
         'Some chunk embeddings failed. Retrying will attempt only the failed chunks.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
-    expect(await screen.findByRole('button', { name: /retry embeddings/i }, { timeout: 5000 })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /retry embeddings/i })).toBeEnabled();
     expect(screen.queryByText(/openai/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/traceback/i)).not.toBeInTheDocument();
   });
@@ -279,9 +278,9 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }));
 
-    const result = (await screen.findByText('Latest generation result', {}, { timeout: 5000 })).closest(
+    const result = (await screen.findByText('Latest generation result', {})).closest(
       'div',
     ) as HTMLElement;
     const conflictsRow = within(result).getByText('Conflicts').closest('div') as HTMLElement;
@@ -297,16 +296,15 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }));
 
     expect(
       await screen.findByText(
         'Document must be processed before embeddings can be generated.',
         {},
-        { timeout: 5000 },
       ),
     ).toBeVisible();
-    await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    await waitFor(() => expect(getDocument).toHaveBeenCalledTimes(2));
   });
 
   it('surfaces a backend 422 validation error safely', async () => {
@@ -316,10 +314,10 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /generate embeddings/i }));
 
     expect(
-      await screen.findByText('Some of the submitted information is not valid.', {}, { timeout: 5000 }),
+      await screen.findByText('Some of the submitted information is not valid.', {}),
     ).toBeVisible();
   });
 
@@ -328,7 +326,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    const analysisButton = await screen.findByRole('button', { name: /run ai analysis/i }, { timeout: 5000 });
+    const analysisButton = await screen.findByRole('button', { name: /run ai analysis/i });
     expect(analysisButton).toBeDisabled();
     expect(screen.getByText('Generate embeddings before running analysis.')).toBeVisible();
   });
@@ -350,7 +348,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    const analysisButton = await screen.findByRole('button', { name: /run ai analysis/i }, { timeout: 5000 });
+    const analysisButton = await screen.findByRole('button', { name: /run ai analysis/i });
     // Partial embeddings are accepted, and stated honestly.
     expect(screen.getByText('Some embeddings are incomplete. Analysis uses only the completed ones.')).toBeVisible();
 
@@ -361,7 +359,7 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     resolveAnalysis(buildRun());
 
-    const marker = await screen.findByTestId('analysis-run-route', {}, { timeout: 5000 });
+    const marker = await screen.findByTestId('analysis-run-route', {});
     expect(marker).toHaveTextContent('run-live-9');
   });
 
@@ -376,10 +374,10 @@ describe('DocumentIntelligencePanel — live mode', () => {
     renderDetail('doc-live-1');
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /run ai analysis/i }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /run ai analysis/i }));
 
     expect(
-      await screen.findByText('analysis_type must be one of [sustainability_summary]', {}, { timeout: 5000 }),
+      await screen.findByText('analysis_type must be one of [sustainability_summary]', {}),
     ).toBeVisible();
     expect(screen.queryByTestId('analysis-run-route')).not.toBeInTheDocument();
   });
@@ -401,14 +399,14 @@ describe('DocumentIntelligencePanel — live mode', () => {
 
     renderDetail('doc-live-1');
 
-    const link = await screen.findByRole('link', { name: /view latest analysis/i }, { timeout: 5000 });
+    const link = await screen.findByRole('link', { name: /view latest analysis/i });
     expect(link).toHaveAttribute('href', '/analysis/run-live-3');
   });
 
   it('demo mode renders the preview page and sends no embeddings or analysis request', async () => {
     renderDetail('doc-1', 'preview');
 
-    expect(await screen.findByText(/local preview record/i, {}, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByText(/local preview record/i, {})).toBeVisible();
     expect(getDocument).not.toHaveBeenCalled();
     expect(generateEmbeddings).not.toHaveBeenCalled();
     expect(analyzeDocument).not.toHaveBeenCalled();

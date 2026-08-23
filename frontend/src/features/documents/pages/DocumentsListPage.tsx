@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
   Button,
   DemoDataBadge,
@@ -83,7 +83,19 @@ export function DocumentsListPage() {
 
   const [tab, setTab] = useState<TabValue>('ALL');
   const [search, setSearch] = useState('');
-  const [engagementFilter, setEngagementFilter] = useState<string>('ALL');
+  /**
+   * Seeded from `?engagement=` so the Engagements detail page can link
+   * here and have the filter actually apply — a link labelled "view this
+   * engagement's documents" that landed on an unfiltered list would be
+   * making a claim the page then failed to honour.
+   *
+   * Read once, for the initial value only: after that the select owns the
+   * state, so changing the filter does not fight the URL.
+   */
+  const [searchParams] = useSearchParams();
+  const [engagementFilter, setEngagementFilter] = useState<string>(
+    () => searchParams.get('engagement') ?? 'ALL',
+  );
   const [page, setPage] = useState(1);
 
   const engagementsState = useEngagements();

@@ -72,9 +72,13 @@ describe('global search is presented as unavailable', () => {
     vi.unstubAllGlobals();
   });
 
-  it('has translated copy in both languages', () => {
+  /* The Arabic dictionary is now `Partial` — the MVP ships English only and
+     Arabic is deferred to a later phase — but this copy is part of the
+     preserved Arabic foundation and must not be lost. */
+  it('keeps the preserved Arabic copy alongside the English source', () => {
+    const arabic = ar['contextBar.search.unavailable'];
     expect(en['contextBar.search.unavailable'].length).toBeGreaterThan(0);
-    expect(ar['contextBar.search.unavailable'].length).toBeGreaterThan(0);
-    expect(ar['contextBar.search.unavailable']).not.toBe(en['contextBar.search.unavailable']);
+    expect(arabic).toBeDefined();
+    expect(arabic).not.toBe(en['contextBar.search.unavailable']);
   });
 });

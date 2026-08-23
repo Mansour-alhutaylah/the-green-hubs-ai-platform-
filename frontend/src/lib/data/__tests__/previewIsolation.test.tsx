@@ -50,7 +50,21 @@ describe('Preview mode network isolation', () => {
     vi.unstubAllGlobals();
   });
 
-  it.each(['/dashboard', '/documents', '/analysis', '/profile'])(
+  it.each([
+    '/dashboard',
+    '/documents',
+    '/analysis',
+    '/profile',
+    // F2A routes. Each reads through a Preview source that is pure and
+    // synchronous — there is no `fetch`, `apiRequest`, or Supabase call in
+    // any of their dependency graphs to intercept.
+    '/organizations',
+    '/organizations/preview-org-green-hubs-demo',
+    '/engagements',
+    '/engagements/preview-engagement-facility-alpha',
+    '/users',
+    '/settings',
+  ])(
     'renders %s without calling fetch, Supabase, or apiRequest',
     async (path) => {
       renderWithProviders(<AppRoutes />, {

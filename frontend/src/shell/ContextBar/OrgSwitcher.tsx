@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Avatar, Icon, PopoverMenu } from '@/design-system';
+import { Avatar, Icon, PopoverMenu, Tooltip } from '@/design-system';
 import { useAuth } from '@/features/auth/useAuth';
 import { useWorkspace } from '@/features/organizations/workspace/WorkspaceContext';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -31,21 +31,31 @@ export function OrgSwitcher() {
 
   if (sessionKind === 'live') {
     if (workspace.status !== 'ready' || !workspace.organization) return null;
+    // The visible label truncates at narrow widths, so the full name is
+    // disclosed two ways rather than lost: a tooltip for pointer users and
+    // `title` as the always-available fallback. Without this a workspace
+    // called "Northern Facilities Group (Region 4)" reads as "Northern
+    // Fac..." with no way to recover the rest.
     return (
-      <span className="flex min-h-10 min-w-0 items-center gap-2 rounded-m border border-line-200 bg-surface-0 px-2.5 py-1.5 shadow-card">
-        <Avatar
-          name={workspace.organization.name}
-          shape="square"
-          size={24}
-          className="hidden ring-2 ring-leaf-100 sm:inline-flex"
-        />
+      <Tooltip content={workspace.organization.name}>
         <span
-          className="min-w-0 max-w-20 truncate text-body font-bold text-forest-900 sm:max-w-30 md:max-w-45"
-          data-user-content
+          className="flex min-h-10 min-w-0 items-center gap-2 rounded-m border border-line-200 bg-surface-0 px-2.5 py-1.5 shadow-card"
+          title={workspace.organization.name}
         >
-          {workspace.organization.name}
+          <Avatar
+            name={workspace.organization.name}
+            shape="square"
+            size={24}
+            className="hidden ring-2 ring-leaf-100 sm:inline-flex"
+          />
+          <span
+            className="min-w-0 max-w-20 truncate text-body font-bold text-forest-900 sm:max-w-30 md:max-w-45"
+            data-user-content
+          >
+            {workspace.organization.name}
+          </span>
         </span>
-      </span>
+      </Tooltip>
     );
   }
 

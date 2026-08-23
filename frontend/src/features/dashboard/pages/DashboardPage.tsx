@@ -1,23 +1,25 @@
 import { Link } from 'react-router';
 import { Avatar, EmptyState, Icon, SectionCard, StatusBadge } from '@/design-system';
 import { useLocale } from '@/lib/i18n/useLocale';
-import { useAuth } from '@/features/auth/useAuth';
 import { ROUTES } from '@/app/navigation/routePaths';
 import type { StringKey } from '@/lib/i18n/strings/en';
 import { cn } from '@/lib/utils/cn';
 import { formatDateTime } from '@/lib/utils/formatDate';
 import { useDashboardSnapshot } from '@/lib/data/hooks/useDashboardSnapshot';
+import { isPreviewMode } from '@/lib/data/source';
 import type {
   ActivityAction,
   DashboardAnalysisInsight,
   DashboardSnapshot,
   DocumentState,
 } from '@/lib/data/contracts';
+import { useExecutiveSummary } from '@/lib/data/hooks/useExecutiveData';
 import { AnalysisActivityChart } from '../components/AnalysisActivityChart';
 import { AnalysisSummaryDonut } from '../components/AnalysisSummaryDonut';
 import { DashboardCard } from '../components/DashboardCard';
-import { DashboardHero } from '../components/DashboardHero';
-import { DashboardKpiCard } from '../components/DashboardKpiCard';
+import { DashboardExecutiveView } from '../components/DashboardExecutiveView';
+import { DashboardLiveView } from '../components/DashboardLiveView';
+import { ExecutiveHeader } from '../components/ExecutiveHeader';
 import { DocumentStatusPip, ComplianceStatusPip } from '../components/StatusPip';
 import { CoachmarksSequence } from '../CoachmarksSequence';
 
@@ -38,36 +40,88 @@ const DOCUMENT_RAIL: Record<DocumentState, string> = {
 /**
  * The executive workspace.
  *
- * Where its figures come from is decided by `useDashboardSnapshot`, not by
- * this page: a Preview build renders deterministic Preview fixtures, and a
- * Live build renders whatever a real source returns. There is no dashboard
- * endpoint on the Backend yet, so Live resolves to `unavailable` and this
- * page says so plainly.
+ * Two dashboards, deliberately not one. They render different contracts
+ * because they can prove different things, and forcing them through a
+ * single component is how a synthetic figure ends up in a real card.
  *
- * The audit found the previous version showing a fabricated 128 documents,
- * an 86% compliance score, and a named activity feed to *every* signed-in
- * user, real ones included, above a line describing that as "some metrics".
- * None of those numbers can be reached in Live mode any more: the page has
- * no fixture import to fall back to.
+ * - **Preview** renders `DashboardSnapshot` (deterministic fixtures) plus
+ *   the F2A breakdowns — processing states, the evidence-review lifecycle,
+ *   an engagement roll-up, readiness — a complete demonstration workspace.
+ * - **Live** renders `DashboardLiveSummary`: exact `total` figures from
+ *   `GET /documents` and `GET /engagements`, the real five most recent
+ *   documents, the caller's real organization name, and compact,
+ *   specifically-named unavailable states for the four capabilities no
+ *   endpoint provides. It replaces the single large "metrics are not
+ *   connected" placeholder F1 shipped, which was truthful but told a real
+ *   user nothing they could use.
+ *
+ * The audit that produced F1 found this page showing a fabricated 128
+ * documents, an 86% compliance score, and a named activity feed to *every*
+ * signed-in user. None of that is reachable in Live: the Live branch's
+ * dependency graph contains no fixture module, so there is nothing
+ * synthetic for a failure to fall back to.
+ *
+ * The mode is a build-time constant, so the branch below is stable for the
+ * life of a build and the two branches never share hook state.
  */
 export function DashboardPage() {
-  const { user } = useAuth();
-  const snapshot = useDashboardSnapshot();
-
-  const data = snapshot.status === 'ready' ? snapshot.data : null;
-
   return (
-    <div>
-      <DashboardHero user={user} totals={data?.totals} />
-
-      {snapshot.status === 'ready' ? (
-        <DashboardSnapshotView snapshot={data!} isPartial={snapshot.coverage === 'partial'} />
-      ) : (
-        <DashboardStateNotice status={snapshot.status} />
-      )}
-
+    // The bottom padding is the safe area for the coachmarks panel, which
+    // is `position: fixed` over the bottom-end corner. Without it the panel
+    // covers the last card in the final column on a short viewport.
+    <div className="pb-28 sm:pb-32">
+      {isPreviewMode() ? <PreviewDashboard /> : <LiveDashboard />}
       <CoachmarksSequence />
     </div>
+  );
+}
+
+/**
+ * The Live branch. The header carries no reporting period and no
+ * generated-at timestamp: neither has an endpoint, so those chips are
+ * omitted rather than filled with a plausible value. The figures below
+ * are exact `total` counts in their own cards, where a failed one says
+ * "Unavailable" instead of "0".
+ */
+function LiveDashboard() {
+  return (
+    <>
+      <ExecutiveHeader />
+      <DashboardLiveView />
+    </>
+  );
+}
+
+function PreviewDashboard() {
+  const snapshot = useDashboardSnapshot();
+  const executive = useExecutiveSummary();
+
+  const data = snapshot.status === 'ready' ? snapshot.data : null;
+  const isPartial = snapshot.status === 'ready' && snapshot.coverage === 'partial';
+  const summary = executive.status === 'ready' ? executive.data : null;
+
+  return (
+    <>
+      <ExecutiveHeader
+        reportingPeriod={summary?.reportingPeriod}
+        generatedAt={summary?.generatedAt}
+      />
+
+      {summary && (
+        <DashboardExecutiveView
+          summary={summary}
+          isPartial={executive.status === 'ready' && executive.coverage === 'partial'}
+        />
+      )}
+
+      {data ? (
+        <DashboardSnapshotView snapshot={data} isPartial={isPartial} />
+      ) : (
+        <DashboardStateNotice
+          status={snapshot.status as 'loading' | 'empty' | 'error' | 'forbidden' | 'unavailable'}
+        />
+      )}
+    </>
   );
 }
 
@@ -135,18 +189,16 @@ function DashboardSnapshotView({
         <p className="mt-4 text-meta font-semibold text-gray-600">{t('dashboard.state.partial')}</p>
       )}
 
-      {snapshot.metrics.length > 0 && (
-        <section className="mt-4 sm:mt-5" aria-labelledby="workspace-overview-heading">
-          <h2 id="workspace-overview-heading" className="sr-only">
-            {t('dashboard.hero.workspace')}
-          </h2>
-          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:gap-4 min-[1440px]:grid-cols-4">
-            {snapshot.metrics.map((metric) => (
-              <DashboardKpiCard key={metric.id} metric={metric} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* The snapshot KPI strip that used to sit here is gone. It has been
+          superseded by the executive KPI row above, which leads the page,
+          and keeping both meant four headline figures appearing twice in
+          one screenful.
+
+          One of its four cards was also labelled "Compliance score" over a
+          percentage. No backend computes a regulatory judgement, so the
+          product cannot make one; that figure is now "Evidence readiness",
+          which describes documents rather than law. `DashboardKpiCard` and
+          its metric contract are untouched and still used elsewhere. */}
 
       <div className="mt-5 grid grid-cols-1 gap-5 xl:mt-6 xl:grid-cols-3 xl:gap-6">
         <div className="xl:col-span-2">

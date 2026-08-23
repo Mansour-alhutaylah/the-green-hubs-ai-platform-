@@ -24,18 +24,23 @@ describe('routed page content', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
-    // This is a Live session, and no dashboard endpoint exists yet, so the
-    // page states that rather than rendering metric cards — see
+    // This is a Live session. F2A's Live dashboard renders exact totals
+    // from endpoints that exist and names the capabilities that have none;
+    // it never renders the Preview KPI cards — see
     // DashboardTruthfulness.test.tsx for the full rule.
-    expect(screen.getByText(/dashboard metrics are not connected yet/i)).toBeVisible();
+    expect(screen.getByText(/not provided by the product api/i)).toBeVisible();
     expect(screen.queryByText(/documents analyzed/i)).toBeNull();
     const main = screen.getByRole('main');
     expect(main).not.toBeEmptyDOMElement();
     expect(main).toHaveClass('py-4', 'md:py-5', 'xl:py-6');
+    // The dashboard heading now sits in the executive `<header>` band
+    // rather than a `<section>`; the property being pinned is unchanged,
+    // that the page shell does not apply the panel entrance animation to
+    // the dashboard's own header.
     expect(
-      screen.getByRole('heading', { name: /^dashboard$/i }).closest('section'),
+      screen.getByRole('heading', { name: /^dashboard$/i }).closest('header'),
     ).not.toHaveClass('panel-enter');
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(window.history.scrollRestoration).toBe('manual');
@@ -47,7 +52,7 @@ describe('routed page content', () => {
       session: buildTestSession(admin),
     });
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     firstView.unmount();
 
@@ -56,25 +61,30 @@ describe('routed page content', () => {
       session: buildTestSession(admin),
     });
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' });
 
     const user = userEvent.setup();
     vi.mocked(window.scrollTo).mockClear();
-    await user.click(screen.getByRole('link', { name: /review documents/i }));
+    await user.click(screen.getByRole('link', { name: /review evidence/i }));
     expect(
-      await screen.findByRole('heading', { name: /^documents$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^documents$/i }),
     ).toBeVisible();
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     vi.mocked(window.scrollTo).mockClear();
     await user.click(screen.getByRole('link', { name: /^dashboard$/i }));
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
-  }, 15_000);
+    // Four route renders and two navigations in one test. The 15s this
+    // carried was set when a cold dashboard chunk resolved in well under a
+    // second; it no longer does on a modest machine (see the measurement in
+    // `src/test/setupTests.ts`), so the budget matches the suite default
+    // rather than silently capping this one test below it.
+  }, 60_000);
 
   it('leaves in-page hash navigation to the browser', async () => {
     renderWithProviders(<AppRoutes />, {
@@ -83,7 +93,7 @@ describe('routed page content', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     expect(window.scrollTo).not.toHaveBeenCalled();
   });
@@ -100,7 +110,7 @@ describe('routed page content', () => {
       });
 
       expect(
-        await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+        await screen.findByRole('heading', { name: /^dashboard$/i }),
       ).toBeVisible();
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
@@ -119,7 +129,7 @@ describe('routed page content', () => {
       session: buildTestSession(admin),
     });
 
-    expect(await screen.findByRole('heading', { name: heading }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
     expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
   });
 
@@ -135,7 +145,7 @@ describe('routed page content', () => {
       session: buildTestSession(admin),
     });
 
-    expect(await screen.findByRole('heading', { name: heading }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
     expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /back to dashboard/i })).toHaveAttribute(
       'href',

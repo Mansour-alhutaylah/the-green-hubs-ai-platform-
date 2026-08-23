@@ -103,7 +103,7 @@ describe('MobileDrawer — navigation and dismissal', () => {
       await user.click(within(drawer).getByRole('link', { name: linkName }));
 
       expect(
-        await screen.findByRole('heading', { name: headingName }, { timeout: 5000 }),
+        await screen.findByRole('heading', { name: headingName }),
       ).toBeVisible();
       await waitFor(() => expect(screen.queryByTestId('mobile-drawer')).not.toBeInTheDocument());
       expect(screen.queryByTestId('mobile-drawer-overlay')).not.toBeInTheDocument();
@@ -119,7 +119,7 @@ describe('MobileDrawer — navigation and dismissal', () => {
     await user.click(within(drawer).getByRole('link', { name: /^dashboard$/i }));
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     await waitFor(() => expect(screen.queryByTestId('mobile-drawer')).not.toBeInTheDocument());
   });
@@ -143,7 +143,7 @@ describe('MobileDrawer — navigation and dismissal', () => {
     await user.click(within(drawer).getByRole('link', { name: /carbon intelligence/i }));
 
     expect(
-      await screen.findByRole('heading', { name: /carbon intelligence/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /carbon intelligence/i }),
     ).toBeVisible();
     await waitFor(() => expect(screen.queryByTestId('mobile-drawer')).not.toBeInTheDocument());
     expect(screen.queryByTestId('mobile-drawer-overlay')).not.toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('MobileDrawer — navigation and dismissal', () => {
     const drawer = await openDrawer(user);
     await user.click(within(drawer).getByRole('link', { name: /^documents$/i }));
     expect(
-      await screen.findByRole('heading', { name: /^documents$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^documents$/i }),
     ).toBeVisible();
     await waitFor(() => expect(screen.queryByTestId('mobile-drawer')).not.toBeInTheDocument());
 
@@ -231,7 +231,7 @@ describe('responsive nav mode across target viewports', () => {
     renderShell();
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
 
     const triggers = screen.queryAllByRole('button', { name: /open navigation/i });
@@ -253,7 +253,7 @@ describe('responsive nav mode across target viewports', () => {
       renderShell(path);
 
       expect(
-        await screen.findByRole('button', { name: /open navigation/i }, { timeout: 5000 }),
+        await screen.findByRole('button', { name: /open navigation/i }),
       ).toBeVisible();
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     },
@@ -266,7 +266,7 @@ describe('MobileDrawer — desktop is unaffected', () => {
     renderShell();
 
     expect(
-      await screen.findByRole('heading', { name: /^dashboard$/i }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: /^dashboard$/i }),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: /open navigation/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('mobile-drawer')).not.toBeInTheDocument();

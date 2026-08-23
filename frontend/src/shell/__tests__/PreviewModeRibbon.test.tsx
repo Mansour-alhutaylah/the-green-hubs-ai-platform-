@@ -68,15 +68,19 @@ describe('Preview disclosure ribbon', () => {
       expect(ribbon.querySelectorAll('button, a, input')).toHaveLength(0);
     });
 
-    it('has translated copy in both languages', () => {
+    /* The Arabic dictionary is now `Partial` — the MVP ships English only
+       and Arabic is deferred to a later phase — but the disclosure copy is
+       part of the preserved Arabic foundation and must not be lost. */
+    it('keeps the preserved Arabic disclosure copy alongside the English source', () => {
       for (const key of [
         'preview.ribbon.label',
         'preview.ribbon.demonstration',
         'preview.ribbon.notProduction',
       ] as const) {
+        const arabic = ar[key];
         expect(en[key].length).toBeGreaterThan(0);
-        expect(ar[key].length).toBeGreaterThan(0);
-        expect(ar[key]).not.toBe(en[key]);
+        expect(arabic).toBeDefined();
+        expect(arabic).not.toBe(en[key]);
       }
     });
   });

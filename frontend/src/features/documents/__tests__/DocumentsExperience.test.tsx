@@ -62,12 +62,17 @@ describe('document experience', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('uses RTL direction without changing document behavior', () => {
+  /* The MVP ships English only, so a stored Arabic preference resolves to
+     English and the document direction stays LTR. The logical-property
+     layout that makes RTL work is untouched and is asserted separately in
+     `MvpLanguage.test.tsx`. */
+  it('resolves a stored Arabic preference to English and keeps LTR direction', () => {
     window.localStorage.setItem('ghp:locale', 'ar');
     renderWithProviders(<DocumentsListPage />);
 
-    expect(document.documentElement).toHaveAttribute('dir', 'rtl');
-    expect(screen.getByRole('list', { name: /مستندات بيئة العمل/ })).toBeVisible();
+    expect(document.documentElement).toHaveAttribute('dir', 'ltr');
+    expect(document.documentElement).toHaveAttribute('lang', 'en');
+    expect(screen.getByRole('list', { name: /workspace documents/i })).toBeVisible();
   });
 
   it('filters by status tab, search, and engagement, and paginates the results', async () => {
