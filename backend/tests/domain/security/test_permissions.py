@@ -23,14 +23,11 @@ from app.domain.security import (
 )
 
 _ADMIN_CLASS_PERMISSIONS = frozenset({Permission.ORGANIZATION_MANAGE})
-_ROLES_TS = (
-    Path(__file__).resolve().parents[3].parent
-    / "frontend"
-    / "src"
-    / "features"
-    / "rbac"
-    / "roles.ts"
+_RBAC_DIR = (
+    Path(__file__).resolve().parents[3].parent / "frontend" / "src" / "features" / "rbac"
 )
+_ROLES_TS = _RBAC_DIR / "roles.ts"
+_PERMISSIONS_TS = _RBAC_DIR / "permissions.ts"
 
 
 def _user(role: object) -> User:
@@ -61,6 +58,28 @@ def test_backend_roles_match_the_frontend_role_vocabulary() -> None:
     block = source.split("export const Role = {", 1)[1].split("} as const;", 1)[0]
     frontend_roles = set(re.findall(r"'([a-z]+)'", block))
     assert frontend_roles == {role.value for role in Role}
+
+
+def test_the_frontend_evidence_review_policy_matches_the_backend() -> None:
+    """The frontend decides which review controls are *offered*; this
+    module decides which commands are *allowed*. They are separate
+    concerns, but a disagreement between them is always a defect: either
+    a reviewer is shown a control the server will refuse, or an
+    authorized reviewer is silently denied the control they are entitled
+    to use.
+
+    The backend remains the enforcement boundary regardless -- this pins
+    the UX mirror to the policy, it does not delegate authority to it."""
+
+    source = _PERMISSIONS_TS.read_text(encoding="utf-8")
+    block = source.split("EVIDENCE_REVIEW_ROLES: readonly Role[] = [", 1)[1].split("]", 1)[0]
+    # `Role.Approver` -> `approver`, matching the backend's enum values.
+    frontend_roles = {name.lower() for name in re.findall(r"Role\.([A-Za-z]+)", block)}
+    backend_roles = {
+        role.value for role in Role if Permission.EVIDENCE_REVIEW in permissions_for_role(role)
+    }
+
+    assert frontend_roles == backend_roles
 
 
 # ---------------------------------------------------------------------------
@@ -123,29 +142,100 @@ def test_write_capable_roles_can_upload_a_document() -> None:
         assert has_permission(role, Permission.DOCUMENT_UPLOAD) is True
 
 
-def test_evidence_review_is_granted_to_exactly_the_documented_roles() -> None:
-    """The authoritative pin for MVP Slice 4's authorization policy.
+#: The recorded **M-4** evidence-review matrix, written out once, in full,
+#: as the decision itself states it. Every M-4 assertion below reads from
+#: this table rather than restating a role list, so the recorded policy and
+#: the tests that pin it cannot drift apart.
+M4_EVIDENCE_REVIEW_MATRIX: dict[Role, bool] = {
+    Role.VIEWER: False,
+    Role.EDITOR: False,
+    Role.APPROVER: True,
+    Role.ADMIN: True,
+    Role.OWNER: True,
+}
+
+
+def test_the_m4_matrix_covers_every_role() -> None:
+    """A role added later must be given an explicit M-4 answer rather
+    than silently escaping the matrix below."""
+
+    assert set(M4_EVIDENCE_REVIEW_MATRIX) == set(Role)
+
+
+@pytest.mark.parametrize(("role", "allowed"), sorted(M4_EVIDENCE_REVIEW_MATRIX.items()))
+def test_evidence_review_follows_the_recorded_m4_matrix(role: Role, allowed: bool) -> None:
+    """The authoritative pin for the evidence-review authorization policy.
 
     This assertion -- not any API test -- is where the evidence-review
     role mapping is decided; ``test_document_evidence.py`` derives its
     allowed/denied parametrization from ``ROLE_PERMISSIONS`` so that the
     tests follow the policy rather than establish it.
 
-    The mapping grants ``evidence.review`` to every role that already
-    holds write permissions, and to no other. That is deliberately the
-    coarsest split that closes the property Slice 4 needs -- a
-    ``viewer`` cannot approve evidence, withdraw an approval, or make a
-    document retrievable -- without inventing the approver/editor
-    distinction that management decision **M-4** owns and that backlog
-    risk R-1 forbids engineering from inventing.
+    **M-4 is recorded**: evidence review is an approval authority, not a
+    write authority. ``approver``, ``admin`` and ``owner`` hold it;
+    ``viewer`` and ``editor`` do not. The editor exclusion is the
+    substance of the decision -- the role that uploads and processes a
+    document is deliberately not the role that may approve it as
+    evidence, because a reviewer approving their own upload makes the
+    review step decorative."""
 
-    **This assertion is expected to change when M-4 lands**, and the
-    change is one line in ``ROLE_PERMISSIONS`` plus one line here."""
+    assert has_permission(role, Permission.EVIDENCE_REVIEW) is allowed
+    assert (Permission.EVIDENCE_REVIEW in permissions_for_role(role)) is allowed
+
+
+def test_evidence_review_is_granted_to_exactly_the_documented_roles() -> None:
+    """The same policy stated as a set, so a role gaining the permission
+    without a matrix entry fails here even if the parametrization above
+    were somehow narrowed."""
 
     granted = {role for role in Role if Permission.EVIDENCE_REVIEW in permissions_for_role(role)}
 
-    assert granted == {Role.EDITOR, Role.APPROVER, Role.ADMIN, Role.OWNER}
+    assert granted == {Role.APPROVER, Role.ADMIN, Role.OWNER}
     assert Role.VIEWER not in granted
+    assert Role.EDITOR not in granted
+
+
+def test_m4_removed_only_evidence_review_from_the_editor() -> None:
+    """M-4 narrowed exactly one permission. An editor must keep every
+    unrelated authority -- upload, processing, analysis and engagement
+    management -- so this change cannot be mistaken for a general
+    demotion of the role."""
+
+    editor = permissions_for_role(Role.EDITOR)
+
+    assert Permission.EVIDENCE_REVIEW not in editor
+    assert editor == {
+        Permission.ENGAGEMENT_MANAGE,
+        Permission.DOCUMENT_UPLOAD,
+        Permission.DOCUMENT_PROCESS,
+        Permission.ANALYSIS_RUN,
+    }
+
+
+def test_an_approver_differs_from_an_editor_by_exactly_evidence_review() -> None:
+    """The approver/editor split M-4 draws is this one permission and
+    nothing else -- an approver gains no administrative authority."""
+
+    difference = permissions_for_role(Role.APPROVER) ^ permissions_for_role(Role.EDITOR)
+
+    assert difference == {Permission.EVIDENCE_REVIEW}
+
+
+@pytest.mark.parametrize("raw_role", ["", "   ", "reviewer", "superuser", "EDITOR_", "None"])
+def test_an_unknown_role_string_is_denied_evidence_review(raw_role: str) -> None:
+    """Fail closed: a role value outside the catalog resolves to no role
+    and therefore to no evidence-review authority."""
+
+    resolved = resolve_trusted_role(_user(raw_role))
+
+    assert has_permission(resolved, Permission.EVIDENCE_REVIEW) is False
+
+
+def test_a_missing_role_is_denied_evidence_review() -> None:
+    """A user row with no role at all is denied, not defaulted upward."""
+
+    assert resolve_trusted_role(_user(None)) is None
+    assert has_permission(None, Permission.EVIDENCE_REVIEW) is False
 
 
 def test_evidence_review_is_not_administrative() -> None:
