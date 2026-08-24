@@ -56,7 +56,13 @@ EXPECTED_ALEMBIC_HEAD = "b7d41e0c9a52"
 # editor) and 3 allowed (approver, admin, owner). If M-4 is ever revised,
 # these counts move with it and this constant must be reconciled again --
 # which is precisely what the gate exists to force.
-EXPECTED_EXISTING_INTEGRATION_CASES = 297
+#
+# The evidence-revision idempotency fix adds 1 for 298:
+# tests/api/test_analysis_integration.py::
+# test_evidence_verification_creates_new_run_after_insufficient_evidence_end_to_end,
+# the real-database upload/analyze/verify/analyze-again lifecycle proof
+# for the request-hash evidence-revision correction.
+EXPECTED_EXISTING_INTEGRATION_CASES = 298
 REQUIRED_DATABASE_SUFFIX = "_test"
 
 LOCAL_TEST_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "test-postgres"})

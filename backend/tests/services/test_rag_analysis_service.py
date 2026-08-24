@@ -870,6 +870,58 @@ async def test_identical_request_in_same_organization_is_idempotent(harness: Har
     assert gateway.call_count == 1  # the LLM is never called twice for the same request
 
 
+async def test_unchanged_document_revision_reuses_same_run(harness: Harness) -> None:
+    organization_id, engagement_id, document_id, chunk_id = harness.seed_org()
+    harness.embedding_repository.results = [
+        _search_result(chunk_id=chunk_id, document_id=document_id, engagement_id=engagement_id)
+    ]
+    harness.llm_gateway_responses = [VALID_STRUCTURED_OUTPUT]
+    service, gateway = harness.build_service()
+    user = _user(organization_id)
+
+    first = await service.analyze_document(
+        user, document_id, analysis_type="sustainability_summary", query_text="q"
+    )
+    second = await service.analyze_document(
+        user, document_id, analysis_type="sustainability_summary", query_text="q"
+    )
+
+    assert first.analysis_run_id == second.analysis_run_id
+    assert len(harness.analysis_run_repository.runs) == 1
+    assert gateway.call_count == 1
+
+
+async def test_verified_document_revision_creates_run_after_insufficient_evidence(
+    harness: Harness,
+) -> None:
+    organization_id, engagement_id, document_id, chunk_id = harness.seed_org()
+    harness.llm_gateway_responses = [VALID_STRUCTURED_OUTPUT]
+    service, gateway = harness.build_service()
+    user = _user(organization_id)
+
+    before_verification = await service.analyze_document(
+        user, document_id, analysis_type="sustainability_summary", query_text="q"
+    )
+    assert before_verification.status == "INSUFFICIENT_EVIDENCE"
+
+    document = harness.document_repository.rows[document_id]
+    document.updated_at = document.updated_at + timedelta(seconds=1)
+    harness.embedding_repository.results = [
+        _search_result(chunk_id=chunk_id, document_id=document_id, engagement_id=engagement_id)
+    ]
+    after_verification = await service.analyze_document(
+        user, document_id, analysis_type="sustainability_summary", query_text="q"
+    )
+
+    assert after_verification.status == "COMPLETED"
+    assert after_verification.analysis_run_id != before_verification.analysis_run_id
+    assert harness.analysis_run_repository.runs[before_verification.analysis_run_id].status == (
+        "INSUFFICIENT_EVIDENCE"
+    )
+    assert len(harness.analysis_run_repository.runs) == 2
+    assert gateway.call_count == 1
+
+
 async def test_identical_request_in_different_organizations_creates_separate_runs() -> None:
     harness_a = Harness()
     org_a, eng_a, doc_a, chunk_a = harness_a.seed_org()
@@ -942,6 +994,9 @@ async def test_stale_processing_run_is_reclaimed_and_reprocessed(harness: Harnes
         organization_id=organization_id,
         engagement_id=engagement_id,
         document_id=None,
+        evidence_revision=(
+            f"{document_id}:{harness.document_repository.rows[document_id].updated_at.isoformat()}"
+        ),
         analysis_type="sustainability_summary",
         query_text="q",
         provider=PROVIDER_NAME,
@@ -1004,6 +1059,9 @@ async def test_non_stale_processing_run_is_not_reprocessed(harness: Harness) -> 
         organization_id=organization_id,
         engagement_id=engagement_id,
         document_id=None,
+        evidence_revision=(
+            f"{document_id}:{harness.document_repository.rows[document_id].updated_at.isoformat()}"
+        ),
         analysis_type="sustainability_summary",
         query_text="q",
         provider=PROVIDER_NAME,
